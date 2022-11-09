@@ -90,10 +90,10 @@ def main():
         # Display the resulting frame
         
         # cv.imshow('gray', gray)
-        cv.imshow('blur', blur)
-        cv.imshow('erode', erode)
+        # cv.imshow('blur', blur)
+        # cv.imshow('erode', erode)
         cv.imshow('dilate', dilate)
-        cv.imshow('thresh', th3)
+        # cv.imshow('thresh', th3)
         cv.imshow('frame', frame)
 
 
