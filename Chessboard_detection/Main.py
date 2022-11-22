@@ -2,6 +2,7 @@ import numpy as np
 import cv2 as cv
 import math
 from pathlib import Path
+from matplotlib import pyplot as plt
 
 import Fake_Camera
 
@@ -44,7 +45,15 @@ class ChessBoard:
         self.BOARD_SIZE_INT = (7, 7)
 
         self.setInitialImage(camera)
+
         self.thresholdOpt = self.findOptimalThreshold(self.initialImage)
+
+        s, cornersInt  = self.findBoardCorners(self.initialImage, self.thresholdOpt)
+
+        cornersIntReshaped = np.reshape(cornersInt, self.BOARD_SIZE_INT + (2,))
+        cornersIntReoriented = self.makeTopRowFirst(cornersIntReshaped)
+
+        self.cornersExt = self.estimateExternalCorners(cornersIntReoriented)
 
     
     def setInitialImage(self, camera, confirmFirst=False):
@@ -156,7 +165,7 @@ class ChessBoard:
         thresholdOpt = int((maxBound+minBound)/2)
         return thresholdOpt 
 
-    def findExternalCorners(self, cornersInt):
+    def estimateExternalCorners(self, cornersInt):
 
         diffRow = np.diff(cornersInt, axis=0)
         meanDiffRow = np.mean(diffRow, axis=0)
@@ -175,11 +184,11 @@ class ChessBoard:
         botLeft = 3*cornersInt[None, -1, None, 0, :] - cornersInt[None, -2, None, 0, :] - cornersInt[None, -1, None, 1, :]
         botRight = 3*cornersInt[None, -1, None, -1, :] - cornersInt[None, -2, None, -1, :] - cornersInt[None, -1, None, -2, :]
 
-        cornersExt0 = np.hstack([topLeft, externTop, topRight])
-        cornersExt1 = np.hstack([externleft, cornersInt, externRight])
-        cornersExt2 = np.hstack([botLeft, externBottom, botRight])
+        cornersExtRow0 = np.hstack([topLeft, externTop, topRight])
+        cornersExtRow1 = np.hstack([externleft, cornersInt, externRight])
+        cornersExtRow2 = np.hstack([botLeft, externBottom, botRight])
 
-        cornersExt = np.vstack([cornersExt0, cornersExt1, cornersExt2])
+        cornersExt = np.vstack([cornersExtRow0, cornersExtRow1, cornersExtRow2])
 
         return cornersExt
 
@@ -190,35 +199,47 @@ class ChessBoard:
         lastPointFirstRow = corners[0][-1]
 
         # firstRowAngle = np.arctan2()
-        newArr = np.transpose(corners, axes=(1, 0, 2))
-        newArr = np.flip(newArr, axis=1)
+        # newArr = np.transpose(corners, axes=(1, 0, 2))
+        # newArr = np.flip(newArr, axis=1)
+        newArr = corners
         return newArr
 
     def getCurrentPositions(self):
+        # Read new image from camera object
         s, img = self.camera.read()
-        s, cornersInt  = self.findBoardCorners(img, self.thresholdOpt)
 
-        cornersIntReshaped = np.reshape(cornersInt, self.BOARD_SIZE_INT + (2,))
-        cornersIntReoriented = self.makeTopRowFirst(cornersIntReshaped)
+        #TODO: Change the detection to work with board pieces on
+        # it will not work work with findBoardCorners
 
-        cornersExt = self.findExternalCorners(cornersIntReoriented)
+        cornersExt = np.vstack([
+                self.cornersExt[None, 0, 0, :],
+                self.cornersExt[None, 0, -1, :],
+                self.cornersExt[None, -1, -1, :],
+                self.cornersExt[None, -1, 0, :]
+            ])
 
-        cornersExt = np.reshape(cornersExt, (81, 2))
+        blur = cv.GaussianBlur(img, (11,11), 0)
+        mask = np.zeros(img.shape, dtype=np.uint8)
+        mask = cv.fillConvexPoly(mask, np.int32(cornersExt), color=(255, 255, 255))
+
+        masked = cv.bitwise_and(blur, mask)
         cv.drawChessboardCorners(img, self.BOARD_SIZE, cornersExt, True)
+        showImg(masked)
         
-        while cv.waitKey(1) != ord('q'):
-            cv.imshow('name', img)
-        return s, cornersInt
+        return s, cornersExt
+
+def showImg(img):
+    while cv.waitKey(1) != ord('q'):
+        cv.imshow('name', img)
 
 
 def main():
     # Open Video camera
-    cam = cv.VideoCapture(0)
-    cam = Fake_Camera.FakeCamera("Chessboard_detection\Test_Images\IMG_0165.png", CAMERA_RESOLUTION)    
+    # cam = cv.VideoCapture(0)
+    cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION)    
 
     if not cam.isOpened():
-        print("Cannot open camera")
-        exit()
+        raise("Cannot open camera.")
 
     # Initialize ChessBoard object and select optimal thresh
     board = ChessBoard(cam)
@@ -230,7 +251,7 @@ def main():
         s, corners = board.getCurrentPositions()
         # cv.drawChessboardCorners(img, BOARD_SIZE_INT, corners, s)
         
-        cv.imshow("Image", img)
+        # cv.imshow("Image", img)
 
     cam.release()
     cv.destroyAllWindows()
