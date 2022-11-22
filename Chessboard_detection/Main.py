@@ -35,12 +35,14 @@ def maxPos(arr):
 
 
 class ChessBoard:
-    def __init__(self) -> None:
+    def __init__(self, camera) -> None:
         self.currentConfig = np.zeros(BOARD_SIZE, dtype=bool)  
         self.cornersInterior = np.zeros(BOARD_SIZE_INT, dtype=np.uint32)
         self.cornersAll = np.zeros(BOARD_SIZE, dtype=np.uint32)
         self.initialImage = np.zeros(CAMERA_RESOLUTION)
-        self.thresholdOpt = 0
+
+        self.setInitialImage(camera)
+        self.thresholdOpt = self.findOptimalThreshold(self.initialImage)
     
     def setInitialImage(self, camera):
         while True:
@@ -62,7 +64,7 @@ class ChessBoard:
             
                 # Check if the image is good enough
                 if resp == 'y':
-                    self.initialImage = frame
+                    self.initialImage = frame.copy()
                     cv.destroyWindow('Initial Image')
                     break
 
@@ -96,6 +98,11 @@ class ChessBoard:
         didFind, intCorners = cv.findChessboardCorners(dilate, BOARD_SIZE_INT)
 
         return didFind, intCorners
+
+    def findBoardCorners(self, img, threshold, blursize=3, erodeSize=3):
+        grayBlur = self.findGrayBlur(img, blursize)
+        ret, corners = self.threshHoldAndFindBoard(grayBlur, threshold, erodeSize)
+        return ret, corners
 
     def findOptimalThreshold(self, img, blurSize=3, erodeSize=3):
         stepSize = 10
@@ -141,9 +148,11 @@ class ChessBoard:
             raise("maxBound never found finetuned val")
 
         # return average of minBound and Maxbound to hopefully be most reliable threshold
-        self.thresholdOpt = int((maxBound+minBound)/2)
-        return self.thresholdOpt 
+        thresholdOpt = int((maxBound+minBound)/2)
+        return thresholdOpt 
 
+    def findExternalCorners(self, img):
+        pass
 
 def main():
     # Open Video camera
@@ -152,16 +161,17 @@ def main():
         print("Cannot open camera")
         exit()
 
-    # Initialize ChessBoard object and select initialimage.
-    board = ChessBoard()
-    board.setInitialImage(cam)
+    # Initialize ChessBoard object and select optimal thresh
+    board = ChessBoard(cam)
 
-    # Use initial image to find optimal threshold
-    opt = board.findOptimalThreshold(board.initialImage)
-    print(opt)
-
+    # display video of chessboard with corners
     while cv.waitKey(1) != ord('q'):
-        pass
+        ret, img = cam.read()
+        
+        s, corners = board.findBoardCorners(img, board.thresholdOpt)
+        cv.drawChessboardCorners(img, BOARD_SIZE_INT, corners, s)
+        
+        cv.imshow("Image", img)
 
     cam.release()
     cv.destroyAllWindows()
