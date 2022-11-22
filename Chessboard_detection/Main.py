@@ -3,8 +3,9 @@ import cv2 as cv
 import math
 from pathlib import Path
 
-BOARD_SIZE = (8, 8)
-BOARD_SIZE_INT = (7, 7)
+import Fake_Camera
+
+
 
 CAMERA_RESOLUTION = (640, 480)
 
@@ -36,39 +37,43 @@ def maxPos(arr):
 
 class ChessBoard:
     def __init__(self, camera) -> None:
-        self.currentConfig = np.zeros(BOARD_SIZE, dtype=bool)  
-        self.cornersInterior = np.zeros(BOARD_SIZE_INT, dtype=np.uint32)
-        self.cornersAll = np.zeros(BOARD_SIZE, dtype=np.uint32)
         self.initialImage = np.zeros(CAMERA_RESOLUTION)
+        self.camera = camera
+
+        self.BOARD_SIZE = (9, 9)
+        self.BOARD_SIZE_INT = (7, 7)
 
         self.setInitialImage(camera)
         self.thresholdOpt = self.findOptimalThreshold(self.initialImage)
+
     
-    def setInitialImage(self, camera):
+    def setInitialImage(self, camera, confirmFirst=False):
         while True:
             #Get image frame
             ret, frame = camera.read()
-            # frame = cv.imread(r"C:\Users\spies\OneDrive\Documents\Chess Robot\ChessRobot\Chessboard_detection\Test_Images\IMG_0165.png")
-            # frame = cv.resize(frame, CAMERA_RESOLUTION)
-            # ret = True
+
             if not ret:
-                print("Can't receive frame (stream end?). Exiting ...")
-                exit()
+                print("Can't receive frame (stream end?).")
+                raise("Could not receive frame from camera to set initial image")
             
             # Display video
-            cv.imshow('Initial Image', frame)
+            if confirmFirst:
+                cv.imshow('Initial Image', frame)
 
-            # Pause video when q is pressed
-            if cv.waitKey(1) == ord('q'):
-                resp = input("Are you happy with this initialization image? (y/n)")
-            
-                # Check if the image is good enough
-                if resp == 'y':
-                    self.initialImage = frame.copy()
-                    cv.destroyWindow('Initial Image')
-                    break
+                # Pause video when q is pressed
+                if cv.waitKey(1) == ord('q'):
+                    resp = input("Are you happy with this initialization image? (y/n)")
+                
+                    # Check if the image is good enough
+                    if resp == 'y':
+                        cv.destroyWindow('Initial Image')
+                        break
 
-        return
+            if not confirmFirst:
+                break
+        
+        self.initialImage = frame.copy()
+        
 
     def findGrayBlur(self, img, blurSize):
         # Convert img to grayscale
@@ -95,7 +100,7 @@ class ChessBoard:
             dilate = thresh
 
         # find chessboard corners, If its too slow add the fast stop param
-        didFind, intCorners = cv.findChessboardCorners(dilate, BOARD_SIZE_INT)
+        didFind, intCorners = cv.findChessboardCorners(dilate, self.BOARD_SIZE_INT)
 
         return didFind, intCorners
 
@@ -151,12 +156,66 @@ class ChessBoard:
         thresholdOpt = int((maxBound+minBound)/2)
         return thresholdOpt 
 
-    def findExternalCorners(self, img):
-        pass
+    def findExternalCorners(self, cornersInt):
+
+        diffRow = np.diff(cornersInt, axis=0)
+        meanDiffRow = np.mean(diffRow, axis=0)
+        externTop = 2*cornersInt[None, 0, :, :] - cornersInt[None, 1, :, :]
+        externBottom = 2*cornersInt[None, -1, :, :] - cornersInt[None, -2, :, :]
+
+        difCol = np.diff(cornersInt, axis=1)
+        meanDiffCol = np.mean(difCol, axis=1)
+        meanDiffCol = np.reshape(meanDiffCol, (7, 1, 2))
+
+        externleft = 2*cornersInt[:, None, 0, :] - cornersInt[:, None, 1, :]
+        externRight = 2*cornersInt[:, None, -1, :] - cornersInt[:, None, -2, :]
+
+        topLeft = 3*cornersInt[None, 0, None, 0, :] - cornersInt[None, 1, None, 0, :] - cornersInt[None, 0, None, 1, :]
+        topRight = 3*cornersInt[None, 0, None, -1, :] - cornersInt[None, 1, None, -1, :] - cornersInt[None, 0, None, -2, :]
+        botLeft = 3*cornersInt[None, -1, None, 0, :] - cornersInt[None, -2, None, 0, :] - cornersInt[None, -1, None, 1, :]
+        botRight = 3*cornersInt[None, -1, None, -1, :] - cornersInt[None, -2, None, -1, :] - cornersInt[None, -1, None, -2, :]
+
+        cornersExt0 = np.hstack([topLeft, externTop, topRight])
+        cornersExt1 = np.hstack([externleft, cornersInt, externRight])
+        cornersExt2 = np.hstack([botLeft, externBottom, botRight])
+
+        cornersExt = np.vstack([cornersExt0, cornersExt1, cornersExt2])
+
+        return cornersExt
+
+    def makeTopRowFirst(self, corners):
+        # TODO: adjust angle to keep top row at the top of image
+        # The array should start form top left.
+        firstPoint = corners[0][0]
+        lastPointFirstRow = corners[0][-1]
+
+        # firstRowAngle = np.arctan2()
+        newArr = np.transpose(corners, axes=(1, 0, 2))
+        newArr = np.flip(newArr, axis=1)
+        return newArr
+
+    def getCurrentPositions(self):
+        s, img = self.camera.read()
+        s, cornersInt  = self.findBoardCorners(img, self.thresholdOpt)
+
+        cornersIntReshaped = np.reshape(cornersInt, self.BOARD_SIZE_INT + (2,))
+        cornersIntReoriented = self.makeTopRowFirst(cornersIntReshaped)
+
+        cornersExt = self.findExternalCorners(cornersIntReoriented)
+
+        cornersExt = np.reshape(cornersExt, (81, 2))
+        cv.drawChessboardCorners(img, self.BOARD_SIZE, cornersExt, True)
+        
+        while cv.waitKey(1) != ord('q'):
+            cv.imshow('name', img)
+        return s, cornersInt
+
 
 def main():
     # Open Video camera
     cam = cv.VideoCapture(0)
+    cam = Fake_Camera.FakeCamera("Chessboard_detection\Test_Images\IMG_0165.png", CAMERA_RESOLUTION)    
+
     if not cam.isOpened():
         print("Cannot open camera")
         exit()
@@ -168,8 +227,8 @@ def main():
     while cv.waitKey(1) != ord('q'):
         ret, img = cam.read()
         
-        s, corners = board.findBoardCorners(img, board.thresholdOpt)
-        cv.drawChessboardCorners(img, BOARD_SIZE_INT, corners, s)
+        s, corners = board.getCurrentPositions()
+        # cv.drawChessboardCorners(img, BOARD_SIZE_INT, corners, s)
         
         cv.imshow("Image", img)
 
