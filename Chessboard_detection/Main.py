@@ -1,12 +1,11 @@
-import numpy as np
-import cv2 as cv
 import math
-from pathlib import Path
-from matplotlib import pyplot as plt
+
+import numpy as np
+
+from sklearn.cluster import KMeans
+import cv2 as cv
 
 import Fake_Camera
-
-
 
 CAMERA_RESOLUTION = (640, 480)
 
@@ -44,6 +43,8 @@ class ChessBoard:
         self.BOARD_SIZE = (9, 9)
         self.BOARD_SIZE_INT = (7, 7)
 
+        self.kmeans = None
+
         self.setInitialImage(camera)
 
         self.thresholdOpt = self.findOptimalThreshold(self.initialImage)
@@ -55,6 +56,35 @@ class ChessBoard:
 
         self.cornersExt = self.estimateExternalCorners(cornersIntReoriented)
 
+    def assignToClosestCluster(self, img):
+        blur = cv.medianBlur(img, 11)
+        maskedImage = self.maskImage(blur)
+
+        imgReshaped = np.reshape(maskedImage, (maskedImage.shape[0]*maskedImage.shape[1], 3))
+
+        predictions = self.kmeans.predict(imgReshaped)
+        clustersInt = self.kmeans.cluster_centers_.astype(np.uint8)
+
+        newImg = [clustersInt[x] for x in predictions]
+        newImg = np.reshape(newImg, (maskedImage.shape[0], maskedImage.shape[1], 3))
+        
+        return newImg
+
+    def findKClusters(self):
+        _, img = self.camera.read()
+
+        # blur = cv.GaussianBlur(img, (11,11), 0)
+        blur = cv.medianBlur(img, 11)
+        maskedImage = self.maskImage(blur)
+
+        imgReshaped = np.reshape(maskedImage, (maskedImage.shape[0]*maskedImage.shape[1], 3))
+
+        self.kmeans = KMeans(n_clusters=4)
+        self.kmeans.fit(imgReshaped)
+
+        newImg = self.assignToClosestCluster(img)
+        showImg(newImg)
+        return 
     
     def setInitialImage(self, camera, confirmFirst=False):
         while True:
@@ -203,6 +233,21 @@ class ChessBoard:
         # newArr = np.flip(newArr, axis=1)
         newArr = corners
         return newArr
+    
+    def maskImage(self, img):
+        outerCorners = np.vstack([
+                self.cornersExt[None, 0, 0, :],
+                self.cornersExt[None, 0, -1, :],
+                self.cornersExt[None, -1, -1, :],
+                self.cornersExt[None, -1, 0, :]
+            ])
+
+        mask = np.zeros(img.shape, dtype=np.uint8)
+        mask = cv.fillConvexPoly(mask, np.int32(outerCorners), color=(255, 255, 255))
+
+        maskedImage = cv.bitwise_and(img, mask)
+
+        return maskedImage
 
     def getCurrentPositions(self):
         # Read new image from camera object
@@ -211,22 +256,13 @@ class ChessBoard:
         #TODO: Change the detection to work with board pieces on
         # it will not work work with findBoardCorners
 
-        cornersExt = np.vstack([
-                self.cornersExt[None, 0, 0, :],
-                self.cornersExt[None, 0, -1, :],
-                self.cornersExt[None, -1, -1, :],
-                self.cornersExt[None, -1, 0, :]
-            ])
+        # blur = cv.GaussianBlur(img, (11,11), 0)
+        # maskedImage = self.maskImage(blur)
 
-        blur = cv.GaussianBlur(img, (11,11), 0)
-        mask = np.zeros(img.shape, dtype=np.uint8)
-        mask = cv.fillConvexPoly(mask, np.int32(cornersExt), color=(255, 255, 255))
-
-        masked = cv.bitwise_and(blur, mask)
-        cv.drawChessboardCorners(img, self.BOARD_SIZE, cornersExt, True)
-        showImg(masked)
+        # # cv.drawChessboardCorners(maskedImage, self.BOARD_SIZE, cornersExt, True)
+        # showImg(maskedImage)
         
-        return s, cornersExt
+        return s
 
 def showImg(img):
     while cv.waitKey(1) != ord('q'):
@@ -243,6 +279,8 @@ def main():
 
     # Initialize ChessBoard object and select optimal thresh
     board = ChessBoard(cam)
+
+    board.findKClusters()
 
     # display video of chessboard with corners
     while cv.waitKey(1) != ord('q'):

@@ -12,7 +12,7 @@ class FakeCamera:
         self.stateNum = -1
     
     def read(self):
-        if self.stateNum == -1:
+        if self.stateNum <0:
             self.frame = cv.imread(self.path_full + "empty.JPG")
             self.frame = cv.resize(self.frame, self.cameraRes)
         elif self.stateNum >= 0:
