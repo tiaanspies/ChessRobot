@@ -1,6 +1,7 @@
 import math
 
 import numpy as np
+from scipy import signal
 
 from sklearn.cluster import KMeans
 import cv2 as cv
@@ -34,6 +35,11 @@ def maxPos(arr):
 
     return found, index
 
+def gkern(kernlen=21, std=3):
+    """Returns a 2D Gaussian kernel array."""
+    gkern1d = signal.gaussian(kernlen, std=std).reshape(kernlen, 1)
+    gkern2d = np.outer(gkern1d, gkern1d)
+    return gkern2d
 
 class ChessBoard:
     def __init__(self, camera) -> None:
@@ -57,6 +63,9 @@ class ChessBoard:
         self.cornersExt = self.estimateExternalCorners(cornersIntReoriented)
 
     def assignToClosestCluster(self, img):
+        """
+        Assigns the pixels to a cluster then gives them a pixel value of that cluster.
+        """
         blur = cv.medianBlur(img, 11)
         maskedImage = self.maskImage(blur)
 
@@ -70,7 +79,23 @@ class ChessBoard:
         
         return newImg
 
-    def findKClusters(self):
+    def findClusters(self, blocks):
+        """
+        Blurs the image with median blur then asigns each pixel to a cluster. 
+        Giving it a cluster id between 0 and 3.
+        return shape is (imgRows, ImgCols, 1)
+        """
+        blockShape = np.shape(blocks)
+        predictions = np.zeros(shape=(blockShape[0], blockShape[1], blockShape[2]), dtype=np.uint8)
+
+        for id, block in enumerate(blocks):
+            imgReshaped = np.reshape(block, (block.shape[0]*block.shape[1], 3))
+            predictionReshaped = self.kmeans.predict(imgReshaped)
+            predictions[id] = np.reshape(predictionReshaped, (block.shape[0], block.shape[1]))
+
+        return predictions
+
+    def fitKClusters(self):
         _, img = self.camera.read()
 
         # blur = cv.GaussianBlur(img, (11,11), 0)
@@ -82,9 +107,7 @@ class ChessBoard:
         self.kmeans = KMeans(n_clusters=4)
         self.kmeans.fit(imgReshaped)
 
-        newImg = self.assignToClosestCluster(img)
-        showImg(newImg)
-        return 
+        return None
     
     def setInitialImage(self, camera, confirmFirst=False):
         while True:
@@ -196,6 +219,9 @@ class ChessBoard:
         return thresholdOpt 
 
     def estimateExternalCorners(self, cornersInt):
+        """
+        Expand the internal corners by one row. 
+        """
 
         diffRow = np.diff(cornersInt, axis=0)
         meanDiffRow = np.mean(diffRow, axis=0)
@@ -235,6 +261,10 @@ class ChessBoard:
         return newArr
     
     def maskImage(self, img):
+        """
+        Create a mask so that only the chessboard is visible.
+        Uses the 4 furthest corners for mask edge.
+        """
         outerCorners = np.vstack([
                 self.cornersExt[None, 0, 0, :],
                 self.cornersExt[None, 0, -1, :],
@@ -250,19 +280,75 @@ class ChessBoard:
         return maskedImage
 
     def getCurrentPositions(self):
+        """
+        Look at each square in board and see which color piece is on it.
+        """
         # Read new image from camera object
         s, img = self.camera.read()
 
-        #TODO: Change the detection to work with board pieces on
-        # it will not work work with findBoardCorners
+        clusteredImg = self.assignToClosestCluster(img)
+        showImg(clusteredImg)
+        
+        blocks = self.splitBoardIntoSquares(img)
+        clustered = self.findClusters(blocks)
+        blockIDs = self.detectPieces(clustered)
 
-        # blur = cv.GaussianBlur(img, (11,11), 0)
-        # maskedImage = self.maskImage(blur)
+        blockIDs = np.reshape(blockIDs, (8, 8))
 
         # # cv.drawChessboardCorners(maskedImage, self.BOARD_SIZE, cornersExt, True)
-        # showImg(maskedImage)
-        
+
         return s
+
+    def splitBoardIntoSquares(self, img):
+        """
+        Take a img of the chessboard with vertex positions and split
+        each square into a seperate array.
+        """
+        blocks = []
+        for r in range(self.BOARD_SIZE_INT[0] + 1):
+            for c in range(self.BOARD_SIZE_INT[1] + 1):
+                # minX = np.min([self.cornersExt[r, c, 0], self.cornersExt[r+1, c, 0]])
+                # minY = np.min([self.cornersExt[r, c, 0], self.cornersExt[r, c+1, 0]])
+
+                # maxX = np.max([self.cornersExt[r, c+1, 0], self.cornersExt[r+1, c+1, 0]])
+                # maxY = np.max([self.cornersExt[r+1, c, 0], self.cornersExt[r+1, c+1, 0]])
+
+                vertices = self.cornersExt[r:r+2, c:c+2, :].astype(np.uint)
+                minX = np.min(vertices[:, :, 0], axis=(0,1))
+                minY = np.min(vertices[:, :, 1], axis=(0,1))
+                
+                maxX = np.max(vertices[:, :, 0], axis=(0,1))
+                maxY = np.max(vertices[:, :, 1], axis=(0,1))
+
+                block = img[minY:maxY, minX:maxX]
+                block = cv.resize(block, (32, 32))
+
+                img = cv.rectangle(img, [minX, minY], [maxX, maxY], (255, 0, 0))
+
+                blocks.append(block)
+
+        return blocks
+
+    def detectPieces(self, blocks):
+        """
+        given a square, detect which cluster is likely present in the center.
+        """
+        blocksize = blocks.shape[0] # assuming pieces are square
+        kern = gkern(kernlen=int(blocksize/2), std=4)
+        
+        pieces = np.zeros((np.shape(blocks)[0]), dtype=np.uint8)
+
+        for id, block in enumerate(blocks):
+            scores = np.zeros((4))
+
+            for r, row in enumerate(block):
+                for c, pixel in enumerate(row):
+                    scores [pixel] += kern[r, c]
+
+            pieces[id] = np.argmax(scores, axis = 0)
+
+        return pieces
+
 
 def showImg(img):
     while cv.waitKey(1) != ord('q'):
@@ -280,7 +366,7 @@ def main():
     # Initialize ChessBoard object and select optimal thresh
     board = ChessBoard(cam)
 
-    board.findKClusters()
+    board.fitKClusters()
 
     # display video of chessboard with corners
     while cv.waitKey(1) != ord('q'):
