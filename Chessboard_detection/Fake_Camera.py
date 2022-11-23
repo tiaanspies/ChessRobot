@@ -3,10 +3,9 @@ import cv2 as cv
 
 class FakeCamera:
     def __init__(self, res) -> None:
-        # "Chessboard_detection\Test_Images\IMG_0165.png"
-        # C:\Users\spies\OneDrive\Documents\Chess Robot\ChessRobot\Chessboard_detection\Test_Images\b_w_game\empty.JPG
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        self.path_full = dir_path + "\Test_Images\\b_w_game\\"
+        # self.path_full = dir_path + "\Test_Images\\b_w_game\\"
+        self.path_full = dir_path + "\Test_Images\\b_w_game_2\\"
         self.cameraRes = res
 
         self.stateNum = -1
