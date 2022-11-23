@@ -6,6 +6,8 @@ from scipy import signal
 from sklearn.cluster import KMeans
 import cv2 as cv
 
+from collections import Counter
+
 import Fake_Camera
 
 CAMERA_RESOLUTION = (640, 480)
@@ -48,8 +50,11 @@ class ChessBoard:
 
         self.BOARD_SIZE = (9, 9)
         self.BOARD_SIZE_INT = (7, 7)
+        self.KERN_STD = 4
 
         self.kmeans = None
+        self.whiteID = None
+        self.blackID = None
 
         self.setInitialImage(camera)
 
@@ -102,10 +107,19 @@ class ChessBoard:
         blur = cv.medianBlur(img, 11)
         maskedImage = self.maskImage(blur)
 
+        showImg(maskedImage)
+
         imgReshaped = np.reshape(maskedImage, (maskedImage.shape[0]*maskedImage.shape[1], 3))
 
         self.kmeans = KMeans(n_clusters=4)
         self.kmeans.fit(imgReshaped)
+
+        kMeansImg = self.assignToClosestCluster(img)
+        blocks = self.splitBoardIntoSquares(kMeansImg)
+        clustered = self.findClusters(blocks)
+        self.findPieceID(clustered)
+
+        showImg(kMeansImg)
 
         return None
     
@@ -295,9 +309,7 @@ class ChessBoard:
 
         blockIDs = np.reshape(blockIDs, (8, 8))
 
-        # # cv.drawChessboardCorners(maskedImage, self.BOARD_SIZE, cornersExt, True)
-
-        return s
+        return blockIDs
 
     def splitBoardIntoSquares(self, img):
         """
@@ -323,33 +335,75 @@ class ChessBoard:
                 block = img[minY:maxY, minX:maxX]
                 block = cv.resize(block, (32, 32))
 
-                img = cv.rectangle(img, [minX, minY], [maxX, maxY], (255, 0, 0))
+                # img = cv.rectangle(img, [minX, minY], [maxX, maxY], (255, 0, 0))
 
                 blocks.append(block)
 
         return blocks
+    
+    def detectPiece(self, block, kern):
+        PIECE_WEIGHT = 1.5
+        scores = np.zeros((4))
+
+        for r, row in enumerate(block):
+            for c, pixel in enumerate(row):
+                scores [pixel] += kern[r, c]
+
+        if self.whiteID is not None and self.blackID is not None:
+            scores[self.whiteID] *= PIECE_WEIGHT
+            scores[self.blackID] *= PIECE_WEIGHT
+
+        return np.argmax(scores, axis = 0)
+
 
     def detectPieces(self, blocks):
         """
         given a square, detect which cluster is likely present in the center.
         """
+
         blocksize = blocks.shape[0] # assuming pieces are square
-        kern = gkern(kernlen=int(blocksize/2), std=4)
+        kern = gkern(kernlen=int(blocksize/2), std=self.KERN_STD)
         
-        pieces = np.zeros((np.shape(blocks)[0]), dtype=np.uint8)
+        pieces = np.zeros((np.shape(blocks)[0]), dtype=np.int8)
 
         for id, block in enumerate(blocks):
-            scores = np.zeros((4))
-
-            for r, row in enumerate(block):
-                for c, pixel in enumerate(row):
-                    scores [pixel] += kern[r, c]
-
-            pieces[id] = np.argmax(scores, axis = 0)
+            pieceID = self.detectPiece(block, kern)
+            if pieceID == self.whiteID:
+                pieces[id] = 1
+            elif pieceID == self.blackID:
+                pieces[id] = -1
+            else:
+                pieces[id] = 0
 
         return pieces
 
+    def findPieceID(self, blocks):
+        topPieces = np.zeros((self.BOARD_SIZE_INT[0]+1)*2)
+        bottomPieces = np.zeros((self.BOARD_SIZE_INT[0]+1)*2)
 
+        kern = gkern(kernlen=int(np.shape(blocks)[0]/2), std=self.KERN_STD)
+
+        for id, block in enumerate(blocks[0:16]):
+            topPieces[id] = self.detectPiece(block, kern)
+
+        for id, block in enumerate(blocks[-17:-1]):
+            bottomPieces[id] = self.detectPiece(block, kern)
+
+        topPieceMax = (Counter(topPieces).most_common(1))[0][0]
+        bottomPieceMax = (Counter(bottomPieces).most_common(1))[0][0]
+
+        img = np.zeros(shape=(1,2,3))
+        img[0, 0] = np.array(self.kmeans.cluster_centers_[int(topPieceMax)])
+        img[0, 1] = np.array(self.kmeans.cluster_centers_[int(bottomPieceMax)])
+
+        imgGray = cv.cvtColor(img.astype(np.uint8), cv.COLOR_BGR2GRAY)
+        if imgGray[0, 0] > imgGray[0, 1]:
+            self.whiteID = int(topPieceMax)
+            self.blackID = int(bottomPieceMax)
+        else:
+            self.whiteID = int(bottomPieceMax)
+            self.blackID = int(topPieceMax)
+ 
 def showImg(img):
     while cv.waitKey(1) != ord('q'):
         cv.imshow('name', img)
@@ -364,15 +418,16 @@ def main():
         raise("Cannot open camera.")
 
     # Initialize ChessBoard object and select optimal thresh
+    # Board must be empty when this is called
     board = ChessBoard(cam)
 
+    # Board is setup in starting setup.
+    # Runs kmeans clustering to group peice and board colours
     board.fitKClusters()
 
     # display video of chessboard with corners
-    while cv.waitKey(1) != ord('q'):
-        ret, img = cam.read()
-        
-        s, corners = board.getCurrentPositions()
+    while cv.waitKey(1) != ord('q'):        
+        positions = board.getCurrentPositions()
         # cv.drawChessboardCorners(img, BOARD_SIZE_INT, corners, s)
         
         # cv.imshow("Image", img)
