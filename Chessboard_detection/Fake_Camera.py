@@ -6,6 +6,7 @@ class FakeCamera:
         dir_path = os.path.dirname(os.path.realpath(__file__))
         # self.path_full = dir_path + "\Test_Images\\b_w_game\\"
         self.path_full = dir_path + "\Test_Images\\b_w_game_2\\"
+        # self.path_full = dir_path + "\Test_Images\\brown_pieces\\"
         self.cameraRes = res
 
         self.stateNum = -1
@@ -25,4 +26,7 @@ class FakeCamera:
         return ret, self.frame
 
     def isOpened(self):
+        return True
+
+    def release(self):
         return True

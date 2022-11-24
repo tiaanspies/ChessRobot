@@ -45,22 +45,31 @@ def gkern(kernlen=21, std=3):
 
 class ChessBoard:
     def __init__(self, camera) -> None:
+        # CAMERA OBJECT PROPERTIES
         self.initialImage = np.zeros(CAMERA_RESOLUTION)
         self.camera = camera
 
+        # BOARD SIZE PROPERTIES
+        # KERN STD is the standard deviation of the gaussian kernal used for 
+        # weighting the piece prediction. 
         self.BOARD_SIZE = (9, 9)
         self.BOARD_SIZE_INT = (7, 7)
-        self.KERN_STD = 4
+        self.KERN_STD = 6
+        self.PIECE_WEIGHT = 3
 
+        # Kmeans class with the id of the black and white pieces
         self.kmeans = None
         self.whiteID = None
         self.blackID = None
 
+        # save the blank board
         self.setInitialImage(camera)
 
-        self.thresholdOpt = self.findOptimalThreshold(self.initialImage)
+        # see which blak and white threshold makes the board the easiest to find
+        # Opt is estimated by middle of min and max
+        thresholdOpt = self.findOptimalThreshold(self.initialImage, onlyFindOne=True)
 
-        s, cornersInt  = self.findBoardCorners(self.initialImage, self.thresholdOpt)
+        _, cornersInt  = self.findBoardCorners(self.initialImage, thresholdOpt)
 
         cornersIntReshaped = np.reshape(cornersInt, self.BOARD_SIZE_INT + (2,))
         cornersIntReoriented = self.makeTopRowFirst(cornersIntReshaped)
@@ -86,9 +95,9 @@ class ChessBoard:
 
     def findClusters(self, blocks):
         """
-        Blurs the image with median blur then asigns each pixel to a cluster. 
-        Giving it a cluster id between 0 and 3.
-        return shape is (imgRows, ImgCols, 1)
+        Receives blocks of 32x32 of pixel color values.
+        assigns each pixel to a cluster and returns cluster ID
+        return shape is (NrBlocks, BlockRows, BlockCols)
         """
         blockShape = np.shape(blocks)
         predictions = np.zeros(shape=(blockShape[0], blockShape[1], blockShape[2]), dtype=np.uint8)
@@ -100,26 +109,48 @@ class ChessBoard:
 
         return predictions
 
-    def fitKClusters(self):
+    def fitKClusters(self, weighted=False):
+        """
+        Fit 4 k-means clusters to the image. Use HSV color scale
+        Weighting can be used if pieces are on starting squares.
+        To increase the weight of pieces.
+        """
         _, img = self.camera.read()
 
-        # blur = cv.GaussianBlur(img, (11,11), 0)
-        blur = cv.medianBlur(img, 11)
-        maskedImage = self.maskImage(blur)
+        # Mask image by turning all pixels outside of board black
+        maskedImage = self.maskImage(img)
+        maskedImageHSV = cv.cvtColor(maskedImage, cv.COLOR_RGB2HSV)
 
-        showImg(maskedImage)
+        # Get a block for each square and resize it to 32x32,
+        # then stack back together for 256x256 image
+        blocks = self.splitBoardIntoSquares(maskedImageHSV)
+        resizedImg = np.reshape(blocks, (8, 8, 32, 32, 3))
+        resizedImg = np.hstack(resizedImg)
+        resizedImg = np.hstack(resizedImg)
 
-        imgReshaped = np.reshape(maskedImage, (maskedImage.shape[0]*maskedImage.shape[1], 3))
+        blur = cv.medianBlur(resizedImg, 7)
 
+        # reshape image into a single line for k means fitting
         self.kmeans = KMeans(n_clusters=4)
-        self.kmeans.fit(imgReshaped)
+        imgReshaped = np.reshape(blur, (blur.shape[0]*blur.shape[1], 3))
 
-        kMeansImg = self.assignToClosestCluster(img)
-        blocks = self.splitBoardIntoSquares(kMeansImg)
-        clustered = self.findClusters(blocks)
-        self.findPieceID(clustered)
-
-        showImg(kMeansImg)
+        # if weighed is true apply a gaussian weight to each block.
+        # add priority to blocks with peices on (starting squares)
+        if weighted:
+            kern = gkern(int(np.shape(blocks[0])[0]), self.KERN_STD)
+            kernArr = np.tile(kern, (8, 8))
+            kernArr[:2*32, :8*32] *= 2
+            kernArr[-2*32:, -8*32:] *= 2
+        
+            kernReshaped = np.reshape(kernArr, (blur.shape[0]*blur.shape[1]))
+            self.kmeans.fit(imgReshaped, sample_weight=kernReshaped)
+        else:
+            self.kmeans.fit(imgReshaped)
+        
+        #Assign cluster id to all pixels on blocks
+        # find what cluster id is black or white
+        blockClusterID = self.findClusters(blocks)
+        self.findPieceID(blockClusterID)
 
         return None
     
@@ -185,7 +216,7 @@ class ChessBoard:
         ret, corners = self.threshHoldAndFindBoard(grayBlur, threshold, erodeSize)
         return ret, corners
 
-    def findOptimalThreshold(self, img, blurSize=3, erodeSize=3):
+    def findOptimalThreshold(self, img, blurSize=3, erodeSize=3, onlyFindOne=False):
         stepSize = 10
 
         #Find gray blurry img
@@ -196,6 +227,10 @@ class ChessBoard:
         result_array = [0]*(math.ceil(255/stepSize)-2)
         for i in range(1, math.floor(255/stepSize)):
             result_array[i-1], _ = self.threshHoldAndFindBoard(grayBlur, i*stepSize, erodeSize)
+
+            # stop at first success if flag to find one is true
+            if onlyFindOne and result_array[i-1] == True:
+                return i*stepSize
 
         #Find min and max threshold bound
         respMin, minBound = minPos(result_array)
@@ -299,11 +334,11 @@ class ChessBoard:
         """
         # Read new image from camera object
         s, img = self.camera.read()
+        imgHSV = cv.cvtColor(img, cv.COLOR_RGB2HSV)
 
-        clusteredImg = self.assignToClosestCluster(img)
-        showImg(clusteredImg)
+        clusteredImg = self.assignToClosestCluster(imgHSV)
         
-        blocks = self.splitBoardIntoSquares(img)
+        blocks = self.splitBoardIntoSquares(imgHSV)
         clustered = self.findClusters(blocks)
         blockIDs = self.detectPieces(clustered)
 
@@ -342,7 +377,12 @@ class ChessBoard:
         return blocks
     
     def detectPiece(self, block, kern):
-        PIECE_WEIGHT = 1.5
+        """
+        Given a block it decides which cluster it belongs to.
+        Higher weights are placed on pixels closer to the 
+        center of the block, as well as to pieces.
+        """
+        
         scores = np.zeros((4))
 
         for r, row in enumerate(block):
@@ -350,8 +390,8 @@ class ChessBoard:
                 scores [pixel] += kern[r, c]
 
         if self.whiteID is not None and self.blackID is not None:
-            scores[self.whiteID] *= PIECE_WEIGHT
-            scores[self.blackID] *= PIECE_WEIGHT
+            scores[self.whiteID] *= self.PIECE_WEIGHT
+            scores[self.blackID] *= self.PIECE_WEIGHT
 
         return np.argmax(scores, axis = 0)
 
@@ -428,6 +468,7 @@ def main():
     # display video of chessboard with corners
     while cv.waitKey(1) != ord('q'):        
         positions = board.getCurrentPositions()
+        print(positions)
         # cv.drawChessboardCorners(img, BOARD_SIZE_INT, corners, s)
         
         # cv.imshow("Image", img)
