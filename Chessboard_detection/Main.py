@@ -16,6 +16,10 @@ def empty(a):
     pass
 
 def minPos(arr):
+    """
+    Finds the first occurance of a True array element
+    in a boolean array.
+    """
     found = False
     index = 0
     for i, item in enumerate(arr):
@@ -27,6 +31,10 @@ def minPos(arr):
     return found, index
 
 def maxPos(arr):
+    """
+    Finds the last occurance of a True array element
+    in a boolean array.
+    """
     found = False
     index = 0
     for i, item in reversed(list(enumerate(arr))):
@@ -45,6 +53,9 @@ def gkern(kernlen=21, std=3):
 
 class ChessBoard:
     def __init__(self, camera) -> None:
+        """
+        Initializes board object and finds position of empty board
+        """
         # CAMERA OBJECT PROPERTIES
         self.initialImage = np.zeros(CAMERA_RESOLUTION)
         self.camera = camera
@@ -76,12 +87,12 @@ class ChessBoard:
 
         self.cornersExt = self.estimateExternalCorners(cornersIntReoriented)
 
-    def assignToClosestCluster(self, img):
+    def findClusterImg(self, img):
         """
-        Assigns the pixels to a cluster then gives them a pixel value of that cluster.
+        Assigns pixels to their closest cluster.
+        returns image with all pixels assigned to cluster
         """
-        blur = cv.medianBlur(img, 11)
-        maskedImage = self.maskImage(blur)
+        maskedImage = self.maskImage(img)
 
         imgReshaped = np.reshape(maskedImage, (maskedImage.shape[0]*maskedImage.shape[1], 3))
 
@@ -93,7 +104,7 @@ class ChessBoard:
         
         return newImg
 
-    def findClusters(self, blocks):
+    def findBlockClusters(self, blocks):
         """
         Receives blocks of 32x32 of pixel color values.
         assigns each pixel to a cluster and returns cluster ID
@@ -149,12 +160,17 @@ class ChessBoard:
         
         #Assign cluster id to all pixels on blocks
         # find what cluster id is black or white
-        blockClusterID = self.findClusters(blocks)
+        blockClusterID = self.findBlockClusters(blocks)
         self.findPieceID(blockClusterID)
 
         return None
     
     def setInitialImage(self, camera, confirmFirst=False):
+        """
+        If confirmFirst then it will ask the user for confirmation 
+        on whether they want to initialize on that image.
+        Otherwise just use image immediatly
+        """
         while True:
             #Get image frame
             ret, frame = camera.read()
@@ -333,13 +349,12 @@ class ChessBoard:
         Look at each square in board and see which color piece is on it.
         """
         # Read new image from camera object
-        s, img = self.camera.read()
+        _, img = self.camera.read()
         imgHSV = cv.cvtColor(img, cv.COLOR_RGB2HSV)
+        blurredHSV = cv.medianBlur(imgHSV, 11)
 
-        clusteredImg = self.assignToClosestCluster(imgHSV)
-        
-        blocks = self.splitBoardIntoSquares(imgHSV)
-        clustered = self.findClusters(blocks)
+        blocks = self.splitBoardIntoSquares(blurredHSV)
+        clustered = self.findBlockClusters(blocks)
         blockIDs = self.detectPieces(clustered)
 
         blockIDs = np.reshape(blockIDs, (8, 8))
@@ -444,9 +459,10 @@ class ChessBoard:
             self.whiteID = int(bottomPieceMax)
             self.blackID = int(topPieceMax)
  
-def showImg(img):
+def showImg(*images):
     while cv.waitKey(1) != ord('q'):
-        cv.imshow('name', img)
+        for i, img in enumerate(images):
+            cv.imshow(str(i), img)
 
 
 def main():
@@ -469,9 +485,6 @@ def main():
     while cv.waitKey(1) != ord('q'):        
         positions = board.getCurrentPositions()
         print(positions)
-        # cv.drawChessboardCorners(img, BOARD_SIZE_INT, corners, s)
-        
-        # cv.imshow("Image", img)
 
     cam.release()
     cv.destroyAllWindows()
