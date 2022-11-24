@@ -1,11 +1,10 @@
+import os
 import math
 
 import numpy as np
 from scipy import signal
-
 from sklearn.cluster import KMeans
 import cv2 as cv
-
 from collections import Counter
 
 import Fake_Camera
@@ -52,13 +51,12 @@ def gkern(kernlen=21, std=3):
     return gkern2d
 
 class ChessBoard:
-    def __init__(self, camera) -> None:
+    def __init__(self, img) -> None:
         """
         Initializes board object and finds position of empty board
         """
         # CAMERA OBJECT PROPERTIES
         self.initialImage = np.zeros(CAMERA_RESOLUTION)
-        self.camera = camera
 
         # BOARD SIZE PROPERTIES
         # KERN STD is the standard deviation of the gaussian kernal used for 
@@ -74,7 +72,8 @@ class ChessBoard:
         self.blackID = None
 
         # save the blank board
-        self.setInitialImage(camera)
+        # self.setInitialImage(camera)
+        self.initialImage = img
 
         # see which blak and white threshold makes the board the easiest to find
         # Opt is estimated by middle of min and max
@@ -120,13 +119,12 @@ class ChessBoard:
 
         return predictions
 
-    def fitKClusters(self, weighted=False):
+    def fitKClusters(self, img, weighted=False):
         """
         Fit 4 k-means clusters to the image. Use HSV color scale
         Weighting can be used if pieces are on starting squares.
         To increase the weight of pieces.
         """
-        _, img = self.camera.read()
 
         # Mask image by turning all pixels outside of board black
         maskedImage = self.maskImage(img)
@@ -347,12 +345,11 @@ class ChessBoard:
 
         return maskedImage
 
-    def getCurrentPositions(self):
+    def getCurrentPositions(self, img):
         """
         Look at each square in board and see which color piece is on it.
         """
         # Read new image from camera object
-        _, img = self.camera.read()
         imgHSV = cv.cvtColor(img, cv.COLOR_RGB2HSV)
         blurredHSV = cv.medianBlur(imgHSV, 11)
 
@@ -475,22 +472,28 @@ def showImg(*images):
 def main():
     # Open Video camera
     # cam = cv.VideoCapture(0)
-    cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION)    
+    dirPath = os.path.dirname(os.path.realpath(__file__))
+    relPath = "\\TestImages\\Test_Set_2"
+    cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath)    
 
     if not cam.isOpened():
         raise("Cannot open camera.")
 
     # Initialize ChessBoard object and select optimal thresh
     # Board must be empty when this is called
-    board = ChessBoard(cam)
+    s, img = cam.read()
+    board = ChessBoard(img)
 
-    # Board is setup in starting setup.
+    # NB --- Board is setup in starting setup.
     # Runs kmeans clustering to group peice and board colours
-    board.fitKClusters()
+    s, img = cam.read()
+    board.fitKClusters(img)
 
     # display video of chessboard with corners
-    while cv.waitKey(1) != ord('q'):        
-        positions = board.getCurrentPositions()
+    s, img = cam.read()  
+    while s is True:  
+        positions = board.getCurrentPositions(img)
+        s, img = cam.read()  
         print(positions)
 
     cam.release()
