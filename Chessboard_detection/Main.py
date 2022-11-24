@@ -226,11 +226,11 @@ class ChessBoard:
         # There is no point in checking 0 and 255
         result_array = [0]*(math.ceil(255/stepSize)-2)
         for i in range(1, math.floor(255/stepSize)):
-            result_array[i-1], thresh = self.threshHoldAndFindBoard(grayBlur, i*stepSize, erodeSize)
+            result_array[i-1], _ = self.threshHoldAndFindBoard(grayBlur, i*stepSize, erodeSize)
 
             # stop at first success if flag to find one is true
             if onlyFindOne and result_array[i-1] == True:
-                return thresh
+                return i*stepSize
 
         #Find min and max threshold bound
         respMin, minBound = minPos(result_array)
