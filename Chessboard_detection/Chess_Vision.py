@@ -211,8 +211,11 @@ class ChessBoard:
         return blur
 
     def threshHoldAndFindBoard(self, grayBlurImg, threshold, erodeSize):
+        """
+        Theshold image and invert as detect chessboard requires a white border around chessboard.
+        """
         # Threshold
-        ret, thresh = cv.threshold(grayBlurImg, threshold, 255, cv.THRESH_BINARY_INV)
+        _, thresh = cv.threshold(grayBlurImg, threshold, 255, cv.THRESH_BINARY_INV)
         
         # If erodeSize is invalid skip eroding and dilating
         if erodeSize > 0:
@@ -433,6 +436,10 @@ class ChessBoard:
         return pieces
 
     def findPieceID(self, blocks):
+        """
+        Assign find which cluster the black and white pieces
+        belong to.
+        """
         topPieces = np.zeros((self.BOARD_SIZE_INT[0]+1)*2)
         bottomPieces = np.zeros((self.BOARD_SIZE_INT[0]+1)*2)
 

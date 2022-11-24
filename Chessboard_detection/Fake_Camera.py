@@ -2,10 +2,10 @@ import os
 import cv2 as cv
 
 class FakeCamera:
-    def __init__(self, res) -> None:
+    def __init__(self, res, relPath) -> None:
         dir_path = os.path.dirname(os.path.realpath(__file__))
         # self.path_full = dir_path + "\Test_Images\\b_w_game\\"
-        self.path_full = dir_path + "\Test_Images\\b_w_game_2\\"
+        self.path_full = dir_path + relPath
         # self.path_full = dir_path + "\Test_Images\\brown_pieces\\"
         self.cameraRes = res
 
