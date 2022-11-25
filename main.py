@@ -28,12 +28,14 @@ loop: when the human makes their turn (hits the timer)
 from stockfish import Stockfish
 import numpy as np
 import chess
+import matplotlib.pyplot as plt
+from NLinkArm3d import NLinkArm
 
 ### INITIALIZE ###
 
 # necessary functions
 def whichColor():
-    """Human decides which color to play"""
+    """Human decides which color to play. Black is -1, White is 1"""
     ans = input("Hello, human. Do you want to play black or white today? (b/w): ").strip().lower()
     if ans not in ['b', 'w']:
         print(f'"{ans}" is invalid, please try again...')
@@ -47,6 +49,10 @@ def whichColor():
 
 def humansTurnFinished():
     """Simple yes/no question to determine if human is done with their turn. This will later be the function that flags when the clock is pressed"""
+
+    # for debugging sake, I currently have this set permanently to True
+    return True
+
     ans = input("Are you finished? (y/n): ").strip().lower()
     if ans not in ['y', 'n']:
         print(f'"{ans}" is invalid, please try again...')
@@ -71,7 +77,7 @@ def seeBoard(board):
     """Uses CV to determine which squares are occupied, returns -1, 0, 1 representation"""
     # instead right now it takes the users input for which piece to move where
     
-    ans = input("what was your move? ")
+    ans = input("what is your move? ")
     board = updateVisBoard(board, ans, HUMAN)
 
     return board
@@ -127,7 +133,7 @@ def robotsVirtualMove(visboard):
     stockboard = stockfish.get_board_visual(HUMAN == chess.WHITE)
     print(stockboard)
 
-    return visboard
+    return best_move, visboard
 
 def perceiveHumanMove():
     """take image (or typed move for now) and return the move that was made"""
@@ -137,30 +143,91 @@ def perceiveHumanMove():
         return perceiveHumanMove()
     return seen_visboard, human_move
 
-# initialize stockfish
-depth = 15
-params = {
-    "Contempt": 0,
-    "Threads": 1, # More threads will make the engine stronger, but should be kept at less than the number of logical processors on your computer.
-    "Hash": 128, # Default size is 16 MB. It's recommended that you increase this value, but keep it as some power of 2. E.g., if you're fine using 2 GB of RAM, set Hash to 2048 (11th power of 2).
-    "UCI_LimitStrength": "true",
-    "UCI_Elo": 800
-}
-stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=depth, parameters=params)
+def getWaypoints_simple(start, goal, lift=50, N=100):
+    """creates a 3xN array of waypoints from the 3x1 start to the 3x1 end"""
+    N_up = round(N/3)
+    N_over = N - N_up*2
+    going_up = np.vstack((np.linspace(start[0], start[0], N_up),
+                         np.linspace(start[1], start[1], N_up),
+                         np.linspace(start[2], start[2] + lift, N_up)))
+    going_over = np.vstack((np.linspace(start[0], goal[0], N_over),
+                           np.linspace(start[1], goal[1], N_over),
+                           np.linspace(start[2] + lift, goal[2] + lift, N_over)))
+    going_down = np.vstack((np.linspace(goal[0], goal[0], N_up),
+                           np.linspace(goal[1], goal[1], N_up),
+                           np.linspace(goal[2] + lift, goal[2], N_up)))
+    waypoints = np.hstack((going_up, going_over, going_down))
+
+    '''
+    # for debugging
+    print(waypoints)
+    ax = plt.axes(projection='3d')
+    ax.scatter3D(waypoints[0],waypoints[1],waypoints[2])
+    plt.show()
+    '''
+
+    return waypoints
+
+def defBoardCoords(square_width=30, border_width=10, base_dist=15, base_height=10):
+    """gives an 3x8x8 ndarray representing the euclidean coordinates of the center of each board square"""
+    # zero is at the robot base, which is centered base_dist from the edge of the board
+    
+    # initialize
+    board_coords = np.zeros((3,8,8)) 
+
+    # set z coord
+    board_coords[2,:,:] = base_height
+
+    # define and set x and y coords
+    file_coords = np.linspace(-3.5*square_width,3.5*square_width,8,endpoint=True)
+    rank_coords = np.linspace(7.5*square_width,0.5*square_width,8,endpoint=True) + border_width + base_dist
+    board_coords[:2,:,:] = np.array(np.meshgrid(file_coords,rank_coords))
+
+    return board_coords
+
+def getCoords(square_name, board_coords):
+    """gives real-world coordinates in mm based on chess board square (e.g. 'e2')"""
+    file_idx = chess.FILE_NAMES.index(square_name[0]) if ROBOT==1 else chess.FILE_NAMES[::-1].index(square_name[0])
+    rank_idx = chess.RANK_NAMES[::-1].index(square_name[1]) if ROBOT==1 else chess.RANK_NAMES.index(square_name[1])
+    return board_coords[:,rank_idx,file_idx]
+
+def robotsPhysicalMove(robot_move):
+    start = getCoords(robot_move[:2],cboard)
+    goal = getCoords(robot_move[2:],cboard)
+    coords_path = getWaypoints_simple(start, goal,N=100)
+    print(f"start: {start}, goal: {goal}")
+    # TODO: find thetapath using inverse kinematics
+
+def defRobotArm(L1=250,L2=250):
+    """creates an instance of the NLinkArm class for our specific robot configuration"""
+    # define robot parameters in DH convention [theta alpha a d]
+    l1_params = [0, np.pi/2, 0, 0]
+    l2_params = [0, 0, L1, 0]
+    l3_params = [0, 0, L2, 0]
+    param_list = [l1_params, l2_params, l3_params]
+    return NLinkArm(param_list)
+
 
 ### SETUP GAME ###
 
 # have human pick which side to play (1 = white, -1 = black)
 HUMAN, ROBOT = whichColor()
 
-# Define the -1, 0, 1 representation (visboard) and python-chess (pyboard) versions of the game
+# create an instance of of the stockfish engine with the parameters requested
+stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=15, parameters={"UCI_Elo":800})
+
+# create NLinkArm instance specific to our robot using python_robotics NLinkArm class
+robotarm = defRobotArm()
+
+# Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
 starting_visboard = np.vstack((np.ones((2,8))*ROBOT, np.zeros((4,8)), np.ones((2,8))*HUMAN))
 pyboard = chess.Board()
+cboard = defBoardCoords()
 
 if ROBOT == chess.WHITE: # if robot is playing white, have it go first
     print("My turn first")
-    current_visboard = robotsVirtualMove(starting_visboard) # make the move virtually
-    # TODO: implement the physical commands to the robot # make the move physically
+    robot_move, current_visboard = robotsVirtualMove(starting_visboard) # make the move virtually
+    robotsPhysicalMove(robot_move) # make the move physically
 else:
     current_visboard = starting_visboard
     print("Your turn first")
@@ -193,11 +260,16 @@ while humansTurnFinished(): # eventually this will be based on the clock change,
     
     ### ROBOT'S TURN ###
     # make the move virtually
-    current_visboard = robotsVirtualMove(seen_visboard)
+    robot_move, current_visboard = robotsVirtualMove(seen_visboard)
     
     # make the move physically
-    # TODO: implement the physical commands to the robot
+    robotsPhysicalMove(robot_move)
 
     # end the game if the robot won
     if gameOver():
         break
+
+    # TODO: currently the code doesn't handle castling (i don't even know what the algebraic notation is)
+    # TODO: currently doesn't capture a piece before moving
+    # TODO: make a better display of who won. The chess object output doesn't make sense
+    # TODO: make waypoints that are more smooth and won't result in a jerky motion straight up, stop, over, stop, down.
