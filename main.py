@@ -64,10 +64,15 @@ def humansTurnFinished():
         return True
     return False
 
-def updateVisBoard(board, move, player):
+def updateVisBoard(board, move, player, capture=None):
     """Updates the -1, 0, 1 representation of the board"""
     start_square = chess.parse_square(move[:2])
     end_square = chess.parse_square(move[2:])
+
+    if capture:
+        capture_square = chess.parse_square(capture)
+        board.ravel()[capture_square] = 0
+
     board.ravel()[start_square] = 0
     board.ravel()[end_square] = player
     
@@ -98,6 +103,7 @@ def compareVisBoards(current, previous):
 
     start_square = np.flatnonzero(np.logical_and((current!=previous),(current==0)))
     end_square = np.flatnonzero(np.logical_and((current!=previous),(current==HUMAN)))
+    
     if start_square.size == 0:
         print("failed to locate which piece was moved")
         return None
@@ -118,22 +124,34 @@ def gameOver():
         return True
     return False
 
-def robotsVirtualMove(visboard):
+def robotsVirtualMove(visboard, human_move=None):
     """takes in the game in it's current state and returns it having made one best move or None if robot won"""
     
     # ask the engine for the best move
     best_move = stockfish.get_best_move()
 
+    # handle captures
+    capture = stockfish.will_move_be_a_capture(best_move)
+    print(capture)
+    if capture is stockfish.Capture.DIRECT_CAPTURE:
+        capture_square = best_move[2:]
+    elif capture is stockfish.Capture.EN_PASSANT:
+        capture_square = human_move[2:]
+    elif capture is stockfish.Capture.NO_CAPTURE:
+        capture_square = None
+    else:
+        print("you clearly don't understand this function")
+
     # make that move and update the board representations
     stockfish.make_moves_from_current_position([best_move])
-    visboard = updateVisBoard(visboard, best_move, ROBOT)
+    visboard = updateVisBoard(visboard, best_move, ROBOT, capture=capture_square)
     pyboard.push_uci(best_move)
 
     # print the board so the human can make a next move - this won't be needed later
     stockboard = stockfish.get_board_visual(HUMAN == chess.WHITE)
     print(stockboard)
 
-    return best_move, visboard
+    return best_move, visboard, capture_square
 
 def perceiveHumanMove():
     """take image (or typed move for now) and return the move that was made"""
@@ -143,47 +161,69 @@ def perceiveHumanMove():
         return perceiveHumanMove()
     return seen_visboard, human_move
 
-def getWaypoints_simple(start, goal, lift=50, N=100):
+def getPath_simple(start, goal, capture_square, lift=50, step=10):
     """creates a 3xN array of waypoints from the 3x1 start to the 3x1 end"""
-    N_up = round(N/3)
-    N_over = N - N_up*2
-    going_up = np.vstack((np.linspace(start[0], start[0], N_up),
-                         np.linspace(start[1], start[1], N_up),
-                         np.linspace(start[2], start[2] + lift, N_up)))
-    going_over = np.vstack((np.linspace(start[0], goal[0], N_over),
-                           np.linspace(start[1], goal[1], N_over),
-                           np.linspace(start[2] + lift, goal[2] + lift, N_over)))
-    going_down = np.vstack((np.linspace(goal[0], goal[0], N_up),
-                           np.linspace(goal[1], goal[1], N_up),
-                           np.linspace(goal[2] + lift, goal[2], N_up)))
-    waypoints = np.hstack((going_up, going_over, going_down))
+    lift = np.array([0,0,lift])
+    if capture_square is not None:
+        storage = cap_list[:,0]
+        cap_list = np.delete(cap_list,0,1)
+        first_moves = np.hstack((getLinePoints(home, capture_square, step),
+                                 capture_square.reshape((3,1)), capture_square.reshape((3,1)),
+                                 getLinePoints(capture_square, capture_square + lift, step),
+                                 getLinePoints(capture_square + lift, storage + lift, step),
+                                 getLinePoints(storage + lift, storage, step),
+                                 storage.reshape((3,1)), storage.reshape((3,1)),
+                                 getLinePoints(storage, start, step)))
+    else:
+        first_moves = getLinePoints(home, start, step)
+    
+    second_moves = np.hstack((start.reshape((3,1)), start.reshape((3,1)),
+                              getLinePoints(start, start + lift, step),
+                              getLinePoints(start + lift, goal + lift, step),
+                              getLinePoints(goal + lift, goal, step),
+                              goal.reshape((3,1)), goal.reshape((3,1)),
+                              getLinePoints(goal, home, step)))
 
-    '''
+    path = np.hstack((first_moves, second_moves))
+    
     # for debugging
-    print(waypoints)
     ax = plt.axes(projection='3d')
-    ax.scatter3D(waypoints[0],waypoints[1],waypoints[2])
+    ax.scatter3D(path[0],path[1],path[2])
     plt.show()
-    '''
+    
+    return path
 
-    return waypoints
+def getLinePoints(start, goal, step):
+    dist = np.linalg.norm(goal - start)
+    n_steps = int(dist // step)
+    x_points = np.linspace(start[0], goal[0], n_steps)
+    y_points = np.linspace(start[1], goal[1], n_steps)
+    z_points = np.linspace(start[2], goal[2], n_steps)
+    return np.vstack((x_points, y_points, z_points))
 
 def defBoardCoords(square_width=30, border_width=10, base_dist=15, base_height=10):
     """gives an 3x8x8 ndarray representing the euclidean coordinates of the center of each board square"""
     # zero is at the robot base, which is centered base_dist from the edge of the board
     
     # initialize
-    board_coords = np.zeros((3,8,8)) 
-
+    board_coords = np.zeros((3,8,8))
+    board_width = 8 * square_width + 2 * border_width
+    home = np.array([0, base_dist, 1.5*board_width])
+    
     # set z coord
     board_coords[2,:,:] = base_height
 
-    # define and set x and y coords
+    # define and set x and y coords of board
     file_coords = np.linspace(-3.5*square_width,3.5*square_width,8,endpoint=True)
     rank_coords = np.linspace(7.5*square_width,0.5*square_width,8,endpoint=True) + border_width + base_dist
     board_coords[:2,:,:] = np.array(np.meshgrid(file_coords,rank_coords))
 
-    return board_coords
+    # define array for coords of captured pieces
+    captured_coords = np.vstack((np.linspace(-board_width/2,board_width/2,15,endpoint=True),
+                                np.ones(15)*(base_dist - square_width),
+                                np.zeros(15)))
+
+    return board_coords, captured_coords, home
 
 def getCoords(square_name, board_coords):
     """gives real-world coordinates in mm based on chess board square (e.g. 'e2')"""
@@ -191,11 +231,14 @@ def getCoords(square_name, board_coords):
     rank_idx = chess.RANK_NAMES[::-1].index(square_name[1]) if ROBOT==1 else chess.RANK_NAMES.index(square_name[1])
     return board_coords[:,rank_idx,file_idx]
 
-def robotsPhysicalMove(robot_move):
+def robotsPhysicalMove(robot_move, capture_square):
+    """creates and executes the robot's physical move"""
     start = getCoords(robot_move[:2],cboard)
     goal = getCoords(robot_move[2:],cboard)
-    coords_path = getWaypoints_simple(start, goal,N=100)
-    print(f"start: {start}, goal: {goal}")
+    if capture_square is not None:
+        capture_square = getCoords(capture_square, cboard)
+    path = getPath_simple(start, goal, capture_square)
+    
     # TODO: find thetapath using inverse kinematics
 
 def defRobotArm(L1=250,L2=250):
@@ -222,12 +265,12 @@ robotarm = defRobotArm()
 # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
 starting_visboard = np.vstack((np.ones((2,8))*ROBOT, np.zeros((4,8)), np.ones((2,8))*HUMAN))
 pyboard = chess.Board()
-cboard = defBoardCoords()
+cboard, cap_list, home = defBoardCoords()
 
 if ROBOT == chess.WHITE: # if robot is playing white, have it go first
     print("My turn first")
-    robot_move, current_visboard = robotsVirtualMove(starting_visboard) # make the move virtually
-    robotsPhysicalMove(robot_move) # make the move physically
+    robot_move, current_visboard, capture_square = robotsVirtualMove(starting_visboard) # make the move virtually
+    robotsPhysicalMove(robot_move, capture_square) # make the move physically
 else:
     current_visboard = starting_visboard
     print("Your turn first")
@@ -260,10 +303,10 @@ while humansTurnFinished(): # eventually this will be based on the clock change,
     
     ### ROBOT'S TURN ###
     # make the move virtually
-    robot_move, current_visboard = robotsVirtualMove(seen_visboard)
+    robot_move, current_visboard, capture_square = robotsVirtualMove(seen_visboard, human_move)
     
     # make the move physically
-    robotsPhysicalMove(robot_move)
+    robotsPhysicalMove(robot_move, capture_square)
 
     # end the game if the robot won
     if gameOver():
