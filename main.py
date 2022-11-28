@@ -25,15 +25,56 @@ loop: when the human makes their turn (hits the timer)
         exit
 """
 
+import os
 from stockfish import Stockfish
 import numpy as np
 import chess
 import matplotlib.pyplot as plt
+from Chessboard_detection import Fake_Camera, Chess_Vision
 # from NLinkArm3d import NLinkArm
 
 ### INITIALIZE ###
 
 # necessary functions
+def cameraMain():
+    CAMERA_RESOLUTION = (640, 480)
+
+    # Open Video camera
+    # cam = cv.VideoCapture(0)
+    dirPath = os.path.dirname(os.path.realpath(__file__))
+    relPath = "\\Chessboard_detection\\TestImages\\Test_Set_2"
+    cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath)    
+
+    if not cam.isOpened():
+        raise("Cannot open camera.")
+
+    # Initialize ChessBoard object and select optimal thresh
+    # Board must be empty when this is called
+    ans = input("Is the empty board in view? (y/n): ").strip().lower()
+    if ans == 'y':
+        s, img = cam.read()
+        board = Chess_Vision.ChessBoard(img)
+    else:
+        print("Error: put the board in view")
+        exit()
+
+    # NB --- Board is setup in starting setup.
+    # Runs kmeans clustering to group peice and board colours
+    ans = input("Is the board set up? (y/n): ").strip().lower()
+    if ans== 'y':
+        s, img = cam.read()
+        board.fitKClusters(img)
+    else:
+        print("Error: set up the board")
+        exit()
+
+    return cam, board
+
+def seeBoardReal(cam, board):
+    s, img = cam.read()  # read in image from camera
+    positions = board.getCurrentPositions(img) # turn it into -1, 0, 1 representation
+    return positions
+
 def whichColor():
     """Human decides which color to play. Black is -1, White is 1"""
     ans = input("Hello, human. Do you want to play black or white today? (b/w): ").strip().lower()
@@ -128,7 +169,8 @@ def robotsVirtualMove(visboard, human_move=None):
     """takes in the game in it's current state and returns it having made one best move or None if robot won"""
     
     # ask the engine for the best move
-    best_move = stockfish.get_best_move()
+    # best_move = stockfish.get_best_move()
+    _, best_move = input("What was your move? ")
 
     # handle captures
     capture = stockfish.will_move_be_a_capture(best_move)
@@ -155,7 +197,8 @@ def robotsVirtualMove(visboard, human_move=None):
 
 def perceiveHumanMove():
     """take image (or typed move for now) and return the move that was made"""
-    seen_visboard = seeBoard(current_visboard.copy()) # Tiaan's vision function to find occupied squares  
+    # seen_visboard = seeBoard(current_visboard.copy()) # Tiaan's vision function to find occupied squares  
+    seen_visboard = seeBoardReal(cam, board)
     human_move = compareVisBoards(seen_visboard, current_visboard) # Compare boards to figure out what piece moved
     if human_move is None:
         return perceiveHumanMove()
@@ -261,6 +304,9 @@ def defRobotArm(L1=250,L2=250):
 
 ### SETUP GAME ###
 
+# set up the camera
+cam, board = cameraMain()
+
 # have human pick which side to play (1 = white, -1 = black)
 HUMAN, ROBOT = whichColor()
 
@@ -320,7 +366,9 @@ while humansTurnFinished(): # eventually this will be based on the clock change,
     if gameOver():
         break
 
-    # TODO: currently the code doesn't handle castling (i don't even know what the algebraic notation is)
-    # TODO: currently doesn't capture a piece before moving
-    # TODO: make a better display of who won. The chess object output doesn't make sense
-    # TODO: make waypoints that are more smooth and won't result in a jerky motion straight up, stop, over, stop, down.
+cam.release()
+
+# TODO: currently the code doesn't handle castling (i don't even know what the algebraic notation is)
+# TODO: currently doesn't capture a piece before moving
+# TODO: make a better display of who won. The chess object output doesn't make sense
+# TODO: make waypoints that are more smooth and won't result in a jerky motion straight up, stop, over, stop, down.
