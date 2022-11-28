@@ -42,7 +42,7 @@ def cameraMain():
     # Open Video camera
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
-    relPath = "\\Chessboard_detection\\TestImages\\Test_Set_2"
+    relPath = "\\Chessboard_detection\\TestImages\\Test_Set_2_W_Only"
     cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath)    
 
     if not cam.isOpened():
@@ -170,7 +170,7 @@ def robotsVirtualMove(visboard, human_move=None):
     
     # ask the engine for the best move
     # best_move = stockfish.get_best_move()
-    _, best_move = input("What was your move? ")
+    best_move = input("What was your move? ")
 
     # handle captures
     capture = stockfish.will_move_be_a_capture(best_move)
