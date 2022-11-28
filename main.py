@@ -161,19 +161,19 @@ def perceiveHumanMove():
         return perceiveHumanMove()
     return seen_visboard, human_move
 
-def getPath_simple(start, goal, capture_square, lift=50, step=10):
+def getPath_simple(start, goal, capture_square, storage_list, lift=50, step=10):
     """creates a 3xN array of waypoints from the 3x1 start to the 3x1 end"""
     lift = np.array([0,0,lift])
     if capture_square is not None:
-        storage = cap_list[:,0]
-        cap_list = np.delete(cap_list,0,1)
+        storage = np.array(storage_list.pop(0))
         first_moves = np.hstack((getLinePoints(home, capture_square, step),
                                  capture_square.reshape((3,1)), capture_square.reshape((3,1)),
                                  getLinePoints(capture_square, capture_square + lift, step),
                                  getLinePoints(capture_square + lift, storage + lift, step),
                                  getLinePoints(storage + lift, storage, step),
                                  storage.reshape((3,1)), storage.reshape((3,1)),
-                                 getLinePoints(storage, start, step)))
+                                 getLinePoints(storage, storage + lift, step),
+                                 getLinePoints(storage + lift, start, step)))
     else:
         first_moves = getLinePoints(home, start, step)
     
@@ -187,7 +187,15 @@ def getPath_simple(start, goal, capture_square, lift=50, step=10):
     path = np.hstack((first_moves, second_moves))
     
     # for debugging
+    sq_width = 30
+    bdr_width = 10
+    bas_dist = 15
+    file_lines = np.linspace(-4*sq_width,4*sq_width,9,endpoint=True)
+    rank_lines = np.linspace(8*sq_width,0,9,endpoint=True) + bdr_width + bas_dist
+    X,Y = np.meshgrid(file_lines,rank_lines)
+    Z = np.ones_like(X) * 10
     ax = plt.axes(projection='3d')
+    ax.plot_wireframe(X,Y,Z, color="r")
     ax.scatter3D(path[0],path[1],path[2])
     plt.show()
     
@@ -219,11 +227,11 @@ def defBoardCoords(square_width=30, border_width=10, base_dist=15, base_height=1
     board_coords[:2,:,:] = np.array(np.meshgrid(file_coords,rank_coords))
 
     # define array for coords of captured pieces
-    captured_coords = np.vstack((np.linspace(-board_width/2,board_width/2,15,endpoint=True),
+    storage_coords = list(np.vstack((np.linspace(-board_width/2,board_width/2,15,endpoint=True),
                                 np.ones(15)*(base_dist - square_width),
-                                np.zeros(15)))
+                                np.zeros(15))).T)
 
-    return board_coords, captured_coords, home
+    return board_coords, storage_coords, home
 
 def getCoords(square_name, board_coords):
     """gives real-world coordinates in mm based on chess board square (e.g. 'e2')"""
@@ -237,7 +245,7 @@ def robotsPhysicalMove(robot_move, capture_square):
     goal = getCoords(robot_move[2:],cboard)
     if capture_square is not None:
         capture_square = getCoords(capture_square, cboard)
-    path = getPath_simple(start, goal, capture_square)
+    path = getPath_simple(start, goal, capture_square, storage_list)
     
     # TODO: find thetapath using inverse kinematics
 
@@ -265,7 +273,7 @@ robotarm = defRobotArm()
 # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
 starting_visboard = np.vstack((np.ones((2,8))*ROBOT, np.zeros((4,8)), np.ones((2,8))*HUMAN))
 pyboard = chess.Board()
-cboard, cap_list, home = defBoardCoords()
+cboard, storage_list, home = defBoardCoords()
 
 if ROBOT == chess.WHITE: # if robot is playing white, have it go first
     print("My turn first")
