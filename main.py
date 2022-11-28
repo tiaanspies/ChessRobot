@@ -29,7 +29,7 @@ from stockfish import Stockfish
 import numpy as np
 import chess
 import matplotlib.pyplot as plt
-from NLinkArm3d import NLinkArm
+# from NLinkArm3d import NLinkArm
 
 ### INITIALIZE ###
 
@@ -268,7 +268,7 @@ HUMAN, ROBOT = whichColor()
 stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=15, parameters={"UCI_Elo":800})
 
 # create NLinkArm instance specific to our robot using python_robotics NLinkArm class
-robotarm = defRobotArm()
+# robotarm = defRobotArm()
 
 # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
 starting_visboard = np.vstack((np.ones((2,8))*ROBOT, np.zeros((4,8)), np.ones((2,8))*HUMAN))
