@@ -321,9 +321,9 @@ class ChessBoard:
         lastPointFirstRow = corners[0][-1]
 
         # firstRowAngle = np.arctan2()
-        # newArr = np.transpose(corners, axes=(1, 0, 2))
-        # newArr = np.flip(newArr, axis=1)
-        newArr = corners
+        newArr = np.transpose(corners, axes=(1, 0, 2))
+        newArr = np.flip(newArr, axis=1)
+        # newArr = corners
         return newArr
     
     def maskImage(self, img):
@@ -350,7 +350,8 @@ class ChessBoard:
         Look at each square in board and see which color piece is on it.
         """
         # Read new image from camera object
-        imgHSV = cv.cvtColor(img, cv.COLOR_RGB2HSV)
+        imgReorientated = self.makeTopRowFirst(img)
+        imgHSV = cv.cvtColor(imgReorientated, cv.COLOR_RGB2HSV)
         blurredHSV = cv.medianBlur(imgHSV, 11)
 
         blocks = self.splitBoardIntoSquares(blurredHSV)

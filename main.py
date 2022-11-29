@@ -1,11 +1,13 @@
 """
 ### PSEUDOCODE ###
 INITIALIZE
-imports libraries, define functions, start stockfish
+imports libraries, define functions
 
 SETUP GAME
 have human pick a side to play
-create representations of the board in numpy-chess and in -1, 0, 1 representation for the vision
+start an instance of the stockfish engine
+create representations of the game in numpy-chess, physical coordinates, and in -1, 0, 1 representation for the vision
+
 have the robot go first if it's playing white
 
 loop: when the human makes their turn (hits the timer)
@@ -31,12 +33,13 @@ import numpy as np
 import chess
 import matplotlib.pyplot as plt
 from Chessboard_detection import Fake_Camera, Chess_Vision
-# from NLinkArm3d import NLinkArm
+# from NLinkArm3d import NLinkArm -- commented out bc only necessary for IK and simulation
 
 ### INITIALIZE ###
 
-# necessary functions
+# functions for gameplay
 def cameraMain():
+    """Sets up the camera, needs to calibrate on both empty and starting board. returns cam and board instances"""
     CAMERA_RESOLUTION = (640, 480)
 
     # Open Video camera
@@ -70,14 +73,9 @@ def cameraMain():
 
     return cam, board
 
-def seeBoardReal(cam, board):
-    s, img = cam.read()  # read in image from camera
-    positions = board.getCurrentPositions(img) # turn it into -1, 0, 1 representation
-    return positions
-
 def whichColor():
     """Human decides which color to play. Black is -1, White is 1"""
-    ans = input("Hello, human. Do you want to play black or white today? (b/w): ").strip().lower()
+    ans = input("Hello, human. Are you playing black or white today? (b/w): ").strip().lower()
     if ans not in ['b', 'w']:
         print(f'"{ans}" is invalid, please try again...')
         return whichColor()
@@ -89,7 +87,7 @@ def whichColor():
     return HUMAN, ROBOT
 
 def humansTurnFinished():
-    """Simple yes/no question to determine if human is done with their turn. This will later be the function that flags when the clock is pressed"""
+    """Simple yes/no question to determine if human is done with their turn. This will eventually be the function that flags when the clock is pressed"""
 
     # for debugging sake, I currently have this set permanently to True
     return True
@@ -105,6 +103,29 @@ def humansTurnFinished():
         return True
     return False
 
+def gameOver():
+    """returns False if game isn't over, prints the outcome and returns True if it is"""
+    if pyboard.outcome():
+        print("Good game, human")
+        print(pyboard.outcome())     
+        return True
+    return False
+
+# functions for handling visboard (the -1, 0, 1 representation)
+def seeBoardReal(cam, board):
+    """Uses CV to determine which squares are occupied, returns -1, 0, 1 representation"""
+    s, img = cam.read()  # read in image from camera
+    positions = board.getCurrentPositions(img) # turn it into -1, 0, 1 representation
+    return positions
+
+def seeBoardFiller(board):
+    """Filler function for seeBoardReal which takes users input for which piece to move and updates visboard with it"""
+        
+    ans = input("what is your move? ")
+    board = updateVisBoard(board, ans, HUMAN)
+
+    return board
+
 def updateVisBoard(board, move, player, capture=None):
     """Updates the -1, 0, 1 representation of the board"""
     start_square = chess.parse_square(move[:2])
@@ -117,15 +138,6 @@ def updateVisBoard(board, move, player, capture=None):
     board.ravel()[start_square] = 0
     board.ravel()[end_square] = player
     
-    return board
-
-def seeBoard(board):
-    """Uses CV to determine which squares are occupied, returns -1, 0, 1 representation"""
-    # instead right now it takes the users input for which piece to move where
-    
-    ans = input("what is your move? ")
-    board = updateVisBoard(board, ans, HUMAN)
-
     return board
     
 def compareVisBoards(current, previous):
@@ -157,52 +169,54 @@ def compareVisBoards(current, previous):
     
     return start_name + end_name
 
-def gameOver():
-    """returns False if game isn't over, prints the outcome and returns True if it is"""
-    if pyboard.outcome():
-        print("Good game, human")
-        print(pyboard.outcome())     
-        return True
-    return False
-
-def robotsVirtualMove(visboard, human_move=None):
-    """takes in the game in it's current state and returns it having made one best move or None if robot won"""
-    
-    # ask the engine for the best move
-    # best_move = stockfish.get_best_move()
-    best_move = input("What was your move? ")
-
-    # handle captures
-    capture = stockfish.will_move_be_a_capture(best_move)
-    print(capture)
-    if capture is stockfish.Capture.DIRECT_CAPTURE:
-        capture_square = best_move[2:]
-    elif capture is stockfish.Capture.EN_PASSANT:
-        capture_square = human_move[2:]
-    elif capture is stockfish.Capture.NO_CAPTURE:
-        capture_square = None
-    else:
-        print("you clearly don't understand this function")
-
-    # make that move and update the board representations
-    stockfish.make_moves_from_current_position([best_move])
-    visboard = updateVisBoard(visboard, best_move, ROBOT, capture=capture_square)
-    pyboard.push_uci(best_move)
-
-    # print the board so the human can make a next move - this won't be needed later
-    stockboard = stockfish.get_board_visual(HUMAN == chess.WHITE)
-    print(stockboard)
-
-    return best_move, visboard, capture_square
-
 def perceiveHumanMove():
     """take image (or typed move for now) and return the move that was made"""
-    # seen_visboard = seeBoard(current_visboard.copy()) # Tiaan's vision function to find occupied squares  
-    seen_visboard = seeBoardReal(cam, board)
+    # seen_visboard = seeBoardFiller(current_visboard.copy())   
+    seen_visboard = seeBoardReal(cam, board) # Tiaan's vision function to find occupied squares
     human_move = compareVisBoards(seen_visboard, current_visboard) # Compare boards to figure out what piece moved
     if human_move is None:
         return perceiveHumanMove()
     return seen_visboard, human_move
+
+# functions for handling transition to real 3D space
+def getLinePoints(start, goal, step):
+    """Creates a 3xN nparray of 3D waypoints roughly 'step' distance apart between two 3D points"""
+    dist = np.linalg.norm(goal - start)
+    n_steps = int(dist // step)
+    x_points = np.linspace(start[0], goal[0], n_steps)
+    y_points = np.linspace(start[1], goal[1], n_steps)
+    z_points = np.linspace(start[2], goal[2], n_steps)
+    return np.vstack((x_points, y_points, z_points))
+
+def defBoardCoords(square_width=30, border_width=10, base_dist=15, base_height=10):
+    """gives an 3x8x8 ndarray representing the euclidean coordinates of the center of each board square"""
+    # zero is at the robot base, which is centered base_dist from the edge of the board
+    
+    # initialize
+    board_coords = np.zeros((3,8,8))
+    board_width = 8 * square_width + 2 * border_width
+    home = np.array([0, base_dist, 1.5*board_width])
+    
+    # set z coord
+    board_coords[2,:,:] = base_height
+
+    # define and set x and y coords of board
+    file_coords = np.linspace(-3.5*square_width,3.5*square_width,8,endpoint=True)
+    rank_coords = np.linspace(7.5*square_width,0.5*square_width,8,endpoint=True) + border_width + base_dist
+    board_coords[:2,:,:] = np.array(np.meshgrid(file_coords,rank_coords))
+
+    # define array for coords of captured pieces
+    storage_coords = list(np.vstack((np.linspace(-board_width/2,board_width/2,15,endpoint=True),
+                                np.ones(15)*(base_dist - square_width),
+                                np.zeros(15))).T)
+
+    return board_coords, storage_coords, home
+
+def getCoords(square_name, board_coords):
+    """gives real-world coordinates in mm based on chess board square (e.g. 'e2')"""
+    file_idx = chess.FILE_NAMES.index(square_name[0]) if ROBOT==1 else chess.FILE_NAMES[::-1].index(square_name[0])
+    rank_idx = chess.RANK_NAMES[::-1].index(square_name[1]) if ROBOT==1 else chess.RANK_NAMES.index(square_name[1])
+    return board_coords[:,rank_idx,file_idx]
 
 def getPath_simple(start, goal, capture_square, storage_list, lift=50, step=10):
     """creates a 3xN array of waypoints from the 3x1 start to the 3x1 end"""
@@ -244,43 +258,33 @@ def getPath_simple(start, goal, capture_square, storage_list, lift=50, step=10):
     
     return path
 
-def getLinePoints(start, goal, step):
-    dist = np.linalg.norm(goal - start)
-    n_steps = int(dist // step)
-    x_points = np.linspace(start[0], goal[0], n_steps)
-    y_points = np.linspace(start[1], goal[1], n_steps)
-    z_points = np.linspace(start[2], goal[2], n_steps)
-    return np.vstack((x_points, y_points, z_points))
-
-def defBoardCoords(square_width=30, border_width=10, base_dist=15, base_height=10):
-    """gives an 3x8x8 ndarray representing the euclidean coordinates of the center of each board square"""
-    # zero is at the robot base, which is centered base_dist from the edge of the board
+# functions for grouping sections of code
+def robotsVirtualMove(visboard, human_move=None):
+    """takes in the game in it's current state and returns it having made one best move or None if robot won"""
     
-    # initialize
-    board_coords = np.zeros((3,8,8))
-    board_width = 8 * square_width + 2 * border_width
-    home = np.array([0, base_dist, 1.5*board_width])
-    
-    # set z coord
-    board_coords[2,:,:] = base_height
+    # ask the engine for the best move -- instead right now, ask what move was made in the recorded game
+    # best_move = stockfish.get_best_move()
+    best_move = input("What was your move? ")
 
-    # define and set x and y coords of board
-    file_coords = np.linspace(-3.5*square_width,3.5*square_width,8,endpoint=True)
-    rank_coords = np.linspace(7.5*square_width,0.5*square_width,8,endpoint=True) + border_width + base_dist
-    board_coords[:2,:,:] = np.array(np.meshgrid(file_coords,rank_coords))
+    # handle captures
+    capture = stockfish.will_move_be_a_capture(best_move)
+    if capture is stockfish.Capture.DIRECT_CAPTURE:
+        capture_square = best_move[2:]
+    elif capture is stockfish.Capture.EN_PASSANT:
+        capture_square = human_move[2:]
+    elif capture is stockfish.Capture.NO_CAPTURE:
+        capture_square = None
 
-    # define array for coords of captured pieces
-    storage_coords = list(np.vstack((np.linspace(-board_width/2,board_width/2,15,endpoint=True),
-                                np.ones(15)*(base_dist - square_width),
-                                np.zeros(15))).T)
+    # make that move and update the board representations
+    stockfish.make_moves_from_current_position([best_move])
+    visboard = updateVisBoard(visboard, best_move, ROBOT, capture=capture_square)
+    pyboard.push_uci(best_move)
 
-    return board_coords, storage_coords, home
+    # print the board so the human can make a next move - this won't be needed later
+    stockboard = stockfish.get_board_visual(HUMAN == chess.WHITE)
+    print(stockboard)
 
-def getCoords(square_name, board_coords):
-    """gives real-world coordinates in mm based on chess board square (e.g. 'e2')"""
-    file_idx = chess.FILE_NAMES.index(square_name[0]) if ROBOT==1 else chess.FILE_NAMES[::-1].index(square_name[0])
-    rank_idx = chess.RANK_NAMES[::-1].index(square_name[1]) if ROBOT==1 else chess.RANK_NAMES.index(square_name[1])
-    return board_coords[:,rank_idx,file_idx]
+    return best_move, visboard, capture_square
 
 def robotsPhysicalMove(robot_move, capture_square):
     """creates and executes the robot's physical move"""
@@ -292,6 +296,7 @@ def robotsPhysicalMove(robot_move, capture_square):
     
     # TODO: find thetapath using inverse kinematics
 
+# functions for simulation
 def defRobotArm(L1=250,L2=250):
     """creates an instance of the NLinkArm class for our specific robot configuration"""
     # define robot parameters in DH convention [theta alpha a d]
@@ -313,7 +318,7 @@ HUMAN, ROBOT = whichColor()
 # create an instance of of the stockfish engine with the parameters requested
 stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=15, parameters={"UCI_Elo":800})
 
-# create NLinkArm instance specific to our robot using python_robotics NLinkArm class
+# create NLinkArm instance specific to our robot using python_robotics NLinkArm class -- commented out bc only necessary for IK and simulation
 # robotarm = defRobotArm()
 
 # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
