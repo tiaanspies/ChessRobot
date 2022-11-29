@@ -7,7 +7,7 @@ from sklearn.cluster import KMeans
 import cv2 as cv
 from collections import Counter
 
-from Chessboard_detection import Fake_Camera
+import Fake_Camera
 
 CAMERA_RESOLUTION = (640, 480)
 
@@ -85,21 +85,26 @@ class ChessBoard:
         cornersIntReoriented = self.makeTopRowFirst(cornersIntReshaped)
 
         self.cornersExt = self.estimateExternalCorners(cornersIntReoriented)
+        
+        # ====== Uncomment this code to test which side should be up
+        # cornersNew = np.reshape(self.cornersExt, (81, 2))
+        # img_new = cv.drawChessboardCorners(img, self.BOARD_SIZE, cornersNew, True)
+        # showImg(img_new)
 
     def findClusterImg(self, img):
         """
         Assigns pixels to their closest cluster.
         returns image with all pixels assigned to cluster
         """
-        maskedImage = self.maskImage(img)
+        # maskedImage = self.maskImage(img)
 
-        imgReshaped = np.reshape(maskedImage, (maskedImage.shape[0]*maskedImage.shape[1], 3))
+        imgReshaped = np.reshape(img, (img.shape[0]*img.shape[1], 3))
 
         predictions = self.kmeans.predict(imgReshaped)
         clustersInt = self.kmeans.cluster_centers_.astype(np.uint8)
 
         newImg = [clustersInt[x] for x in predictions]
-        newImg = np.reshape(newImg, (maskedImage.shape[0], maskedImage.shape[1], 3))
+        newImg = np.reshape(newImg, (img.shape[0], img.shape[1], 3))
         
         return newImg
 
@@ -138,7 +143,7 @@ class ChessBoard:
         resizedImg = np.hstack(resizedImg)
 
         blur = cv.medianBlur(resizedImg, 7)
-
+        
         # reshape image into a single line for k means fitting
         self.kmeans = KMeans(n_clusters=4)
         imgReshaped = np.reshape(blur, (blur.shape[0]*blur.shape[1], 3))
@@ -154,7 +159,7 @@ class ChessBoard:
             kernReshaped = np.reshape(kernArr, (blur.shape[0]*blur.shape[1]))
             self.kmeans.fit(imgReshaped, sample_weight=kernReshaped)
         else:
-            self.kmeans.fit(imgReshaped)
+            self.kmeans.fit(imgReshaped)       
         
         #Assign cluster id to all pixels on blocks
         # find what cluster id is black or white
@@ -323,6 +328,7 @@ class ChessBoard:
         # firstRowAngle = np.arctan2()
         newArr = np.transpose(corners, axes=(1, 0, 2))
         newArr = np.flip(newArr, axis=1)
+        newArr = np.flip(newArr, axis=0)
         # newArr = corners
         return newArr
     
@@ -350,10 +356,9 @@ class ChessBoard:
         Look at each square in board and see which color piece is on it.
         """
         # Read new image from camera object
-        imgReorientated = self.makeTopRowFirst(img)
-        imgHSV = cv.cvtColor(imgReorientated, cv.COLOR_RGB2HSV)
-        blurredHSV = cv.medianBlur(imgHSV, 11)
-
+        hsv = cv.cvtColor(img, cv.COLOR_RGB2HSV)
+        blurredHSV = cv.medianBlur(hsv, 11)
+        
         blocks = self.splitBoardIntoSquares(blurredHSV)
         clustered = self.findBlockClusters(blocks)
         blockIDs = self.detectPieces(clustered)
@@ -474,7 +479,7 @@ def main():
     # Open Video camera
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
-    relPath = "\\TestImages\\Test_Set_2"
+    relPath = "\\TestImages\\Set_2_W_only"
     cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath)    
 
     if not cam.isOpened():
@@ -488,7 +493,7 @@ def main():
     # NB --- Board is setup in starting setup.
     # Runs kmeans clustering to group peice and board colours
     s, img = cam.read()
-    board.fitKClusters(img)
+    board.fitKClusters(img, True)
 
     # display video of chessboard with corners
     s, img = cam.read()  

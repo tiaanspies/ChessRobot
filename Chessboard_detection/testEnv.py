@@ -18,7 +18,7 @@ def main():
             #     successRate.append(0)
     
     print("Tests Success rate: ")
-    print(successRate*100)
+    print(successRate)
 
 def findFolders(relPath):
     """Find all folder in subfolder"""
