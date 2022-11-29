@@ -327,7 +327,7 @@ class ChessBoard:
 
         # firstRowAngle = np.arctan2()
         newArr = np.transpose(corners, axes=(1, 0, 2))
-        newArr = np.flip(newArr, axis=1)
+        # newArr = np.flip(newArr, axis=1)
         newArr = np.flip(newArr, axis=0)
         # newArr = corners
         return newArr

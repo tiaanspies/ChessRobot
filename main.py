@@ -115,7 +115,8 @@ def gameOver():
 def seeBoardReal():
     """Uses CV to determine which squares are occupied, returns -1, 0, 1 representation"""
     s, img = cam.read()  # read in image from camera
-    positions = board.getCurrentPositions(img) # turn it into -1, 0, 1 representation
+    positions = np.flip(board.getCurrentPositions(img),0) # turn it into -1, 0, 1 representation
+    print(positions)
     return positions
 
 def seeBoardFiller(board):
@@ -128,21 +129,25 @@ def seeBoardFiller(board):
 
 def updateVisBoard(board, move, player, capture=None):
     """Updates the -1, 0, 1 representation of the board"""
+    board_new = board.copy()
     start_square = chess.parse_square(move[:2])
     end_square = chess.parse_square(move[2:])
 
+    temp = board_new.ravel()
+
     if capture:
         capture_square = chess.parse_square(capture)
-        board.ravel()[capture_square] = 0
-
-    board.ravel()[start_square] = 0
-    board.ravel()[end_square] = player
+        temp[capture_square] = 0
     
-    return board
+    temp[start_square] = 0
+    temp[end_square] = player
+    board_final = temp.reshape((8,8))
+    
+    return board_final
     
 def compareVisBoards(current, previous):
     """compares the CV output with most recent board and outputs the move that was made or None if it can't tell"""
-    '''
+    
     # debugging
     print("current:")
     print(current)
@@ -152,7 +157,7 @@ def compareVisBoards(current, previous):
     print(current!=previous)
     print("Human:")
     print(current==HUMAN)
-    '''
+    
 
     start_square = np.flatnonzero(np.logical_and((current!=previous),(current==0)))
     end_square = np.flatnonzero(np.logical_and((current!=previous),(current==HUMAN)))
@@ -322,7 +327,8 @@ cam, board = initializeCamera()
 HUMAN, ROBOT = whichColor()
 
 # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
-starting_visboard = np.vstack((np.ones((2,8))*ROBOT, np.zeros((4,8)), np.ones((2,8))*HUMAN))
+starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64)*ROBOT, np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*HUMAN))
+print(starting_visboard)
 pyboard = chess.Board()
 cboard, storage_list, home = defBoardCoords()
 
