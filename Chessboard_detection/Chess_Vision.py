@@ -85,6 +85,7 @@ class ChessBoard:
         cornersIntReoriented = self.makeTopRowFirst(cornersIntReshaped)
 
         self.cornersExt = self.estimateExternalCorners(cornersIntReoriented)
+        self.flipBoard = False       
         
         # # ====== Uncomment this code to draw chessboardCorners
         # cornersNew = np.reshape(self.cornersExt, (81, 2))
@@ -123,6 +124,23 @@ class ChessBoard:
             predictions[id] = np.reshape(predictionReshaped, (block.shape[0], block.shape[1]))
 
         return predictions
+    
+    def initBoardWithStartPos(self, img):
+        self.fitKClusters(img, weighted=True)
+        positions = self.getCurrentPositions(img)
+
+        meanBottom = math.round(np.mean(positions[-2:, :], axis=(0, 1)))
+        meanTop = math.round(np.mean(positions[:2, :]))
+
+        if meanTop == -1:
+            self.flipBoard = True
+
+        humanColor = meanTop
+        robotColor = meanBottom
+
+        return humanColor, robotColor
+
+
 
     def fitKClusters(self, img, weighted=False):
         """
@@ -197,7 +215,7 @@ class ChessBoard:
 
             if not confirmFirst:
                 break
-        
+        one = np.ones((8, 8), dtype=np.int32)
         self.initialImage = frame.copy()
         
 
@@ -400,6 +418,9 @@ class ChessBoard:
         blockIDs = self.detectPieces(clustered)
 
         blockIDs = np.reshape(blockIDs, (8, 8))
+
+        if self.flipBoard:
+            blockIDs = np.flip(blockIDs, axis=0)
 
         return blockIDs
 
