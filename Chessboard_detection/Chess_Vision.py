@@ -77,7 +77,7 @@ class ChessBoard:
 
         # see which blak and white threshold makes the board the easiest to find
         # Opt is estimated by middle of min and max
-        thresholdOpt = self.findOptimalThreshold(self.initialImage, onlyFindOne=True)
+        thresholdOpt = self.findOptimalThreshold(self.initialImage, onlyFindOne=False)
 
         _, cornersInt  = self.findBoardCorners(self.initialImage, thresholdOpt)
 
@@ -87,7 +87,7 @@ class ChessBoard:
         self.cornersExt = self.estimateExternalCorners(cornersIntReoriented)
         self.flipBoard = False       
         
-        # # ====== Uncomment this code to draw chessboardCorners
+        # # # ====== Uncomment this code to draw chessboardCorners
         # cornersNew = np.reshape(self.cornersExt, (81, 2))
         # img_new = cv.drawChessboardCorners(img, self.BOARD_SIZE, cornersNew, True)
         # showImg(img_new)
@@ -127,10 +127,11 @@ class ChessBoard:
     
     def initBoardWithStartPos(self, img):
         self.fitKClusters(img, weighted=True)
+
         positions = self.getCurrentPositions(img)
 
-        meanBottom = math.round(np.mean(positions[-2:, :], axis=(0, 1)))
-        meanTop = math.round(np.mean(positions[:2, :]))
+        meanBottom = np.round(np.mean(positions[-2:, :], axis=(0, 1)))
+        meanTop = np.round(np.mean(positions[:2, :]))
 
         if meanTop == -1:
             self.flipBoard = True
@@ -413,6 +414,13 @@ class ChessBoard:
         hsv = cv.cvtColor(img, cv.COLOR_RGB2HSV)
         blurredHSV = cv.medianBlur(hsv, 11)
         
+        ### DEBUG TO SHOW CLUSTER IMAGE
+        masked = self.maskImage(blurredHSV)
+        cluster = self.findClusterImg(masked)
+        img_new = cv.cvtColor(cluster, cv.COLOR_HSV2RGB)
+        showImg(img_new)
+        ## END DEBUG
+
         blocks = self.splitBoardIntoSquares(blurredHSV)
         clustered = self.findBlockClusters(blocks)
         blockIDs = self.detectPieces(clustered)
@@ -421,7 +429,8 @@ class ChessBoard:
 
         if self.flipBoard:
             blockIDs = np.flip(blockIDs, axis=0)
-
+            blockIDs = np.flip(blockIDs, axis=1)
+            
         return blockIDs
 
     def splitBoardIntoSquares(self, img):

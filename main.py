@@ -45,8 +45,8 @@ def initializeCamera():
     # Open Video camera
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
-    relPath = "\\Chessboard_detection\\TestImages\\Set_2_B_Only"
-    cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath)    
+    relPath = "\\Chessboard_detection\\TestImages\\Temp"
+    cam = Fake_Camera.PhoneCamera(CAMERA_RESOLUTION, dirPath + relPath)    
 
     if not cam.isOpened():
         raise("Cannot open camera.")
@@ -66,7 +66,7 @@ def initializeCamera():
     ans = input("Are all the pieces placed now? (y/n): ").strip().lower()
     if ans== 'y':
         s, img = cam.read()
-        HUMAN, ROBOT = board.fitKClusters(img)
+        HUMAN, ROBOT = board.initBoardWithStartPos(img)
     else:
         print("Error: set up the board")
         exit()
@@ -90,7 +90,7 @@ def humansTurnFinished():
     """Simple yes/no question to determine if human is done with their turn. This will eventually be the function that flags when the clock is pressed"""
 
     # for debugging sake, I currently have this set permanently to True
-    return True
+    # return True
 
     ans = input("Are you finished? (y/n): ").strip().lower()
     if ans not in ['y', 'n']:
@@ -116,7 +116,9 @@ def seeBoardReal():
     """Uses CV to determine which squares are occupied, returns -1, 0, 1 representation"""
     s, img = cam.read()  # read in image from camera
     positions = board.getCurrentPositions(img) # turn it into -1, 0, 1 representation
-    return positions
+    visboard = np.fliplr(positions)
+
+    return visboard
 
 def seeBoardFiller(board):
     """Filler function for seeBoardReal which takes users input for which piece to move and updates visboard with it"""
@@ -148,7 +150,7 @@ def compareVisBoards(current, previous):
     """compares the CV output with most recent board and outputs the move that was made or None if it can't tell"""
     
     # debugging
-    '''
+    
     print("current:")
     print(current)
     print("previous:")
@@ -157,16 +159,18 @@ def compareVisBoards(current, previous):
     print(current!=previous)
     print("Human:")
     print(current==HUMAN)
-    '''
+    
 
     start_square = np.flatnonzero(np.logical_and((current!=previous),(current==0)))
     end_square = np.flatnonzero(np.logical_and((current!=previous),(current==HUMAN)))
     
     if start_square.size == 0:
         print("failed to locate which piece was moved")
+        ans = input("Have you moved your piece back? ")
         return None
     elif end_square.size == 0:
         print("failed to locate where the piece was played")
+        ans = input("Have you moved your piece back? ")
         return None
     
     start_name = chess.square_name(start_square[0])
@@ -183,7 +187,7 @@ def perceiveHumanMove(previous_visboard):
     new_visboard = seeBoardReal() # Tiaan's vision function to find occupied squares
     human_move = compareVisBoards(new_visboard, previous_visboard) # Compare boards to figure out what piece moved
     if human_move is None:
-        return perceiveHumanMove()
+        return perceiveHumanMove(previous_visboard)
     return new_visboard, human_move
 
 # functions for handling transition to real 3D space
@@ -250,7 +254,7 @@ def getPath_simple(start, goal, capture_square, storage_list, lift=50, step=10):
                               getLinePoints(goal, home, step)))
 
     path = np.hstack((first_moves, second_moves))
-    
+    '''
     # for debugging
     sq_width = 30
     bdr_width = 10
@@ -263,7 +267,7 @@ def getPath_simple(start, goal, capture_square, storage_list, lift=50, step=10):
     ax.plot_wireframe(X,Y,Z, color="r")
     ax.scatter3D(path[0],path[1],path[2])
     plt.show()
-    
+    '''
     return path
 
 # functions for grouping sections of code
@@ -271,8 +275,8 @@ def robotsVirtualMove(visboard, human_move=None):
     """takes in the game in it's current state and returns it having made one best move or None if robot won"""
     
     # ask the engine for the best move -- instead right now, ask what move was made in the recorded game
-    # best_move = stockfish.get_best_move()
-    best_move = input("What was the robot's move? ")
+    best_move = stockfish.get_best_move()
+    # best_move = input("What was the robot's move? ")
 
     # handle captures
     capture = stockfish.will_move_be_a_capture(best_move)
@@ -289,8 +293,9 @@ def robotsVirtualMove(visboard, human_move=None):
     pyboard.push_uci(best_move)
 
     # print the board so the human can make a next move - this won't be needed later
-    stockboard = stockfish.get_board_visual(HUMAN == chess.WHITE)
-    print(stockboard)
+    # stockboard = stockfish.get_board_visual(HUMAN == chess.WHITE)
+    # print(stockboard)
+    print(best_move)
 
     return best_move, visboard, capture_square
 
@@ -318,7 +323,7 @@ def defRobotArm(L1=250,L2=250):
 
 ### Global variables ###
 # create an instance of of the stockfish engine with the parameters requested
-stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=15, parameters={"UCI_Elo":800})
+stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=15, parameters={"UCI_Elo":3000})
 
 # create an instance of the cam and board classes for converting input from the camera
 cam, board, HUMAN, ROBOT = initializeCamera()
@@ -328,7 +333,6 @@ cam, board, HUMAN, ROBOT = initializeCamera()
 
 # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
 starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*-1))
-print(starting_visboard)
 pyboard = chess.Board()
 cboard, storage_list, home = defBoardCoords()
 
