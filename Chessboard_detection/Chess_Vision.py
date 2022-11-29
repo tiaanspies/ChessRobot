@@ -7,7 +7,7 @@ from sklearn.cluster import KMeans
 import cv2 as cv
 from collections import Counter
 
-from Chessboard_detection import Fake_Camera
+import Fake_Camera
 
 CAMERA_RESOLUTION = (640, 480)
 
@@ -86,7 +86,7 @@ class ChessBoard:
 
         self.cornersExt = self.estimateExternalCorners(cornersIntReoriented)
         
-        # ====== Uncomment this code to test which side should be up
+        # # ====== Uncomment this code to draw chessboardCorners
         # cornersNew = np.reshape(self.cornersExt, (81, 2))
         # img_new = cv.drawChessboardCorners(img, self.BOARD_SIZE, cornersNew, True)
         # showImg(img_new)
@@ -318,18 +318,54 @@ class ChessBoard:
         cornersExt = np.vstack([cornersExtRow0, cornersExtRow1, cornersExtRow2])
 
         return cornersExt
+    
+    def findCentroidsOfCorners(self, corners):
+        row_top_pt_1 = corners[0][0]
+        row_top_pt_2 = corners[0][-1]
+        centroid_top = (row_top_pt_1 + row_top_pt_2) / 2
+
+        row_left_pt_1 = corners[0][0]
+        row_left_pt_2 = corners[-1][0]
+        centroid_left = (row_left_pt_1 + row_left_pt_2) / 2
+
+        row_right_pt_1 = corners[0][-1]
+        row_right_pt_2 = corners[-1][-1]
+        centroid_right = (row_right_pt_1 + row_right_pt_2) / 2
+
+        row_bottom_pt_1 = corners[-1][0]
+        row_bottom_pt_2 = corners[-1][-1]
+        centroid_bottom = (row_bottom_pt_1 + row_bottom_pt_2) / 2
+
+        return centroid_top, centroid_left, centroid_right, centroid_bottom
 
     def makeTopRowFirst(self, corners):
         # TODO: adjust angle to keep top row at the top of image
         # The array should start form top left.
-        firstPoint = corners[0][0]
-        lastPointFirstRow = corners[0][-1]
+        # top row is the top row of array. We are aiming to make it the 
+        # top row of the image as well
+        
+        top, left, right, bottom = self.findCentroidsOfCorners(corners)
 
-        # firstRowAngle = np.arctan2()
-        newArr = np.transpose(corners, axes=(1, 0, 2))
-        # newArr = np.flip(newArr, axis=1)
-        newArr = np.flip(newArr, axis=0)
-        # newArr = corners
+        if top[1] > np.min([left[1], right[1], bottom[1]]) \
+            and top[1] < np.max([left[1], right[1], bottom[1]]):
+            # top row is between. therefore it must be on the side of the image.
+            # transpose, and flip it.
+            newArr = np.transpose(corners, axes=(1, 0, 2))
+        else:
+            newArr = corners
+        
+        top, left, right, bottom = self.findCentroidsOfCorners(newArr)
+        
+        if top[1] > np.max([left[1], right[1], bottom[1]]):
+            #Row is at bottom of all. flip to make top.
+            newArr = np.flip(newArr, axis=0)
+        
+        diff = newArr[0][-1] - newArr[0][0]
+        firstRowAngle = np.arctan2(diff[1], diff[0])
+        firstRowAngle = (firstRowAngle + 2*np.pi) % (2*np.pi)
+        if firstRowAngle > np.pi/2 and firstRowAngle < (4/3*np.pi):
+            newArr = np.flip(newArr, axis=1)
+
         return newArr
     
     def maskImage(self, img):
