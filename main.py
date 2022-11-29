@@ -38,7 +38,7 @@ from Chessboard_detection import Fake_Camera, Chess_Vision
 ### INITIALIZE ###
 
 # functions for gameplay
-def cameraMain():
+def initializeCamera():
     """Sets up the camera, needs to calibrate on both empty and starting board. returns cam and board instances"""
     CAMERA_RESOLUTION = (640, 480)
 
@@ -264,7 +264,7 @@ def robotsVirtualMove(visboard, human_move=None):
     
     # ask the engine for the best move -- instead right now, ask what move was made in the recorded game
     # best_move = stockfish.get_best_move()
-    best_move = input("What was your move? ")
+    best_move = input("What was the robot's move? ")
 
     # handle captures
     capture = stockfish.will_move_be_a_capture(best_move)
@@ -295,6 +295,8 @@ def robotsPhysicalMove(robot_move, capture_square):
     path = getPath_simple(start, goal, capture_square, storage_list)
     
     # TODO: find thetapath using inverse kinematics
+    
+    return
 
 # functions for simulation
 def defRobotArm(L1=250,L2=250):
@@ -306,74 +308,76 @@ def defRobotArm(L1=250,L2=250):
     param_list = [l1_params, l2_params, l3_params]
     return NLinkArm(param_list)
 
-
-### SETUP GAME ###
-
-# set up the camera
-cam, board = cameraMain()
-
-# have human pick which side to play (1 = white, -1 = black)
-HUMAN, ROBOT = whichColor()
-
+### Global variables ###
 # create an instance of of the stockfish engine with the parameters requested
 stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=15, parameters={"UCI_Elo":800})
 
-# create NLinkArm instance specific to our robot using python_robotics NLinkArm class -- commented out bc only necessary for IK and simulation
-# robotarm = defRobotArm()
+# create an instance of the cam and board classes for converting input from the camera
+cam, board = initializeCamera()
+
+# create variables for who is playing which side (1 = white, -1 = black)
+HUMAN, ROBOT = whichColor()
 
 # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
 starting_visboard = np.vstack((np.ones((2,8))*ROBOT, np.zeros((4,8)), np.ones((2,8))*HUMAN))
 pyboard = chess.Board()
 cboard, storage_list, home = defBoardCoords()
 
-if ROBOT == chess.WHITE: # if robot is playing white, have it go first
-    print("My turn first")
-    robot_move, current_visboard, capture_square = robotsVirtualMove(starting_visboard) # make the move virtually
-    robotsPhysicalMove(robot_move, capture_square) # make the move physically
-else:
-    current_visboard = starting_visboard
-    print("Your turn first")
-    stockboard = stockfish.get_board_visual(HUMAN == chess.WHITE)
-    print(stockboard)
+# create NLinkArm instance specific to our robot using python_robotics NLinkArm class -- commented out bc only necessary for IK and simulation
+# robotarm = defRobotArm()
 
-# take turns until the game ends. Each iteration starts when the human finishes their turn. Iteration includes processing the human's turn, then making a countermove.
-while humansTurnFinished(): # eventually this will be based on the clock change, not commandline input
-    
-    ### HUMAN'S TURN ###
-    # figure out what their move was
-    seen_visboard, human_move = perceiveHumanMove()
+def main():
 
-    # if move is illegal make human try again
-    if chess.Move.from_uci(human_move) not in pyboard.legal_moves:
-        print("Not a valid move. Try again, human")
-        if pyboard.is_into_check(chess.Move.from_uci(human_move)):
-            print("PS, you might want to avoid check this time")
+    if ROBOT == chess.WHITE: # if robot is playing white, have it go first
+        print("My turn first")
+        robot_move, current_visboard, capture_square = robotsVirtualMove(starting_visboard) # make the move virtually
+        robotsPhysicalMove(robot_move, capture_square) # make the move physically
+    else:
+        current_visboard = starting_visboard
+        print("Your turn first")
+        stockboard = stockfish.get_board_visual(HUMAN == chess.WHITE)
+        print(stockboard)
+
+    # take turns until the game ends. Each iteration starts when the human finishes their turn. Iteration includes processing the human's turn, then making a countermove.
+    while humansTurnFinished(): # eventually this will be based on the clock change, not commandline input
         
-        # TODO: start human's timer again
-        continue
-    
-    # update board representations
-    pyboard.push_uci(human_move)
-    stockfish.make_moves_from_current_position([human_move])
-    
-    # end the game if the human won   
-    if gameOver():
-        break
-    
-    ### ROBOT'S TURN ###
-    # make the move virtually
-    robot_move, current_visboard, capture_square = robotsVirtualMove(seen_visboard, human_move)
-    
-    # make the move physically
-    robotsPhysicalMove(robot_move, capture_square)
+        ### HUMAN'S TURN ###
+        # figure out what their move was
+        seen_visboard, human_move = perceiveHumanMove()
 
-    # end the game if the robot won
-    if gameOver():
-        break
+        # if move is illegal make human try again
+        if chess.Move.from_uci(human_move) not in pyboard.legal_moves:
+            print("Not a valid move. Try again, human")
+            if pyboard.is_into_check(chess.Move.from_uci(human_move)):
+                print("PS, you might want to avoid check this time")
+            
+            # TODO: start human's timer again
+            continue
+        
+        # update board representations
+        pyboard.push_uci(human_move)
+        stockfish.make_moves_from_current_position([human_move])
+        
+        # end the game if the human won   
+        if gameOver():
+            break
+        
+        ### ROBOT'S TURN ###
+        # make the move virtually
+        robot_move, current_visboard, capture_square = robotsVirtualMove(seen_visboard, human_move)
+        
+        # make the move physically
+        robotsPhysicalMove(robot_move, capture_square)
 
-cam.release()
+        # end the game if the robot won
+        if gameOver():
+            break
+
+    cam.release()
 
 # TODO: currently the code doesn't handle castling (i don't even know what the algebraic notation is)
-# TODO: currently doesn't capture a piece before moving
 # TODO: make a better display of who won. The chess object output doesn't make sense
 # TODO: make waypoints that are more smooth and won't result in a jerky motion straight up, stop, over, stop, down.
+
+if __name__ == "__main__":
+    main()
