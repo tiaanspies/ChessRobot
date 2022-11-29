@@ -45,7 +45,7 @@ def initializeCamera():
     # Open Video camera
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
-    relPath = "\\Chessboard_detection\\TestImages\\Set_2_W_Only"
+    relPath = "\\Chessboard_detection\\TestImages\\Set_2_B_Only"
     cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath)    
 
     if not cam.isOpened():
@@ -62,16 +62,16 @@ def initializeCamera():
         exit()
 
     # NB --- Board is setup in starting setup.
-    # Runs kmeans clustering to group peice and board colours
+    # Runs kmeans clustering to group piece and board colours
     ans = input("Are all the pieces placed now? (y/n): ").strip().lower()
     if ans== 'y':
         s, img = cam.read()
-        board.fitKClusters(img)
+        HUMAN, ROBOT = board.fitKClusters(img)
     else:
         print("Error: set up the board")
         exit()
 
-    return cam, board
+    return cam, board, HUMAN, ROBOT
 
 def whichColor():
     """Human decides which color to play. Black is -1, White is 1"""
@@ -115,8 +115,7 @@ def gameOver():
 def seeBoardReal():
     """Uses CV to determine which squares are occupied, returns -1, 0, 1 representation"""
     s, img = cam.read()  # read in image from camera
-    positions = np.flip(board.getCurrentPositions(img),0) # turn it into -1, 0, 1 representation
-    print(positions)
+    positions = board.getCurrentPositions(img) # turn it into -1, 0, 1 representation
     return positions
 
 def seeBoardFiller(board):
@@ -149,6 +148,7 @@ def compareVisBoards(current, previous):
     """compares the CV output with most recent board and outputs the move that was made or None if it can't tell"""
     
     # debugging
+    '''
     print("current:")
     print(current)
     print("previous:")
@@ -157,7 +157,7 @@ def compareVisBoards(current, previous):
     print(current!=previous)
     print("Human:")
     print(current==HUMAN)
-    
+    '''
 
     start_square = np.flatnonzero(np.logical_and((current!=previous),(current==0)))
     end_square = np.flatnonzero(np.logical_and((current!=previous),(current==HUMAN)))
@@ -321,13 +321,13 @@ def defRobotArm(L1=250,L2=250):
 stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=15, parameters={"UCI_Elo":800})
 
 # create an instance of the cam and board classes for converting input from the camera
-cam, board = initializeCamera()
+cam, board, HUMAN, ROBOT = initializeCamera()
 
 # create variables for who is playing which side (1 = white, -1 = black)
-HUMAN, ROBOT = whichColor()
+# HUMAN, ROBOT = whichColor()
 
 # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
-starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64)*ROBOT, np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*HUMAN))
+starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*-1))
 print(starting_visboard)
 pyboard = chess.Board()
 cboard, storage_list, home = defBoardCoords()

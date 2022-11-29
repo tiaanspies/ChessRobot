@@ -7,7 +7,7 @@ from sklearn.cluster import KMeans
 import cv2 as cv
 from collections import Counter
 
-import Fake_Camera
+from Chessboard_detection import Fake_Camera
 
 CAMERA_RESOLUTION = (640, 480)
 
