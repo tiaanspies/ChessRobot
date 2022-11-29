@@ -63,7 +63,7 @@ def initializeCamera():
 
     # NB --- Board is setup in starting setup.
     # Runs kmeans clustering to group peice and board colours
-    ans = input("Is the board set up? (y/n): ").strip().lower()
+    ans = input("Are all the pieces placed now? (y/n): ").strip().lower()
     if ans== 'y':
         s, img = cam.read()
         board.fitKClusters(img)
@@ -112,7 +112,7 @@ def gameOver():
     return False
 
 # functions for handling visboard (the -1, 0, 1 representation)
-def seeBoardReal(cam, board):
+def seeBoardReal():
     """Uses CV to determine which squares are occupied, returns -1, 0, 1 representation"""
     s, img = cam.read()  # read in image from camera
     positions = board.getCurrentPositions(img) # turn it into -1, 0, 1 representation
@@ -167,16 +167,19 @@ def compareVisBoards(current, previous):
     start_name = chess.square_name(start_square[0])
     end_name = chess.square_name(end_square[0])
     
-    return start_name + end_name
+    human_move = start_name + end_name
+    print(f"Percieved move was: {human_move}") # for debugging
 
-def perceiveHumanMove():
+    return human_move
+
+def perceiveHumanMove(previous_visboard):
     """take image (or typed move for now) and return the move that was made"""
     # seen_visboard = seeBoardFiller(current_visboard.copy())   
-    seen_visboard = seeBoardReal(cam, board) # Tiaan's vision function to find occupied squares
-    human_move = compareVisBoards(seen_visboard, current_visboard) # Compare boards to figure out what piece moved
+    new_visboard = seeBoardReal() # Tiaan's vision function to find occupied squares
+    human_move = compareVisBoards(new_visboard, previous_visboard) # Compare boards to figure out what piece moved
     if human_move is None:
         return perceiveHumanMove()
-    return seen_visboard, human_move
+    return new_visboard, human_move
 
 # functions for handling transition to real 3D space
 def getLinePoints(start, goal, step):
@@ -343,7 +346,7 @@ def main():
         
         ### HUMAN'S TURN ###
         # figure out what their move was
-        seen_visboard, human_move = perceiveHumanMove()
+        seen_visboard, human_move = perceiveHumanMove(current_visboard)
 
         # if move is illegal make human try again
         if chess.Move.from_uci(human_move) not in pyboard.legal_moves:
