@@ -53,7 +53,8 @@ def gkern(kernlen=21, std=3):
 class ChessBoard:
     def __init__(self, img) -> None:
         """
-        Initializes board object and finds position of empty board
+        Initializes board object and finds position of empty board corners
+        from img.
         """
         # CAMERA OBJECT PROPERTIES
         self.initialImage = np.zeros(CAMERA_RESOLUTION)
@@ -75,8 +76,9 @@ class ChessBoard:
         # self.setInitialImage(camera)
         self.initialImage = img
 
-        # see which blak and white threshold makes the board the easiest to find
-        # Opt is estimated by middle of min and max
+        # see which black and white threshold makes the board the easiest to find
+        # Opt is estimated by middle of min and max. 
+        # Find chessboard corners.
         thresholdOpt = self.findOptimalThreshold(self.initialImage, onlyFindOne=False)
 
         _, cornersInt  = self.findBoardCorners(self.initialImage, thresholdOpt)
@@ -85,6 +87,10 @@ class ChessBoard:
         cornersIntReoriented = self.makeTopRowFirst(cornersIntReshaped)
 
         self.cornersExt = self.estimateExternalCorners(cornersIntReoriented)
+
+        # when starting pos is detected "flipboard" will 
+        # signal that white is at the bottom and must be flipped in all output 
+        # images to chess engine.
         self.flipBoard = False       
         
         # # # ====== Uncomment this code to draw chessboardCorners
@@ -95,11 +101,11 @@ class ChessBoard:
     def findClusterImg(self, img):
         """
         Assigns pixels to their closest cluster.
-        returns image with all pixels assigned to cluster
+        returns image using only cluster colors
         """
-        # maskedImage = self.maskImage(img)
+        maskedImage = self.maskImage(img)
 
-        imgReshaped = np.reshape(img, (img.shape[0]*img.shape[1], 3))
+        imgReshaped = np.reshape(maskedImage, (img.shape[0]*img.shape[1], 3))
 
         predictions = self.kmeans.predict(imgReshaped)
         clustersInt = self.kmeans.cluster_centers_.astype(np.uint8)
@@ -126,18 +132,27 @@ class ChessBoard:
         return predictions
     
     def initBoardWithStartPos(self, img):
+        """
+        Receives img of board with all pieces on starting squares.
+        Finds clusters then finds which pieces are on top of image.
+        Chess engine is set up to require white on top always, 
+        therefore it needs to decide whether the image must be flipped.
+        Also detects which color robot is as robot will always be bottom.
+        """
         self.fitKClusters(img, weighted=True)
 
+        # find which piece color is at top and bottom
         positions = self.getCurrentPositions(img)
 
         meanBottom = np.round(np.mean(positions[-2:, :], axis=(0, 1)))
         meanTop = np.round(np.mean(positions[:2, :]))
 
-        if meanTop == -1:
-            self.flipBoard = True
-
         humanColor = meanTop
         robotColor = meanBottom
+
+        # is top is black, all images will be flipped from this point onwards
+        if meanTop == -1:
+            self.flipBoard = True
 
         return humanColor, robotColor
 
@@ -191,7 +206,7 @@ class ChessBoard:
         """
         If confirmFirst then it will ask the user for confirmation 
         on whether they want to initialize on that image.
-        Otherwise just use image immediatly
+        Otherwise just use image immediatly.
         """
         while True:
             #Get image frame
@@ -253,11 +268,16 @@ class ChessBoard:
         return didFind, intCorners
 
     def findBoardCorners(self, img, threshold, blursize=3, erodeSize=3):
+        """ using threshold value, attempt to find a chessboard image"""
         grayBlur = self.findGrayBlur(img, blursize)
         ret, corners = self.threshHoldAndFindBoard(grayBlur, threshold, erodeSize)
         return ret, corners
 
     def findOptimalThreshold(self, img, blurSize=3, erodeSize=3, onlyFindOne=False):
+        """
+        Step through threshold values. Finding highest and lowest acceptable values.
+        Then estimate the optimal threshold as the mean of these values.
+        """
         stepSize = 10
 
         #Find gray blurry img
@@ -313,14 +333,8 @@ class ChessBoard:
         Expand the internal corners by one row. 
         """
 
-        diffRow = np.diff(cornersInt, axis=0)
-        meanDiffRow = np.mean(diffRow, axis=0)
         externTop = 2*cornersInt[None, 0, :, :] - cornersInt[None, 1, :, :]
         externBottom = 2*cornersInt[None, -1, :, :] - cornersInt[None, -2, :, :]
-
-        difCol = np.diff(cornersInt, axis=1)
-        meanDiffCol = np.mean(difCol, axis=1)
-        meanDiffCol = np.reshape(meanDiffCol, (7, 1, 2))
 
         externleft = 2*cornersInt[:, None, 0, :] - cornersInt[:, None, 1, :]
         externRight = 2*cornersInt[:, None, -1, :] - cornersInt[:, None, -2, :]
@@ -339,6 +353,7 @@ class ChessBoard:
         return cornersExt
     
     def findCentroidsOfCorners(self, corners):
+        """ Find middle of chessbord edges"""
         row_top_pt_1 = corners[0][0]
         row_top_pt_2 = corners[0][-1]
         centroid_top = (row_top_pt_1 + row_top_pt_2) / 2
@@ -358,27 +373,27 @@ class ChessBoard:
         return centroid_top, centroid_left, centroid_right, centroid_bottom
 
     def makeTopRowFirst(self, corners):
-        # TODO: adjust angle to keep top row at the top of image
+        """Orientate the chessboard corners so that the first edge is at the top"""
         # The array should start form top left.
         # top row is the top row of array. We are aiming to make it the 
         # top row of the image as well
         
         top, left, right, bottom = self.findCentroidsOfCorners(corners)
 
+        # top row is between. therefore it must be on the side of the image.
+        # transpose, and flip it.
         if top[1] > np.min([left[1], right[1], bottom[1]]) \
             and top[1] < np.max([left[1], right[1], bottom[1]]):
-            # top row is between. therefore it must be on the side of the image.
-            # transpose, and flip it.
             newArr = np.transpose(corners, axes=(1, 0, 2))
         else:
             newArr = corners
         
         top, left, right, bottom = self.findCentroidsOfCorners(newArr)
-        
+        # top row is at the bottom, flip to top
         if top[1] > np.max([left[1], right[1], bottom[1]]):
-            #Row is at bottom of all. flip to make top.
             newArr = np.flip(newArr, axis=0)
         
+        # check if the top row is facing left or right
         diff = newArr[0][-1] - newArr[0][0]
         firstRowAngle = np.arctan2(diff[1], diff[0])
         firstRowAngle = (firstRowAngle + 2*np.pi) % (2*np.pi)
@@ -415,18 +430,20 @@ class ChessBoard:
         blurredHSV = cv.medianBlur(hsv, 11)
         
         ### DEBUG TO SHOW CLUSTER IMAGE
-        masked = self.maskImage(blurredHSV)
-        cluster = self.findClusterImg(masked)
+        cluster = self.findClusterImg(blurredHSV)
         img_new = cv.cvtColor(cluster, cv.COLOR_HSV2RGB)
         showImg(img_new)
         ## END DEBUG
-
+        
+        # split board into squards, assign to k means clusters
+        # assign each cluster to piece ID
         blocks = self.splitBoardIntoSquares(blurredHSV)
         clustered = self.findBlockClusters(blocks)
         blockIDs = self.detectPieces(clustered)
 
         blockIDs = np.reshape(blockIDs, (8, 8))
 
+        # flip board so that white is always at the top
         if self.flipBoard:
             blockIDs = np.flip(blockIDs, axis=0)
             blockIDs = np.flip(blockIDs, axis=1)
@@ -437,16 +454,11 @@ class ChessBoard:
         """
         Take a img of the chessboard with vertex positions and split
         each square into a seperate array.
+        Each output block is resized to 32x32.
         """
         blocks = []
         for r in range(self.BOARD_SIZE_INT[0] + 1):
             for c in range(self.BOARD_SIZE_INT[1] + 1):
-                # minX = np.min([self.cornersExt[r, c, 0], self.cornersExt[r+1, c, 0]])
-                # minY = np.min([self.cornersExt[r, c, 0], self.cornersExt[r, c+1, 0]])
-
-                # maxX = np.max([self.cornersExt[r, c+1, 0], self.cornersExt[r+1, c+1, 0]])
-                # maxY = np.max([self.cornersExt[r+1, c, 0], self.cornersExt[r+1, c+1, 0]])
-
                 vertices = self.cornersExt[r:r+2, c:c+2, :].astype(np.uint)
                 minX = np.min(vertices[:, :, 0], axis=(0,1))
                 minY = np.min(vertices[:, :, 1], axis=(0,1))
@@ -456,8 +468,6 @@ class ChessBoard:
 
                 block = img[minY:maxY, minX:maxX]
                 block = cv.resize(block, (32, 32))
-
-                # img = cv.rectangle(img, [minX, minY], [maxX, maxY], (255, 0, 0))
 
                 blocks.append(block)
 
@@ -486,6 +496,7 @@ class ChessBoard:
     def detectPieces(self, blocks):
         """
         given a square, detect which cluster is likely present in the center.
+        Change cluster ID to piece ID
         """
 
         blocksize = blocks.shape[0] # assuming pieces are square
@@ -494,7 +505,10 @@ class ChessBoard:
         pieces = np.zeros((np.shape(blocks)[0]), dtype=np.int8)
 
         for id, block in enumerate(blocks):
+            # find which cluster is in block
             pieceID = self.detectPiece(block, kern)
+
+            # change to piece ID
             if pieceID == self.whiteID:
                 pieces[id] = 1
             elif pieceID == self.blackID:
@@ -507,26 +521,30 @@ class ChessBoard:
     def findPieceID(self, blocks):
         """
         Assign find which cluster the black and white pieces
-        belong to.
+        belong to using the starting setup.
         """
         topPieces = np.zeros((self.BOARD_SIZE_INT[0]+1)*2)
         bottomPieces = np.zeros((self.BOARD_SIZE_INT[0]+1)*2)
 
         kern = gkern(kernlen=int(np.shape(blocks)[0]/2), std=self.KERN_STD)
 
+        # find cluster ID of starting positions for both colours
         for id, block in enumerate(blocks[0:16]):
             topPieces[id] = self.detectPiece(block, kern)
 
         for id, block in enumerate(blocks[-17:-1]):
             bottomPieces[id] = self.detectPiece(block, kern)
 
+        # find mode of cluster id for top and bottom pieces.
         topPieceMax = (Counter(topPieces).most_common(1))[0][0]
         bottomPieceMax = (Counter(bottomPieces).most_common(1))[0][0]
 
+        # change the piece cluster color to grascale
         img = np.zeros(shape=(1,2,3))
         img[0, 0] = np.array(self.kmeans.cluster_centers_[int(topPieceMax)])
         img[0, 1] = np.array(self.kmeans.cluster_centers_[int(bottomPieceMax)])
 
+        # peice with lower grayscale value is taken as white.
         imgGray = cv.cvtColor(img.astype(np.uint8), cv.COLOR_BGR2GRAY)
         if imgGray[0, 0] > imgGray[0, 1]:
             self.whiteID = int(topPieceMax)
@@ -542,6 +560,7 @@ def showImg(*images):
 
 
 def main():
+    """Step order to use chessboard class."""
     # Open Video camera
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
