@@ -151,7 +151,7 @@ def updateVisBoard(board, move, player, capture=None):
         start_square = chess.parse_square(move[:2])
         end_square = chess.parse_square(move[2:])
 
-        # adding this hear handles en passants
+        # adding this here handles en passants
         if capture:
             capture_square = chess.parse_square(capture)
             board_new.ravel()[capture_square] = 0
