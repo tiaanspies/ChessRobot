@@ -46,14 +46,15 @@ class PhoneCamera:
 
         self.stateNum = -1
 
-        self.url = "http://10.192.15.240:8080//shot.jpg"
+        self.url = "http://10.0.0.220:8080//shot.jpg" # update this with the url from web
     
     def read(self):
+        # self.stateNum = 10 # use this line to skip the saved empty picture and do it by hand
         if self.stateNum <= 0:
             self.path_full = self.absPath
             self.frame = cv.imread(self.path_full + "\\empty.JPG")
             self.frame = cv.resize(self.frame, self.cameraRes)
-        elif self.stateNum >= 0:
+        elif self.stateNum > 0:
             img_resp = requests.get(self.url)
             img_arr = np.array(bytearray(img_resp.content), dtype=np.uint8)
             self.frame = cv.imdecode(img_arr, -1)

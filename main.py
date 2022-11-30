@@ -117,7 +117,7 @@ def seeBoardReal():
     s, img = cam.read()  # read in image from camera
     positions = board.getCurrentPositions(img) # turn it into -1, 0, 1 representation
     visboard = np.fliplr(positions)
-
+    print(visboard)
     return visboard
 
 def seeBoardFiller(board):
@@ -131,20 +131,35 @@ def seeBoardFiller(board):
 def updateVisBoard(board, move, player, capture=None):
     """Updates the -1, 0, 1 representation of the board"""
     board_new = board.copy()
-    start_square = chess.parse_square(move[:2])
-    end_square = chess.parse_square(move[2:])
 
-    temp = board_new.ravel()
+    # deal with castling
+    if move == "e1g1":
+        board_new.ravel()[4:8] = 0
+        board_new.ravel()[5:7] = player
+    elif move == "e8g8":
+        board_new.ravel()[60:] = 0
+        board_new.ravel()[61:63] = player       
+    elif move == "e1c1":
+        board_new.ravel()[0:5] = 0
+        board_new.ravel()[2:4] = player
+    elif move == "e8c8":
+        board_new.ravel()[56:61] = 0
+        board_new.ravel()[58:60] = player
 
-    if capture:
-        capture_square = chess.parse_square(capture)
-        temp[capture_square] = 0
-    
-    temp[start_square] = 0
-    temp[end_square] = player
-    board_final = temp.reshape((8,8))
-    
-    return board_final
+    # deal with other moves
+    else:
+        start_square = chess.parse_square(move[:2])
+        end_square = chess.parse_square(move[2:])
+
+        # adding this hear handles en passants
+        if capture:
+            capture_square = chess.parse_square(capture)
+            board_new.ravel()[capture_square] = 0
+        
+        board_new.ravel()[start_square] = 0
+        board_new.ravel()[end_square] = player
+        
+    return board_new
     
 def compareVisBoards(current, previous):
     """compares the CV output with most recent board and outputs the move that was made or None if it can't tell"""
@@ -160,25 +175,45 @@ def compareVisBoards(current, previous):
     print("Human:")
     print(current==HUMAN)
     
+    # deal with castling
+    if np.sum(current!=previous) >= 4:
+        if HUMAN == chess.WHITE:
+            if pyboard.has_kingside_castling_rights(chess.WHITE) and (np.sum(current.ravel()[4:7] != previous.ravel()[4:7]) == 3):
+                human_move = "e1g1"
+            elif pyboard.has_queenside_castling_rights(chess.WHITE) and (np.sum(current.ravel()[2:5] != previous.ravel()[2:5]) == 3):
+                human_move = "e1c1"
+            else:
+                ans = input("Detected 4+ changed pieces, but no one castled. Have you reset the turn and played again? ")
+                return None
+        else: # Robot is white
+            if pyboard.has_kingside_castling_rights(chess.BLACK) and (np.sum(current.ravel()[60:63] != previous.ravel()[60:63]) == 3):
+                human_move = "e8g8"
+            elif pyboard.has_queenside_castling_rights(chess.BLACK) and (np.sum(current.ravel()[58:61] != previous.ravel()[58:61]) == 3):
+                human_move = "e8c8"
+            else:
+                ans = input("Detected 4+ changed pieces, but no one castled. Have you reset the turn and played again? ")
+                return None
+    
+    # deal with any other type of move
+    else:
+        start_square = np.flatnonzero(np.logical_and((current!=previous),(current==0)))
+        end_square = np.flatnonzero(np.logical_and((current!=previous),(current==HUMAN)))
+        
+        if start_square.size == 0:
+            print("failed to locate which piece was moved")
+            ans = input("Have you reset the turn and played again? ")
+            return None
+        elif end_square.size == 0:
+            print("failed to locate where the piece was played")
+            ans = input("Have you reset the turn and played again? ")
+            return None
+        
+        start_name = chess.square_name(start_square[0])
+        end_name = chess.square_name(end_square[0])
+        
+        human_move = start_name + end_name
 
-    start_square = np.flatnonzero(np.logical_and((current!=previous),(current==0)))
-    end_square = np.flatnonzero(np.logical_and((current!=previous),(current==HUMAN)))
-    
-    if start_square.size == 0:
-        print("failed to locate which piece was moved")
-        ans = input("Have you moved your piece back? ")
-        return None
-    elif end_square.size == 0:
-        print("failed to locate where the piece was played")
-        ans = input("Have you moved your piece back? ")
-        return None
-    
-    start_name = chess.square_name(start_square[0])
-    end_name = chess.square_name(end_square[0])
-    
-    human_move = start_name + end_name
     print(f"Percieved move was: {human_move}") # for debugging
-
     return human_move
 
 def perceiveHumanMove(previous_visboard):
@@ -295,7 +330,8 @@ def robotsVirtualMove(visboard, human_move=None):
     # print the board so the human can make a next move - this won't be needed later
     # stockboard = stockfish.get_board_visual(HUMAN == chess.WHITE)
     # print(stockboard)
-    print(best_move)
+
+    print(f"Robot's move: {best_move}")
 
     return best_move, visboard, capture_square
 
@@ -348,9 +384,7 @@ def main():
     else:
         current_visboard = starting_visboard
         print("Your turn first")
-        stockboard = stockfish.get_board_visual(HUMAN == chess.WHITE)
-        print(stockboard)
-
+        
     # take turns until the game ends. Each iteration starts when the human finishes their turn. Iteration includes processing the human's turn, then making a countermove.
     while humansTurnFinished(): # eventually this will be based on the clock change, not commandline input
         
@@ -391,6 +425,7 @@ def main():
 # TODO: currently the code doesn't handle castling (i don't even know what the algebraic notation is)
 # TODO: make a better display of who won. The chess object output doesn't make sense
 # TODO: make waypoints that are more smooth and won't result in a jerky motion straight up, stop, over, stop, down.
+# TODO: setup a double-check on CV end that initial position is as expected
 
 if __name__ == "__main__":
     main()

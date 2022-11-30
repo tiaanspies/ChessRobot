@@ -414,12 +414,14 @@ class ChessBoard:
         hsv = cv.cvtColor(img, cv.COLOR_RGB2HSV)
         blurredHSV = cv.medianBlur(hsv, 11)
         
+        '''
         ### DEBUG TO SHOW CLUSTER IMAGE
         masked = self.maskImage(blurredHSV)
         cluster = self.findClusterImg(masked)
         img_new = cv.cvtColor(cluster, cv.COLOR_HSV2RGB)
         showImg(img_new)
         ## END DEBUG
+        '''
 
         blocks = self.splitBoardIntoSquares(blurredHSV)
         clustered = self.findBlockClusters(blocks)
