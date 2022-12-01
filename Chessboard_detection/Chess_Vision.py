@@ -7,8 +7,10 @@ from sklearn.cluster import KMeans
 import cv2 as cv
 from collections import Counter
 
-from Chessboard_detection import Fake_Camera
-# import Fake_Camera
+from matplotlib import pyplot as plt
+
+# from Chessboard_detection import Fake_Camera
+import Fake_Camera
 
 CAMERA_RESOLUTION = (640, 480)
 
@@ -101,9 +103,10 @@ class ChessBoard:
         # maskedImage = self.maskImage(img)
 
         imgReshaped = np.reshape(img, (img.shape[0]*img.shape[1], 3))
+        transformed = self.HSVTransform(imgReshaped)
 
-        predictions = self.kmeans.predict(imgReshaped)
-        clustersInt = self.kmeans.cluster_centers_.astype(np.uint8)
+        predictions = self.kmeans.predict(transformed)
+        clustersInt = np.array([[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 255]])
 
         newImg = [clustersInt[x] for x in predictions]
         newImg = np.reshape(newImg, (img.shape[0], img.shape[1], 3))
@@ -121,13 +124,19 @@ class ChessBoard:
 
         for id, block in enumerate(blocks):
             imgReshaped = np.reshape(block, (block.shape[0]*block.shape[1], 3))
-            predictionReshaped = self.kmeans.predict(imgReshaped)
+            transformed = self.HSVTransform(imgReshaped)
+            predictionReshaped = self.kmeans.predict(transformed)
             predictions[id] = np.reshape(predictionReshaped, (block.shape[0], block.shape[1]))
 
         return predictions
     
     def initBoardWithStartPos(self, img):
-        self.fitKClusters(img, weighted=True)
+        """ 
+        Fit the K-Means cluster with all pieces on starting squares.
+        ALso finds which color is at the top.
+        
+        """
+        self.fitKClusters(img, weighted=False)
 
         positions = self.getCurrentPositions(img)
 
@@ -137,12 +146,45 @@ class ChessBoard:
         if meanTop == -1:
             self.flipBoard = True
 
+        # Check if starting position is valid with all pieces on starting squares
+        topCorrect = (positions.flatten()[:16] == meanTop).all()
+        middleCorrect = (positions.flatten()[16:48] == 0).all()
+        bottomCorrect = (positions.flatten()[48:] == -1*meanTop).all()
+        if not topCorrect or not middleCorrect or not bottomCorrect:
+            raise("starting position is incorrect")
+
         humanColor = meanTop
         robotColor = meanBottom
 
         return humanColor, robotColor
 
+    def HSVTransform(self, HSVImg):
+        
 
+        maxSat = np.max(HSVImg[:, 1])
+        maxI = np.max(HSVImg[:, 2])
+
+        satThreshold = maxSat - maxSat*0.8*HSVImg[:, 2]/maxI
+
+        threshPoints = HSVImg[:, 1] > satThreshold
+        count = np.count_nonzero(threshPoints)
+        transformedCol = np.zeros(shape=(HSVImg.shape[0],1))
+        transformedCol[threshPoints, 0] = HSVImg[threshPoints, 0]
+
+        threshPoints = np.invert(threshPoints)
+        newHSV = np.reshape(HSVImg, (256, 256, 3))
+        newImg = cv.cvtColor(newHSV, cv.COLOR_HSV2RGB)
+
+        showImg(newImg)
+
+        newImg = np.reshape(newImg, (256*256, 3))
+        newImg[threshPoints] = np.array([255,255,255])
+        newImg = np.reshape(newImg, (256, 256, 3))
+        showImg(newImg)
+        
+        transformedCol[threshPoints, 0] = HSVImg[threshPoints, 2]/10+200
+
+        return transformedCol
 
     def fitKClusters(self, img, weighted=False):
         """
@@ -167,6 +209,7 @@ class ChessBoard:
         # reshape image into a single line for k means fitting
         self.kmeans = KMeans(n_clusters=4)
         imgReshaped = np.reshape(blur, (blur.shape[0]*blur.shape[1], 3))
+        transformed = self.HSVTransform(imgReshaped)
 
         # if weighed is true apply a gaussian weight to each block.
         # add priority to blocks with peices on (starting squares)
@@ -179,8 +222,13 @@ class ChessBoard:
             kernReshaped = np.reshape(kernArr, (blur.shape[0]*blur.shape[1]))
             self.kmeans.fit(imgReshaped, sample_weight=kernReshaped)
         else:
-            self.kmeans.fit(imgReshaped)       
+            self.kmeans.fit(transformed)       
         
+
+        img2 = self.findClusterImg(self.maskImage(img))
+        plt.imshow(img2)
+        # showImg(img2)
+
         #Assign cluster id to all pixels on blocks
         # find what cluster id is black or white
         blockClusterID = self.findBlockClusters(blocks)
@@ -541,7 +589,7 @@ class ChessBoard:
 def showImg(*images):
     while cv.waitKey(1) != ord('q'):
         for i, img in enumerate(images):
-            cv.namedWindow(str(i), cv.WINDOW_NORMAL)
+            # cv.namedWindow(str(i), cv.WINDOW_NORMAL)
             
             cv.imshow(str(i), img)
 
@@ -564,7 +612,7 @@ def main():
     # NB --- Board is setup in starting setup.
     # Runs kmeans clustering to group peice and board colours
     s, img = cam.read()
-    board.fitKClusters(img, True)
+    board.fitKClusters(img, False)
 
     # display video of chessboard with corners
     s, img = cam.read()  

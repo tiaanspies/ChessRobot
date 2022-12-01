@@ -4,8 +4,8 @@ import cv2 as cv
 # for PhoneCamera:
 import requests
 import numpy as np
-from Chessboard_detection import Chess_Vision
-# import Chess_Vision
+# from Chessboard_detection import Chess_Vision
+import Chess_Vision
 
 class FakeCamera:
     def __init__(self, res, absPath) -> None:
