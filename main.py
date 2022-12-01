@@ -58,9 +58,13 @@ def initializeCamera():
         s, img = cam.read()
         board = Chess_Vision.ChessBoard(img)
     else:
-        print("Error: put the board in view")
-        exit()
+        print("Please put the empty board is in view")
+        initializeCamera()
 
+    return cam, board
+
+def identifyColors():
+    """Runs k-means to set color centroids, then uses this to determine who's playing which color"""
     # NB --- Board is setup in starting setup.
     # Runs kmeans clustering to group piece and board colours
     ans = input("Are all the pieces placed now? (y/n): ").strip().lower()
@@ -68,10 +72,9 @@ def initializeCamera():
         s, img = cam.read()
         HUMAN, ROBOT = board.initBoardWithStartPos(img)
     else:
-        print("Error: set up the board")
-        exit()
-
-    return cam, board, HUMAN, ROBOT
+        print("Please set up the board")
+        identifyColors()
+    return HUMAN, ROBOT
 
 def whichColor():
     """Human decides which color to play. Black is -1, White is 1"""
@@ -91,7 +94,7 @@ def humansTurnFinished():
 
     # for debugging sake, I currently have this set permanently to True
     # return True
-
+    
     ans = input("Are you finished? (y/n): ").strip().lower()
     if ans not in ['y', 'n']:
         print(f'"{ans}" is invalid, please try again...')
@@ -105,10 +108,32 @@ def humansTurnFinished():
 
 def gameOver():
     """returns False if game isn't over, prints the outcome and returns True if it is"""
-    if pyboard.outcome():
+    outcome = pyboard.outcome()
+    
+    if outcome is not None:
+
+        # print outcome type
+        print(outcome.termination.name)
+
+        # if there was a winner update the running scores
+        if outcome.winner is not None:
+            if outcome.winner == (HUMAN==chess.WHITE):
+                HUMAN_SCORE += 1
+            else:
+                ROBOT_SCORE += 1
+        
+        # print the running scores
+        print(f"Robot: {ROBOT_SCORE}, Human: {HUMAN_SCORE}")
         print("Good game, human")
-        print(pyboard.outcome())     
-        return True
+
+        # decide whether to play again
+        ans = input("Play again? (y/n): ").strip().lower()
+        if ans == 'y':
+            game_counter += 1
+            main()
+        else:
+            return True
+
     return False
 
 # functions for handling visboard (the -1, 0, 1 representation)
@@ -117,7 +142,7 @@ def seeBoardReal():
     s, img = cam.read()  # read in image from camera
     positions = board.getCurrentPositions(img) # turn it into -1, 0, 1 representation
     visboard = np.fliplr(positions)
-    print(visboard)
+    # print(visboard)
     return visboard
 
 def seeBoardFiller(board):
@@ -302,7 +327,7 @@ def getPath_simple(start, goal, capture_square, storage_list, lift=50, step=10):
     ax = plt.axes(projection='3d')
     ax.plot_wireframe(X,Y,Z, color="r")
     ax.scatter3D(path[0],path[1],path[2])
-    ax.view_init(30,225)
+    ax.view_init(90,270)
     plt.show(block=False)
 
     return path
@@ -361,10 +386,10 @@ def defRobotArm(L1=250,L2=250):
 
 ### Global variables ###
 # create an instance of of the stockfish engine with the parameters requested
-stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=15, parameters={"UCI_Elo":3000})
+stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=15, parameters={"UCI_Elo":500})
 
 # create an instance of the cam and board classes for converting input from the camera
-cam, board, HUMAN, ROBOT = initializeCamera()
+cam, board = initializeCamera()
 
 # create variables for who is playing which side (1 = white, -1 = black)
 # HUMAN, ROBOT = whichColor()
@@ -374,10 +399,20 @@ starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), d
 pyboard = chess.Board()
 cboard, storage_list, home = defBoardCoords()
 
+# define global variables for tracking the running score
+global HUMAN_SCORE
+global ROBOT_SCORE
+HUMAN_SCORE = 0
+ROBOT_SCORE = 0
+
 # create NLinkArm instance specific to our robot using python_robotics NLinkArm class -- commented out bc only necessary for IK and simulation
 # robotarm = defRobotArm()
 
 def main():
+    
+    # determine who is playing which side and run k-means to set color centroids
+    global HUMAN, ROBOT 
+    HUMAN, ROBOT = identifyColors()
 
     if ROBOT == chess.WHITE: # if robot is playing white, have it go first
         print("My turn first")
