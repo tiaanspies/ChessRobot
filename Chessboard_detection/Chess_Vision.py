@@ -414,14 +414,14 @@ class ChessBoard:
         hsv = cv.cvtColor(img, cv.COLOR_RGB2HSV)
         blurredHSV = cv.medianBlur(hsv, 11)
         
-        '''
+        
         ### DEBUG TO SHOW CLUSTER IMAGE
         masked = self.maskImage(blurredHSV)
         cluster = self.findClusterImg(masked)
         img_new = cv.cvtColor(cluster, cv.COLOR_HSV2RGB)
         showImg(img_new)
         ## END DEBUG
-        '''
+        
 
         blocks = self.splitBoardIntoSquares(blurredHSV)
         clustered = self.findBlockClusters(blocks)
@@ -538,9 +538,12 @@ class ChessBoard:
             self.blackID = int(topPieceMax)
  
 def showImg(*images):
-    while cv.waitKey(1) != ord('q'):
-        for i, img in enumerate(images):
-            cv.imshow(str(i), img)
+    # while cv.waitKey(1) != ord('q'):
+    for i, img in enumerate(images):
+        im2 = cv.resize(img, (512, 512))
+        cv.namedWindow("out", cv.WINDOW_NORMAL)
+        
+        cv.imshow("out", im2)
 
 
 def main():

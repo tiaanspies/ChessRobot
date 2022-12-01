@@ -165,7 +165,7 @@ def compareVisBoards(current, previous):
     """compares the CV output with most recent board and outputs the move that was made or None if it can't tell"""
     
     # debugging
-    
+    '''
     print("current:")
     print(current)
     print("previous:")
@@ -174,7 +174,8 @@ def compareVisBoards(current, previous):
     print(current!=previous)
     print("Human:")
     print(current==HUMAN)
-    
+    '''
+
     # deal with castling
     if np.sum(current!=previous) >= 4:
         if HUMAN == chess.WHITE:
@@ -289,7 +290,7 @@ def getPath_simple(start, goal, capture_square, storage_list, lift=50, step=10):
                               getLinePoints(goal, home, step)))
 
     path = np.hstack((first_moves, second_moves))
-    '''
+    
     # for debugging
     sq_width = 30
     bdr_width = 10
@@ -301,8 +302,9 @@ def getPath_simple(start, goal, capture_square, storage_list, lift=50, step=10):
     ax = plt.axes(projection='3d')
     ax.plot_wireframe(X,Y,Z, color="r")
     ax.scatter3D(path[0],path[1],path[2])
-    plt.show()
-    '''
+    ax.view_init(30,225)
+    plt.show(block=False)
+
     return path
 
 # functions for grouping sections of code

@@ -46,7 +46,7 @@ class PhoneCamera:
 
         self.stateNum = -1
 
-        self.url = "http://10.0.0.220:8080//shot.jpg" # update this with the url from web
+        self.url = "http://10.192.48.63:8080///shot.jpg" # update this with the url from web
     
     def read(self):
         # self.stateNum = 10 # use this line to skip the saved empty picture and do it by hand
