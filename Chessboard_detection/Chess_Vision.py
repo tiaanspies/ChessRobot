@@ -8,6 +8,7 @@ import cv2 as cv
 from collections import Counter
 
 from Chessboard_detection import Fake_Camera
+# import Fake_Camera
 
 CAMERA_RESOLUTION = (640, 480)
 
@@ -71,13 +72,13 @@ class ChessBoard:
         self.whiteID = None
         self.blackID = None
 
-        # save the blank board
+        # save the blank boardS
         # self.setInitialImage(camera)
         self.initialImage = img
 
         # see which blak and white threshold makes the board the easiest to find
         # Opt is estimated by middle of min and max
-        thresholdOpt = self.findOptimalThreshold(self.initialImage, onlyFindOne=False)
+        thresholdOpt = self.findOptimalThreshold(self.initialImage, onlyFindOne=False, erodeSize=3, blurSize=3)
 
         _, cornersInt  = self.findBoardCorners(self.initialImage, thresholdOpt)
 
@@ -226,7 +227,8 @@ class ChessBoard:
 
         # If blursize is invalid then skip blurring
         if blurSize > 0:
-            blur = cv.blur(gray, (blurSize, blurSize))
+            # blur = cv.blur(gray, (blurSize, blurSize))
+            blur = cv.medianBlur(gray, blurSize)
         else:
             blur = gray
 
@@ -403,7 +405,6 @@ class ChessBoard:
         mask = cv.fillConvexPoly(mask, np.int32(outerCorners), color=(255, 255, 255))
 
         maskedImage = cv.bitwise_and(img, mask)
-
         return maskedImage
 
     def getCurrentPositions(self, img):
@@ -538,19 +539,18 @@ class ChessBoard:
             self.blackID = int(topPieceMax)
  
 def showImg(*images):
-    # while cv.waitKey(1) != ord('q'):
-    for i, img in enumerate(images):
-        im2 = cv.resize(img, (512, 512))
-        cv.namedWindow("out", cv.WINDOW_NORMAL)
-        
-        cv.imshow("out", im2)
+    while cv.waitKey(1) != ord('q'):
+        for i, img in enumerate(images):
+            cv.namedWindow(str(i), cv.WINDOW_NORMAL)
+            
+            cv.imshow(str(i), img)
 
 
 def main():
     # Open Video camera
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
-    relPath = "\\TestImages\\Set_2_W_only"
+    relPath = "\\TestImages\\Test_Set_1"
     cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath)    
 
     if not cam.isOpened():
