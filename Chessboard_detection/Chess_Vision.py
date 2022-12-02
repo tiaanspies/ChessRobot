@@ -538,12 +538,12 @@ class ChessBoard:
             self.whiteID = int(bottomPieceMax)
             self.blackID = int(topPieceMax)
  
-def showImg(*images):
-    while cv.waitKey(1) != ord('q'):
-        for i, img in enumerate(images):
-            cv.namedWindow(str(i), cv.WINDOW_NORMAL)
-            
-            cv.imshow(str(i), img)
+def showImg(img):
+    # while cv.waitKey(1) != ord('q'):
+    # for i, img in enumerate(images):
+    cv.namedWindow("1", cv.WINDOW_NORMAL)
+    
+    cv.imshow("1", img)
 
 
 def main():
