@@ -137,6 +137,13 @@ class ChessBoard:
         if meanTop == -1:
             self.flipBoard = True
 
+        # Check if starting position is valid with all pieces on starting squares
+        topCorrect = (positions.flatten()[:16] == meanTop).all()
+        middleCorrect = (positions.flatten()[16:48] == 0).all()
+        bottomCorrect = (positions.flatten()[48:] == -1*meanTop).all()
+        if not topCorrect or not middleCorrect or not bottomCorrect:
+            raise("starting position is incorrect")
+
         humanColor = meanTop
         robotColor = meanBottom
 
