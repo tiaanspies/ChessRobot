@@ -33,7 +33,6 @@ import numpy as np
 import chess
 import matplotlib.pyplot as plt
 from Chessboard_detection import Fake_Camera, Chess_Vision
-# from NLinkArm3d import NLinkArm -- commented out bc only necessary for IK and simulation
 
 ### INITIALIZE ###
 
@@ -77,7 +76,7 @@ def identifyColors():
     return HUMAN, ROBOT
 
 def whichColor():
-    """Human decides which color to play. Black is -1, White is 1"""
+    """OBSOLETE. Human decides which color to play. Black is -1, White is 1"""
     ans = input("Hello, human. Are you playing black or white today? (b/w): ").strip().lower()
     if ans not in ['b', 'w']:
         print(f'"{ans}" is invalid, please try again...')
@@ -374,25 +373,12 @@ def robotsPhysicalMove(robot_move, capture_square):
     
     return
 
-# functions for simulation
-def defRobotArm(L1=250,L2=250):
-    """creates an instance of the NLinkArm class for our specific robot configuration"""
-    # define robot parameters in DH convention [theta alpha a d]
-    l1_params = [0, np.pi/2, 0, 0]
-    l2_params = [0, 0, L1, 0]
-    l3_params = [0, 0, L2, 0]
-    param_list = [l1_params, l2_params, l3_params]
-    return NLinkArm(param_list)
-
 ### Global variables ###
 # create an instance of of the stockfish engine with the parameters requested
 stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=15, parameters={"UCI_Elo":500})
 
 # create an instance of the cam and board classes for converting input from the camera
 cam, board = initializeCamera()
-
-# create variables for who is playing which side (1 = white, -1 = black)
-# HUMAN, ROBOT = whichColor()
 
 # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
 starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*-1))
@@ -404,9 +390,6 @@ global HUMAN_SCORE
 global ROBOT_SCORE
 HUMAN_SCORE = 0
 ROBOT_SCORE = 0
-
-# create NLinkArm instance specific to our robot using python_robotics NLinkArm class -- commented out bc only necessary for IK and simulation
-# robotarm = defRobotArm()
 
 def main():
     
@@ -459,7 +442,6 @@ def main():
 
     cam.release()
 
-# TODO: currently the code doesn't handle castling (i don't even know what the algebraic notation is)
 # TODO: make a better display of who won. The chess object output doesn't make sense
 # TODO: make waypoints that are more smooth and won't result in a jerky motion straight up, stop, over, stop, down.
 # TODO: setup a double-check on CV end that initial position is as expected
