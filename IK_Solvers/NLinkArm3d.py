@@ -1,6 +1,7 @@
 """
 Class of n-link arm in 3D
 Author: Takayuki Murooka (takayuki5168)
+Edited by Noah Jones for this specific use case
 """
 import numpy as np
 import math
@@ -39,7 +40,6 @@ class Link:
         basic_jacobian = np.hstack(
             (np.cross(z_axis_prev, ee_pos - pos_prev), z_axis_prev))
         return basic_jacobian
-
 
 class NLinkArm:
     def __init__(self, dh_params_list):

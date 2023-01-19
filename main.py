@@ -33,6 +33,7 @@ import numpy as np
 import chess
 import matplotlib.pyplot as plt
 from Chessboard_detection import Fake_Camera, Chess_Vision
+from IK_Solvers.traditional import ChessMoves
 
 ### INITIALIZE ###
 
@@ -45,7 +46,7 @@ def initializeCamera():
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
     relPath = "\\Chessboard_detection\\TestImages\\Temp"
-    cam = Fake_Camera.PhoneCamera(CAMERA_RESOLUTION, dirPath + relPath)    
+    cam = Fake_Camera.PhoneCamera(CAMERA_RESOLUTION, dirPath + relPath) # Change .FakeCamera to .PhoneCamera
 
     if not cam.isOpened():
         raise("Cannot open camera.")
@@ -251,6 +252,7 @@ def perceiveHumanMove(previous_visboard):
     return new_visboard, human_move
 
 # functions for handling transition to real 3D space
+'''
 def getLinePoints(start, goal, step):
     """Creates a 3xN nparray of 3D waypoints roughly 'step' distance apart between two 3D points"""
     dist = np.linalg.norm(goal - start)
@@ -330,6 +332,7 @@ def getPath_simple(start, goal, capture_square, storage_list, lift=50, step=10):
     plt.show(block=False)
 
     return path
+'''
 
 # functions for grouping sections of code
 def robotsVirtualMove(visboard, human_move=None):
@@ -363,15 +366,16 @@ def robotsVirtualMove(visboard, human_move=None):
 
 def robotsPhysicalMove(robot_move, capture_square):
     """creates and executes the robot's physical move"""
-    start = getCoords(robot_move[:2],cboard)
-    goal = getCoords(robot_move[2:],cboard)
+    start = cm.get_coords(robot_move[:2])
+    goal = cm.get_coords(robot_move[2:])
     if capture_square is not None:
-        capture_square = getCoords(capture_square, cboard)
-    path = getPath_simple(start, goal, capture_square, storage_list)
-    
-    # TODO: find thetapath using inverse kinematics
-    
-    return
+        capture_square = cm.getCoords(capture_square)
+    path = cm.generate_path(start, goal, capture_square)
+    thetas = cm.inverse_kinematics(path)
+    #TODO: pass the thetas to arduino 
+
+    # simulate
+    cm.plot_robot(thetas, path)
 
 ### Global variables ###
 # create an instance of of the stockfish engine with the parameters requested
@@ -380,10 +384,13 @@ stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15
 # create an instance of the cam and board classes for converting input from the camera
 cam, board = initializeCamera()
 
+# create an instance of the ChessMoves class, which holds all functions for onverting a algebraic notation move to a theta trajectory
+cm = ChessMoves() # this class takes all the board and robot measurements as optional args
+
 # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
 starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*-1))
 pyboard = chess.Board()
-cboard, storage_list, home = defBoardCoords()
+# cboard, storage_list, home = defBoardCoords()
 
 # define global variables for tracking the running score
 global HUMAN_SCORE
@@ -444,7 +451,6 @@ def main():
 
 # TODO: make a better display of who won. The chess object output doesn't make sense
 # TODO: make waypoints that are more smooth and won't result in a jerky motion straight up, stop, over, stop, down.
-# TODO: setup a double-check on CV end that initial position is as expected
 
 if __name__ == "__main__":
     main()
