@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from chess import FILE_NAMES, RANK_NAMES
 from IK_Solvers.NLinkArm3d import NLinkArm
+from IK_Solvers.quintic_polynomials_planner import QuinticPolynomial
 
 class ChessMoves():
     
@@ -82,6 +83,31 @@ class ChessMoves():
 
         return np.hstack((first_moves, second_moves))
 
+    def generate_quintic_path(self, start, goal, cap_sq, step=10):
+        """creates a 3xN array of waypoints to and from home, handling captures and lifting over pieces"""
+        lift_vector = np.array([0,0,self.LIFT])
+        if cap_sq is not None:
+            storage = np.array(self.storage_coords.pop(0))
+            first_moves = np.hstack((self.line2(self.HOME, cap_sq, step),
+                                    cap_sq.reshape((3,1)), cap_sq.reshape((3,1)),
+                                    self.line2(cap_sq, cap_sq + lift_vector, step),
+                                    self.line2(cap_sq + lift_vector, storage + lift_vector, step),
+                                    self.line2(storage + lift_vector, storage, step),
+                                    storage.reshape((3,1)), storage.reshape((3,1)),
+                                    self.line2(storage, storage + lift_vector, step),
+                                    self.line2(storage + lift_vector, start, step)))
+        else:
+            first_moves = self.line2(self.HOME, start, step)
+        
+        second_moves = np.hstack((start.reshape((3,1)), start.reshape((3,1)),
+                                self.line2(start, start + lift_vector, step),
+                                self.line2(start + lift_vector, goal + lift_vector, step),
+                                self.line2(goal + lift_vector, goal, step),
+                                goal.reshape((3,1)), goal.reshape((3,1)),
+                                self.line2(goal, self.HOME, step)))
+
+        return np.hstack((first_moves, second_moves))
+
     def inverse_kinematics(self, path):
         """generates a 4xN list of joint angles from a 3xN list of waypoints"""
         # execute IK on each point in the path
@@ -149,6 +175,20 @@ class ChessMoves():
             plt.pause(.01)
         plt.show()
 
+    def line2(self, start, goal, avg_step):
+        """Creates a 3xN nparray of 3D waypoints between start and goal using a quintec polynomial"""
+        dist = np.linalg.norm(goal - start)
+        n_steps = int(dist // avg_step)
+        xqnt = QuinticPolynomial(start[0],goal[0],n_steps)
+        yqnt = QuinticPolynomial(start[1],goal[1],n_steps)
+        zqnt = QuinticPolynomial(start[2],goal[2],n_steps)
+
+        path = np.zeros((3,n_steps))
+        for step in range(n_steps):
+            path[:,step] = [xqnt.calc_point(step), yqnt.calc_point(step), zqnt.calc_point(step)]
+        
+        return path
+
     @staticmethod
     def line(start, goal, step):
         """Creates a 3xN nparray of 3D waypoints roughly 'step' distance apart between two 3D points"""
@@ -159,3 +199,5 @@ class ChessMoves():
         z_points = np.linspace(start[2], goal[2], n_steps, endpoint=False)
         
         return np.vstack((x_points, y_points, z_points))
+    
+    
