@@ -45,8 +45,8 @@ def initializeCamera():
     # Open Video camera
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
-    relPath = "\\Chessboard_detection\\TestImages\\Temp"
-    cam = Fake_Camera.PhoneCamera(CAMERA_RESOLUTION, dirPath + relPath) # Change .FakeCamera to .PhoneCamera
+    relPath = "\\Chessboard_detection\\TestImages\\Set_2_W_Only"
+    cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath) # Change .FakeCamera to .PhoneCamera
 
     if not cam.isOpened():
         raise("Cannot open camera.")
@@ -370,7 +370,7 @@ def robotsPhysicalMove(robot_move, capture_square):
     goal = cm.get_coords(robot_move[2:])
     if capture_square is not None:
         capture_square = cm.getCoords(capture_square)
-    path = cm.generate_path(start, goal, capture_square)
+    path = cm.generate_quintic_path(start, goal, capture_square)
     thetas = cm.inverse_kinematics(path)
     #TODO: pass the thetas to arduino 
 
@@ -450,7 +450,8 @@ def main():
     cam.release()
 
 # TODO: make a better display of who won. The chess object output doesn't make sense
-# TODO: make waypoints that are more smooth and won't result in a jerky motion straight up, stop, over, stop, down.
+# TODO: handle promotions
+# TODO: make waypoints that are more smooth and won't result in a jerky motion straight up, stop, over, stop, down. - started this with quintecs
 
 if __name__ == "__main__":
     main()
