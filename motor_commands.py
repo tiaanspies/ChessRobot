@@ -1,60 +1,54 @@
-import RPi.GPIO as GPIO
+import numpy as np
+from board import SCL, SDA
+import busio
+from adafruit_pca9685 import PCA9685
+from adafruit_servokit import ServoKit
 from time import sleep
+
 
 class MotorCommands:
     def __init__(self, thetas):
         # Pin numbers
-        self.BASE = 1
-        self.SHOULDER = 2
-        self.ELBOW = 3
-        self.GRIP = 4
+        self.BASE_CHANNEL = 0
+        self.SHOULDER_CHANNEL = 1
+        self.ELBOW_CHANNEL = 2
+        self.GRIP_CHANNEL = 3
 
-        # set numbering system to BOARD (as opposed to BCM)
-        GPIO.setmode(GPIO.BOARD)
+        # Create the I2C bus interface.
+        i2c_bus = busio.I2C(SCL, SDA)
 
-        # set the channels
-        GPIO.setup([self.BASE, self.SHOULDER, self.ELBOW, self.GRIP], GPIO.OUT)
+        # Create a simple PCA9685 class instance.
+        pca = PCA9685(i2c_bus)
 
-        # PWM instances for each motor at 50Hz
-        self.base = GPIO.PWM(self.BASE, 50)
-        self.shoulder = GPIO.PWM(self.SHOULDER, 50)
-        self.elbow = GPIO.PWM(self.ELBOW, 50)
-        self.grip = GPIO.PWM(self.GRIP, 50)
+        # Set the PWM frequency to 50hz.
+        pca.frequency = 50
 
-        # load the list of commands
-        self.thetas = thetas
+        # Create a servokit class instance with the total number of channels needed
+        kit = ServoKit(channels=4)
+
+        # define shortcuts for each
+        self.base = kit.servo[self.BASE_CHANNEL]
+        self.shoulder = kit.servo[self.SHOULDER_CHANNEL]
+        self.elbow = kit.servo[self.ELBOW_CHANNEL]
+        self.grip = kit.servo[self.GRIP_CHANNEL]
 
     def go_to(self, theta):
         """moves directly to provided theta configuration"""
-        duty = self.thetas2duty(theta)
-        self.base.start(duty[0])
-        self.shoulder.start(duty[1])
-        self.elbow.start(duty[2])
-        self.grip.start(duty[3])
+        angle = np.rad2deg(theta)
+        self.base.angle(angle[0])
+        self.shoulder.angle(angle[1])
+        self.elbow.angle(angle[2])
+        self.grip.angle(angle[3])
 
-    def run(self):
+    def run(self, thetas):
         """runs the full set of theta commands"""
         try:
-            for theta in self.thetas.T:
-                duty = self.thetas2duty(theta)
-                self.base.start(duty[0])
-                self.shoulder.start(duty[1])
-                self.elbow.start(duty[2])
-                self.grip.start(duty[3])
+            for theta in thetas.T:
+                angle = np.rad2deg(theta)
+                self.base.angle(angle[0])
+                self.shoulder.angle(angle[1])
+                self.elbow.angle(angle[2])
+                self.grip.angle(angle[3])
                 sleep(1) # will need to decrease eventually
         except KeyboardInterrupt:
-            self.base.stop()
-            self.shoulder.stop()
-            self.elbow.stop()
-            self.grip.stop() # TODO: make sure this means open
-
-    def finish(self):
-        self.base.stop()
-        self.shoulder.stop()
-        self.elbow.stop()
-        self.grip.stop() # TODO: make sure this means open
-        GPIO.cleanup()
-
-    @staticmethod
-    def thetas2duty(theta):
-        return theta / 18 + 2 # will need to double check. 18 bc 10% window, 2 because that was the starting duty percentage
+            pass # TODO: make sure this means gripper is open
