@@ -34,6 +34,7 @@ import chess
 import matplotlib.pyplot as plt
 from Chessboard_detection import Fake_Camera, Chess_Vision
 from IK_Solvers.traditional import ChessMoves
+from motor_commands import MotorCommands
 
 ### INITIALIZE ###
 
@@ -370,10 +371,11 @@ def robotsPhysicalMove(robot_move, capture_square):
     goal = cm.get_coords(robot_move[2:])
     if capture_square is not None:
         capture_square = cm.getCoords(capture_square)
-    path = cm.generate_quintic_path(start, goal, capture_square)
-    thetas = cm.inverse_kinematics(path)
-    #TODO: pass the thetas to arduino 
-
+    path = cm.generate_quintic_path(start, goal, capture_square) # generate waypoints
+    thetas = cm.inverse_kinematics(path) # convert to joint angles
+    # TODO: clear out wrist commands and insert gripper ones instead
+    mc.run(thetas) # pass joint angles to motors
+    
     # simulate
     cm.plot_robot(thetas, path)
 
@@ -384,8 +386,11 @@ stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15
 # create an instance of the cam and board classes for converting input from the camera
 cam, board = initializeCamera()
 
-# create an instance of the ChessMoves class, which holds all functions for onverting a algebraic notation move to a theta trajectory
+# create an instance of the ChessMoves class, which holds all functions for converting a algebraic notation move to a theta trajectory
 cm = ChessMoves() # this class takes all the board and robot measurements as optional args
+
+# create an instance of the MotorCommands class, which is used to communicate with the raspberry pi
+mc = MotorCommands()
 
 # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
 starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*-1))
