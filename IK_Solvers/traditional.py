@@ -126,6 +126,19 @@ class ChessMoves():
             self.chess_arm.set_joint_angles(theta)
             xpath[:,point] = self.chess_arm.forward_kinematics()[:3]
         return xpath
+    
+    def add_gripper_commands(self, thetas):
+        """inserts a 4th row into the thetas matrix that commands the gripper to open and close"""
+        open = 0 # TODO: replace this with the angle needed for it to be open (in radians)
+        closed = 1 # TODO: replace this with the angle needed for it to be open (in radians)
+        shifted = np.hstack((np.zeros((3,1)),thetas[:,:-1]))
+        no_change = thetas==shifted
+        idxs = np.nonzero((no_change[0,:]==no_change[1,:])==no_change[2,:])[0]
+        grip_commands = np.zeros_like(thetas[0,:])
+        for i in range(len(idxs)-1):
+            grip_commands[:idxs[i]] = open
+            grip_commands[idxs[i]:idxs[i+1]] = closed
+        return np.vstack((thetas,grip_commands))
 
     def plot_board(self, ax):
         """plots the given path along with a representation of the chess board"""

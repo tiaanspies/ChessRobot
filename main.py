@@ -373,7 +373,7 @@ def robotsPhysicalMove(robot_move, capture_square):
         capture_square = cm.getCoords(capture_square)
     path = cm.generate_quintic_path(start, goal, capture_square) # generate waypoints
     thetas = cm.inverse_kinematics(path) # convert to joint angles
-    # TODO: clear out wrist commands and insert gripper ones instead
+    thetas = cm.add_gripper_commands(thetas[:-1,:]) # remove unnecessary wrist commands, add gripper open close instead
     mc.run(thetas) # pass joint angles to motors
     
     # simulate
