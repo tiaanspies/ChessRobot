@@ -7,13 +7,8 @@ from time import sleep
 
 
 class MotorCommands:
-    def __init__(self, thetas):
-        # Pin numbers
-        self.BASE_CHANNEL = 0
-        self.SHOULDER_CHANNEL = 1
-        self.ELBOW_CHANNEL = 2
-        self.GRIP_CHANNEL = 3
-
+    def __init__(self):
+        
         # Create the I2C bus interface.
         i2c_bus = busio.I2C(SCL, SDA)
 
@@ -24,24 +19,43 @@ class MotorCommands:
         pca.frequency = 50
 
         # Create a servokit class instance with the total number of channels needed
-        kit = ServoKit(channels=4)
+        kit = ServoKit(channels=16)
 
-        # define shortcuts for each
-        self.base = kit.servo[self.BASE_CHANNEL]
-        self.shoulder = kit.servo[self.SHOULDER_CHANNEL]
-        self.elbow = kit.servo[self.ELBOW_CHANNEL]
-        self.grip = kit.servo[self.GRIP_CHANNEL]
+        # define shortcuts and set pin numbers for each motor
+        self.base = kit.servo[1]
+        self.shoulder = kit.servo[2]
+        self.elbow = kit.servo[3]
+        self.grip = kit.servo[4]
 
-    def go_to(self, theta):
+        # set all pulsewidth ranges
+        self.base.set_pulse_width_range(500,2500)
+        self.shoulder.set_pulse_width_range(500,2500)
+        self.elbow.set_pulse_width_range(500,2500)
+        self.grip.set_pulse_width_range(500,2500) # TODO: this one is probably different
+
+    def go_to(self, theta, angletype='rad'):
         """moves directly to provided theta configuration"""
-        angle = np.rad2deg(theta)
+        if angletype == 'rad':
+            angle = np.rad2deg(theta)
+        elif angletype == 'deg':
+            angle = theta
+        else:
+            raise ValueError("angletype argument must be either 'rad' or 'deg'")
+        
         self.base.angle(angle[0])
         self.shoulder.angle(angle[1])
         self.elbow.angle(angle[2])
         self.grip.angle(angle[3])
 
-    def run(self, thetas):
+    def run(self, thetas, angletype='rad'):
         """runs the full set of theta commands"""
+        if angletype == 'rad':
+            angle = np.rad2deg(theta)
+        elif angletype == 'deg':
+            angle = theta
+        else:
+            raise ValueError("angletype argument must be either 'rad' or 'deg'")
+        
         try:
             for theta in thetas.T:
                 angle = np.rad2deg(theta)
