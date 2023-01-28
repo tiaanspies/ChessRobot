@@ -35,7 +35,6 @@ import matplotlib.pyplot as plt
 from Chessboard_detection import Fake_Camera, Chess_Vision
 from IK_Solvers.traditional import ChessMoves
 from motor_commands import MotorCommands
-import picamera
 
 ### INITIALIZE ###
 
@@ -54,7 +53,7 @@ def initializeCamera():
     dirPath = os.path.dirname(os.path.realpath(__file__))
     relPath = "\\Chessboard_detection\\TestImages\\Set_2_W_Only"
     cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath) # Change .FakeCamera to .PhoneCamera
-    cam = PiCamera()
+
     if not cam.isOpened():
         raise("Cannot open camera.")
 
@@ -63,6 +62,7 @@ def initializeCamera():
     ans = input("Is the empty board in view? (y/n): ").strip().lower()
     if ans == 'y':
         s, img = cam.read()
+
         board = Chess_Vision.ChessBoard(img)
     else:
         print("Please put the empty board is in view")
@@ -128,7 +128,7 @@ def gameOver():
                 global HUMAN_SCORE
                 HUMAN_SCORE += 1
             else:
-                global HUMAN_SCORE
+                global ROBOT_SCORE
                 ROBOT_SCORE += 1
         
         # print the running scores
@@ -406,6 +406,9 @@ stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15
 
 # create an instance of the cam and board classes for converting input from the camera
 cam, board = initializeCamera()
+
+while 1==1:
+    pass
 
 # create an instance of the ChessMoves class, which holds all functions for converting a algebraic notation move to a theta trajectory
 cm = ChessMoves() # this class takes all the board and robot measurements as optional args

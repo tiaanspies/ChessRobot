@@ -98,9 +98,11 @@ class PiCamera:
             output = np.empty((self.cameraRes[0], self.cameraRes[1], 3), dtype=np.uint8)
             self.camera.capture(output, 'rgb')
             self.camera.stop_preview()
+            self.frame = output
         ret = self.frame is not None
 
         self.stateNum += 1
+        cv.imshow("1", self.frame)
         return ret, self.frame
 
     def isOpened(self):
