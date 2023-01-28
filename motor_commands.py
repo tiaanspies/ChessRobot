@@ -66,3 +66,29 @@ class MotorCommands:
                 sleep(1) # will need to decrease eventually
         except KeyboardInterrupt:
             pass # TODO: make sure this means gripper is open
+
+    def add_gripper_commands(self, sim_thetas):
+        """replaces the sim's wrist angles with a list that commands the gripper to open and close"""
+        thetas = sim_thetas[:-1,:]
+        open = np.pi/6 # TODO: replace this with the angle needed for it to be open (in radians)
+        closed = 2.32 # TODO: replace this with the angle needed for it to be closed (in radians)
+        shifted = np.hstack((np.zeros((3,1)),thetas[:,:-1]))
+        no_change = thetas==shifted
+        idxs = np.nonzero((no_change[0,:]==no_change[1,:])==no_change[2,:])[0]
+        grip_commands = np.zeros_like(thetas[0,:])
+        for i in range(len(idxs)-1):
+            grip_commands[:idxs[i]] = open
+            grip_commands[idxs[i]:idxs[i+1]] = closed
+        return np.vstack((thetas,grip_commands))
+    
+    def fit_robot_limits(self, thetas):
+        thetas = thetas % (2 * np.pi)
+        thetas[0,:] = ((np.pi - thetas[0,:]) - np.pi/4) * 2 # fix the base angle by switching rot direction, shifting to the front slice, then handling the gear ratio
+        thetas[1,:] = thetas[1,:] # make any necessary changes to the shoulder angles
+        thetas[2,:] = 2*np.pi - thetas[2,:] # make any necessary changes to the elbow angles
+        thetas =  thetas % (2 * np.pi)
+
+        if any(thetas.ravel() > np.pi):
+            raise ValueError('IK solution requires angles greater than the 180-degree limits of motors')
+        
+        return thetas
