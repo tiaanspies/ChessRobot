@@ -1,14 +1,14 @@
 import numpy as np
 from IK_Solvers.traditional import ChessMoves
 import matplotlib.pyplot as plt
-# from motor_commands import MotorCommands
+from motor_commands import MotorCommands
 
 def wrap2pi(angles):
     return angles % (2 * np.pi)
 
 # create class instances
 cm = ChessMoves()
-# mc = MotorCommands()
+mc = MotorCommands()
 
 # edit the DH parameters if needed
 '''
@@ -80,35 +80,43 @@ while thetas[0] <= .6:
 # home = cm.forward_kinematics(vertical).reshape((3,))
 # start = np.array([0, 0, 300])
 # goal = np.array([0, 300, 20])
-start = cm.get_coords('a5')
-goal = cm.get_coords('e3')
+start = cm.get_coords('a8')
+goal = cm.get_coords('h3')
 step_len = 10 # mm
 
 # generate a path between them
 # path = cm.quintic_line(start, goal, step_len)
 path = cm.generate_quintic_path(start, goal)
+thetas = cm.inverse_kinematics(path)
+thetas = mc.add_gripper_commands(thetas)
+thetas = mc.fit_robot_limits(thetas)
+
+'''
 thetas = wrap2pi(cm.inverse_kinematics(path))
 
 # simulate the robot following that path
-cm.plot_robot(thetas, path)
+# cm.plot_robot(thetas, path)
 
 # now convert the theta commands to work for the real robot
-motor_thetas = cm.add_gripper_commands(thetas)
+motor_thetas = mc.add_gripper_commands(thetas)
 motor_thetas[0,:] = ((np.pi - motor_thetas[0,:]) - np.pi/4) * 2 # fix the base angle by switching rot direction, shifting to the front slice, then handling the gear ratio
 motor_thetas[1,:] = motor_thetas[1,:] # make any necessary changes to the shoulder angles
 motor_thetas[2,:] = 2*np.pi - motor_thetas[2,:]# make any necessary changes to the elbow angles
 motor_thetas = wrap2pi(motor_thetas) # confirm one more time that all angles are as low as possible
 
-# plot all the angles to confirm they are between 0 - pi
-steps = len(motor_thetas[0,:])
-plt.plot(np.linspace(0,steps,steps), motor_thetas[0,:], color='r',label="base")
-plt.plot(np.linspace(0,steps,steps), motor_thetas[1,:], color='b',label="shoulder")
-plt.plot(np.linspace(0,steps,steps), motor_thetas[2,:], color='y',label="elbow")
-plt.legend()
-plt.show() 
-
 if any(motor_thetas.ravel() > np.pi):
     raise ValueError('IK solution requires angles greater than the 180-degree limits of motors')
 # run the commands on the physical robot
-# mc.run(motor_thetas)
+'''
+print(thetas)
+# plot all the angles to confirm they are between 0 - pi
+steps = len(thetas[0,:])
+plt.plot(np.linspace(0,steps,steps), thetas[0,:], color='r',label="base")
+plt.plot(np.linspace(0,steps,steps), thetas[1,:], color='b',label="shoulder")
+plt.plot(np.linspace(0,steps,steps), thetas[2,:], color='y',label="elbow")
+plt.legend()
+plt.show() 
+
+ans = input("are you ready? (y/n)")
+mc.run(thetas)
 

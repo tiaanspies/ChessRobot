@@ -42,36 +42,35 @@ class MotorCommands:
         else:
             raise ValueError("angletype argument must be either 'rad' or 'deg'")
         
-        self.base.angle(angle[0])
-        self.shoulder.angle(angle[1])
-        self.elbow.angle(angle[2])
-        self.grip.angle(angle[3])
+        self.base.angle = angle[0]
+        self.shoulder.angle = angle[1]
+        self.elbow.angle = angle[2]
+        self.grip.angle = angle[3]
 
     def run(self, thetas, angletype='rad'):
         """runs the full set of theta commands"""
         if angletype == 'rad':
-            angle = np.rad2deg(theta)
+            angles = np.rad2deg(thetas)
         elif angletype == 'deg':
-            angle = theta
+            angles = thetas
         else:
             raise ValueError("angletype argument must be either 'rad' or 'deg'")
         
         try:
-            for theta in thetas.T:
-                angle = np.rad2deg(theta)
-                self.base.angle(angle[0])
-                self.shoulder.angle(angle[1])
-                self.elbow.angle(angle[2])
-                self.grip.angle(angle[3])
-                sleep(1) # will need to decrease eventually
+            for angle in angles.T:
+                self.base.angle = angle[0]
+                self.shoulder.angle = angle[1]
+                self.elbow.angle = angle[2]
+                self.grip.angle = angle[3]
+                sleep(.1) # will need to decrease eventually
         except KeyboardInterrupt:
             pass # TODO: make sure this means gripper is open
 
     def add_gripper_commands(self, sim_thetas):
         """replaces the sim's wrist angles with a list that commands the gripper to open and close"""
         thetas = sim_thetas[:-1,:]
-        open = np.pi/6 # TODO: replace this with the angle needed for it to be open (in radians)
-        closed = 2.32 # TODO: replace this with the angle needed for it to be closed (in radians)
+        open = np.pi/2 # TODO: replace this with the angle needed for it to be open (in radians)
+        closed = 3*np.pi/4 # TODO: replace this with the angle needed for it to be closed (in radians)
         shifted = np.hstack((np.zeros((3,1)),thetas[:,:-1]))
         no_change = thetas==shifted
         idxs = np.nonzero((no_change[0,:]==no_change[1,:])==no_change[2,:])[0]

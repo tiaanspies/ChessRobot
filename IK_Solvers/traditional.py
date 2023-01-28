@@ -15,7 +15,7 @@ class ChessMoves():
         self.L1 = L1 # length of the first link in mm
         self.L2 = L2 # length of the second link in mm
         self.BOARD_WIDTH = 8 * self.SQUARE_WIDTH # total width of the board
-        self.HOME = np.array([0, self.BASE_DIST, 1.5*self.BOARD_WIDTH]) # location of home for the robot arm between moves
+        self.HOME = np.array([0, self.BASE_DIST, 500]) # location of home for the robot arm between moves
 
         self.generate_coords()
         self.initialize_arm()
