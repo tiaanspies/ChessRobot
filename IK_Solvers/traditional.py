@@ -6,12 +6,12 @@ from IK_Solvers.quintic_polynomials_planner import QuinticPolynomial
 
 class ChessMoves():
     
-    def __init__(self, lift=50, square_width=30, base_dist=100, board_height=10, piece_height=50, L1=250, L2=250):
+    def __init__(self, lift=50, square_width=30, base_dist=100, board_height=10, grip_height=20, L1=296, L2=284.76):
         self.LIFT = lift # distance to clear the other pieces in mm
         self.SQUARE_WIDTH = square_width # width of one board square in mm
         self.BASE_DIST = base_dist # distance from edge of the board to the robot base in mm
         self.BOARD_HEIGHT = board_height # height of the board off the ground in mm
-        self.PIECE_HEIGHT = piece_height # height of the pieces off the board in mm
+        self.GRIP_HEIGHT = grip_height # how high off the board to grip the pieces in mm
         self.L1 = L1 # length of the first link in mm
         self.L2 = L2 # length of the second link in mm
         self.BOARD_WIDTH = 8 * self.SQUARE_WIDTH # total width of the board
@@ -31,7 +31,7 @@ class ChessMoves():
         self.board_coords = np.zeros((3,8,8))     
         
         # set z coord of pieces on board
-        self.board_coords[2,:,:] = self.BOARD_HEIGHT + self.PIECE_HEIGHT
+        self.board_coords[2,:,:] = self.BOARD_HEIGHT + self.GRIP_HEIGHT
 
         # define and set x and y coords of board
         self.file_coords = np.linspace(-3.5*self.SQUARE_WIDTH,3.5*self.SQUARE_WIDTH,8,endpoint=True)
@@ -44,11 +44,11 @@ class ChessMoves():
                                 np.zeros(15))).T)
 
     def initialize_arm(self):
-        """initialize instance of NLinkArm with Denavit-Hartenberg parameters of chess arm"""
-        l1_params = [0, np.pi/2, 0, 0]
-        l2_params = [0, 0, self.L1, 0]
-        l3_params = [0, 0, self.L2, 0]
-        l4_params = [np.pi,0,0,0]
+        """initialize inthetasstance of NLinkArm with Denavit-Hartenberg parameters of chess arm"""
+        l1_params = [0, 3*np.pi/2, 0, 83.35]
+        l2_params = [0, np.pi, -self.L1, 0]
+        l3_params = [0, 0, -self.L2, 0]
+        l4_params = [0,0,90,0]
         self.param_list = [l1_params, l2_params, l3_params, l4_params]
         self.chess_arm = NLinkArm(self.param_list)
 
@@ -88,23 +88,23 @@ class ChessMoves():
         lift_vector = np.array([0,0,self.LIFT])
         if cap_sq is not None:
             storage = np.array(self.storage_coords.pop(0))
-            first_moves = np.hstack((self.line2(self.HOME, cap_sq, step),
+            first_moves = np.hstack((self.quintic_line(self.HOME, cap_sq, step),
                                     cap_sq.reshape((3,1)), cap_sq.reshape((3,1)),
-                                    self.line2(cap_sq, cap_sq + lift_vector, step),
-                                    self.line2(cap_sq + lift_vector, storage + lift_vector, step),
-                                    self.line2(storage + lift_vector, storage, step),
+                                    self.quintic_line(cap_sq, cap_sq + lift_vector, step),
+                                    self.quintic_line(cap_sq + lift_vector, storage + lift_vector, step),
+                                    self.quintic_line(storage + lift_vector, storage, step),
                                     storage.reshape((3,1)), storage.reshape((3,1)),
-                                    self.line2(storage, storage + lift_vector, step),
-                                    self.line2(storage + lift_vector, start, step)))
+                                    self.quintic_line(storage, storage + lift_vector, step),
+                                    self.quintic_line(storage + lift_vector, start, step)))
         else:
-            first_moves = self.line2(self.HOME, start, step)
+            first_moves = self.quintic_line(self.HOME, start, step)
         
         second_moves = np.hstack((start.reshape((3,1)), start.reshape((3,1)),
-                                self.line2(start, start + lift_vector, step),
-                                self.line2(start + lift_vector, goal + lift_vector, step),
-                                self.line2(goal + lift_vector, goal, step),
+                                self.quintic_line(start, start + lift_vector, step),
+                                self.quintic_line(start + lift_vector, goal + lift_vector, step),
+                                self.quintic_line(goal + lift_vector, goal, step),
                                 goal.reshape((3,1)), goal.reshape((3,1)),
-                                self.line2(goal, self.HOME, step)))
+                                self.quintic_line(goal, self.HOME, step)))
 
         return np.hstack((first_moves, second_moves))
 
@@ -129,8 +129,8 @@ class ChessMoves():
     
     def add_gripper_commands(self, thetas):
         """inserts a 4th row into the thetas matrix that commands the gripper to open and close"""
-        open = 0 # TODO: replace this with the angle needed for it to be open (in radians)
-        closed = 1 # TODO: replace this with the angle needed for it to be open (in radians)
+        open = np.pi/2 # TODO: replace this with the angle needed for it to be open (in radians)
+        closed = 2.32 # TODO: replace this with the angle needed for it to be closed (in radians)
         shifted = np.hstack((np.zeros((3,1)),thetas[:,:-1]))
         no_change = thetas==shifted
         idxs = np.nonzero((no_change[0,:]==no_change[1,:])==no_change[2,:])[0]
@@ -188,7 +188,7 @@ class ChessMoves():
             plt.pause(.01)
         plt.show()
 
-    def line2(self, start, goal, avg_step):
+    def quintic_line(self, start, goal, avg_step):
         """Creates a 3xN nparray of 3D waypoints between start and goal using a quintec polynomial"""
         dist = np.linalg.norm(goal - start)
         n_steps = int(dist // avg_step)
