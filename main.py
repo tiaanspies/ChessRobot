@@ -35,6 +35,7 @@ import matplotlib.pyplot as plt
 from Chessboard_detection import Fake_Camera, Chess_Vision
 from IK_Solvers.traditional import ChessMoves
 from motor_commands import MotorCommands
+import picamera
 
 ### INITIALIZE ###
 
@@ -48,7 +49,7 @@ def initializeCamera():
     dirPath = os.path.dirname(os.path.realpath(__file__))
     relPath = "\\Chessboard_detection\\TestImages\\Set_2_W_Only"
     cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath) # Change .FakeCamera to .PhoneCamera
-
+    cam = PiCamera()
     if not cam.isOpened():
         raise("Cannot open camera.")
 
