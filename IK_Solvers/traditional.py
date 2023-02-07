@@ -86,7 +86,7 @@ class ChessMoves():
 
         return np.hstack((first_moves, second_moves))
 
-    def generate_quintic_path(self, start, goal, cap_sq, step=10):
+    def generate_quintic_path(self, start, goal, cap_sq=None, step=10):
         """creates a 3xN array of waypoints to and from home, handling captures and lifting over pieces"""
         lift_vector = np.array([0,0,self.LIFT])
         if cap_sq is not None:
