@@ -1,10 +1,12 @@
 import os
 import cv2 as cv
-
+from time import sleep
 # for PhoneCamera:
 import requests
 import numpy as np
 from Chessboard_detection import Chess_Vision
+from picamera import PiCamera
+
 # import Chess_Vision
 
 class FakeCamera:
@@ -74,6 +76,40 @@ class PhoneCamera:
     def release(self):
         return True
 
+
+class PiCamera:
+    def __init__(self, res, absPath) -> None:
+
+        self.camera = PiCamera()
+        self.cameraRes = res
+        self.camera.resolution = res
+
+        self.stateNum = -1
+    
+    def read(self):
+        # self.stateNum = 10 # use this line to skip the saved empty picture and do it by hand
+        if self.stateNum <= 0:
+            self.path_full = self.absPath
+            self.frame = cv.imread(self.path_full + "\\empty.JPG")
+            self.frame = cv.resize(self.frame, self.cameraRes)
+        elif self.stateNum > 0:
+            self.camera.start_preview()
+            sleep(5)
+            output = np.empty((self.cameraRes[0], self.cameraRes[1], 3), dtype=np.uint8)
+            self.camera.capture(output, 'rgb')
+            self.camera.stop_preview()
+        ret = self.frame is not None
+
+        self.stateNum += 1
+        return ret, self.frame
+
+    def isOpened(self):
+        ret, _ = self.read()
+
+        return ret
+
+    def release(self):
+        return True
 '''
 # Replace the below URL with your own. Make sure to add "/shot.jpg" at last.
 url = "http://192.168.0.103:8080/shot.jpg"
