@@ -43,13 +43,16 @@ class ChessMoves():
                                 np.ones(15)*(self.BASE_DIST - self.SQUARE_WIDTH),
                                 np.zeros(15))).T)
 
-    def initialize_arm(self):
+    def initialize_arm(self, param_list=None):
         """initialize inthetasstance of NLinkArm with Denavit-Hartenberg parameters of chess arm"""
-        l1_params = [0, 3*np.pi/2, 0, 83.35]
-        l2_params = [0, np.pi, -self.L1, 0]
-        l3_params = [0, 0, -self.L2, 0]
-        l4_params = [0,0,90,0]
-        self.param_list = [l1_params, l2_params, l3_params, l4_params]
+        if param_list is None:
+            l1_params = [0, 3*np.pi/2, 0, 83.35]
+            l2_params = [0, np.pi, -self.L1, 0]
+            l3_params = [0, 0, -self.L2, 0]
+            l4_params = [0,0,90,0]
+            self.param_list = [l1_params, l2_params, l3_params, l4_params]
+        else:
+            self.param_list = param_list
         self.chess_arm = NLinkArm(self.param_list)
 
     def get_coords(self, name):
@@ -127,8 +130,9 @@ class ChessMoves():
             xpath[:,point] = self.chess_arm.forward_kinematics()[:3]
         return xpath
     
-    def add_gripper_commands(self, thetas):
-        """inserts a 4th row into the thetas matrix that commands the gripper to open and close"""
+    def add_gripper_commands(self, sim_thetas):
+        """replaces the sim's wrist angles with a list that commands the gripper to open and close"""
+        thetas = sim_thetas[:-1,:]
         open = np.pi/2 # TODO: replace this with the angle needed for it to be open (in radians)
         closed = 2.32 # TODO: replace this with the angle needed for it to be closed (in radians)
         shifted = np.hstack((np.zeros((3,1)),thetas[:,:-1]))
@@ -148,7 +152,6 @@ class ChessMoves():
         Z = np.ones_like(X) * self.BOARD_HEIGHT
         ax.plot_wireframe(X,Y,Z, color="k")
         
-
     def plot_robot(self, thetas, path=None):
         n_steps = np.size(thetas,1)
         verts = np.zeros((n_steps, 3, len(self.chess_arm.link_list) + 1))
