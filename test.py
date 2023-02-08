@@ -74,13 +74,13 @@ while thetas[0] <= .6:
 home = cm.forward_kinematics(np.zeros((4,1))).reshape((3,))
 # start = np.array([0, 0, 300])
 # goal = np.array([0, 300, 20])
-start = cm.get_coords('a1')
-goal = cm.get_coords('h8')
+start = cm.get_coords('a7')
+goal = cm.get_coords('e3')
 step_len = 10 # mm
 
 # generate a path between them
-path = cm.quintic_line(start, goal, step_len)
-# path = cm.generate_quintic_path(start, goal)
+# path = cm.quintic_line(start, goal, step_len)
+path = cm.generate_quintic_path(start, goal)
 thetas = wrap2pi(cm.inverse_kinematics(path))
 
 # simulate the robot following that path
@@ -101,7 +101,7 @@ plt.plot(np.linspace(0,steps,steps), motor_thetas[2,:], color='y',label="elbow")
 plt.legend()
 plt.show() 
 
-if motor_thetas.any() > np.pi:
+if any(motor_thetas.ravel() > np.pi):
     raise ValueError('IK solution requires angles greater than the 180-degree limits of motors')
 # run the commands on the physical robot
 # mc.run(motor_thetas)

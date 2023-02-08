@@ -39,6 +39,11 @@ import picamera
 
 ### INITIALIZE ###
 
+# define global variables for tracking the running score
+HUMAN_SCORE = 0
+ROBOT_SCORE = 0
+GAME_COUNTER = 0
+
 # functions for gameplay
 def initializeCamera():
     """Sets up the camera, needs to calibrate on both empty and starting board. returns cam and board instances"""
@@ -120,24 +125,32 @@ def gameOver():
         # if there was a winner update the running scores
         if outcome.winner is not None:
             if outcome.winner == (HUMAN==chess.WHITE):
+                global HUMAN_SCORE
                 HUMAN_SCORE += 1
             else:
+                global HUMAN_SCORE
                 ROBOT_SCORE += 1
         
         # print the running scores
         print(f"Robot: {ROBOT_SCORE}, Human: {HUMAN_SCORE}")
         print("Good game, human")
-
-        # decide whether to play again
-        ans = input("Play again? (y/n): ").strip().lower()
-        if ans == 'y':
-            game_counter += 1
-            main()
-        else:
-            return True
+        return True
 
     return False
 
+def play_again():
+    """decide whether to play again"""
+    ans = input("Play again? (y/n): ").strip().lower()
+    if ans == 'y':
+        global GAME_COUNTER
+        GAME_COUNTER += 1
+        return True
+    elif ans == 'n':
+        print("That's okay, thanks for playing!")
+        return False
+    else:
+        play_again()
+        
 # functions for handling visboard (the -1, 0, 1 representation)
 def seeBoardReal():
     """Uses CV to determine which squares are occupied, returns -1, 0, 1 representation"""
@@ -245,12 +258,19 @@ def compareVisBoards(current, previous):
     return human_move
 
 def perceiveHumanMove(previous_visboard):
-    """take image (or typed move for now) and return the move that was made"""
+    """take image and return the move that was made"""
     # seen_visboard = seeBoardFiller(current_visboard.copy())   
     new_visboard = seeBoardReal() # Tiaan's vision function to find occupied squares
     human_move = compareVisBoards(new_visboard, previous_visboard) # Compare boards to figure out what piece moved
+    
+    # if move was not successfully detected, start over
     if human_move is None:
         return perceiveHumanMove(previous_visboard)
+    
+    # if move was a promotion, find out which piece they chose
+    if chess.Move.from_uci(human_move + "q") in board.legal_moves:
+        human_move += input("Which piece did you promote the pawn to? [q,r,b,n]: ")
+    
     return new_visboard, human_move
 
 # functions for handling transition to real 3D space
@@ -398,12 +418,6 @@ starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), d
 pyboard = chess.Board()
 # cboard, storage_list, home = defBoardCoords()
 
-# define global variables for tracking the running score
-global HUMAN_SCORE
-global ROBOT_SCORE
-HUMAN_SCORE = 0
-ROBOT_SCORE = 0
-
 def main():
     
     # determine who is playing which side and run k-means to set color centroids
@@ -424,16 +438,17 @@ def main():
         ### HUMAN'S TURN ###
         # figure out what their move was
         seen_visboard, human_move = perceiveHumanMove(current_visboard)
-
+        
         # if move is illegal make human try again
         if chess.Move.from_uci(human_move) not in pyboard.legal_moves:
             print("Not a valid move. Try again, human")
             if pyboard.is_into_check(chess.Move.from_uci(human_move)):
                 print("PS, you might want to avoid check this time")
             
-            # TODO: start human's timer again
+            # TODO: replace the below with starting human's timer again
+            ans = input("Have you reset the turn and played again? ")
             continue
-        
+
         # update board representations
         pyboard.push_uci(human_move)
         stockfish.make_moves_from_current_position([human_move])
@@ -455,9 +470,12 @@ def main():
 
     cam.release()
 
-# TODO: make a better display of who won. The chess object output doesn't make sense
-# TODO: handle promotions
+# TODO: make a better display of who won. The chess object output doesn't make sense - think I fixed this, will need to test
+# TODO: handle promotions - done for human, not for robot
+# TODO: handle castling for robot
 # TODO: make waypoints that are more smooth and won't result in a jerky motion straight up, stop, over, stop, down. - started this with quintecs
+# TODO: build in a check that the physical move worked according to the camera
 
 if __name__ == "__main__":
-    main()
+    while GAME_COUNTER == 0 or play_again():
+        main()
