@@ -46,10 +46,10 @@ class ChessMoves():
     def initialize_arm(self, param_list=None):
         """initialize inthetasstance of NLinkArm with Denavit-Hartenberg parameters of chess arm"""
         if param_list is None:
-            l1_params = [0, 3*np.pi/2, 0, 83.35]
-            l2_params = [0, np.pi, -self.L1, 0]
-            l3_params = [0, 0, -self.L2, 0]
-            l4_params = [0,0,90,0]
+            l1_params = [np.pi/4, np.pi/2, 0, 83.35]
+            l2_params = [np.pi/2, 0, 296, 0]
+            l3_params = [3*np.pi/2, 0, 284.76, 0]
+            l4_params = [np.pi,0,90,0]
             self.param_list = [l1_params, l2_params, l3_params, l4_params]
         else:
             self.param_list = param_list
@@ -129,20 +129,6 @@ class ChessMoves():
             self.chess_arm.set_joint_angles(theta)
             xpath[:,point] = self.chess_arm.forward_kinematics()[:3]
         return xpath
-    
-    def add_gripper_commands(self, sim_thetas):
-        """replaces the sim's wrist angles with a list that commands the gripper to open and close"""
-        thetas = sim_thetas[:-1,:]
-        open = np.pi/2 # TODO: replace this with the angle needed for it to be open (in radians)
-        closed = 2.32 # TODO: replace this with the angle needed for it to be closed (in radians)
-        shifted = np.hstack((np.zeros((3,1)),thetas[:,:-1]))
-        no_change = thetas==shifted
-        idxs = np.nonzero((no_change[0,:]==no_change[1,:])==no_change[2,:])[0]
-        grip_commands = np.zeros_like(thetas[0,:])
-        for i in range(len(idxs)-1):
-            grip_commands[:idxs[i]] = open
-            grip_commands[idxs[i]:idxs[i+1]] = closed
-        return np.vstack((thetas,grip_commands))
 
     def plot_board(self, ax):
         """plots the given path along with a representation of the chess board"""
