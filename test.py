@@ -88,8 +88,8 @@ step_len = 10 # mm
 # path = cm.quintic_line(start, goal, step_len)
 path = cm.generate_quintic_path(start, goal)
 thetas = cm.inverse_kinematics(path)
-thetas = mc.add_gripper_commands(thetas)
-thetas = mc.fit_robot_limits(thetas)
+grip_commands = cm.get_gripper_commands(path)
+thetas = mc.sort_commands(thetas, grip_commands)
 
 '''
 thetas = wrap2pi(cm.inverse_kinematics(path))

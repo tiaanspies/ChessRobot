@@ -72,7 +72,8 @@ class MotorCommands:
         open = np.pi/2 # TODO: replace this with the angle needed for it to be open (in radians)
         closed = 3*np.pi/4 # TODO: replace this with the angle needed for it to be closed (in radians)
         shifted = np.hstack((np.zeros((3,1)),thetas[:,:-1]))
-        no_change = thetas==shifted
+        err = 1e-2
+        no_change = (thetas-shifted) <= err
         idxs = np.nonzero((no_change[0,:]==no_change[1,:])==no_change[2,:])[0]
         grip_commands = np.zeros_like(thetas[0,:])
         for i in range(len(idxs)-1):
@@ -80,7 +81,8 @@ class MotorCommands:
             grip_commands[idxs[i]:idxs[i+1]] = closed
         return np.vstack((thetas,grip_commands))
     
-    def fit_robot_limits(self, thetas):
+    def sort_commands(self, thetas, grip_commands):
+        thetas[3,:] = grip_commands
         thetas = thetas % (2 * np.pi)
         thetas[0,:] = ((np.pi - thetas[0,:]) - np.pi/4) * 2 # fix the base angle by switching rot direction, shifting to the front slice, then handling the gear ratio
         thetas[1,:] = thetas[1,:] # make any necessary changes to the shoulder angles
