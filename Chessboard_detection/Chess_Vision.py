@@ -133,7 +133,6 @@ class ChessBoard:
         self.fitKClusters(img, weighted=True)
 
         positions = self.getCurrentPositions(img)
-        print(positions)
 
         meanBottom = np.round(np.mean(positions[-2:, :], axis=(0, 1)))
         meanTop = np.round(np.mean(positions[:2, :]))
@@ -446,7 +445,8 @@ class ChessBoard:
         if self.flipBoard:
             blockIDs = np.flip(blockIDs, axis=0)
             blockIDs = np.flip(blockIDs, axis=1)
-            
+        
+        print(blockIDs)
         return blockIDs
 
     def splitBoardIntoSquares(self, img):
