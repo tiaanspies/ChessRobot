@@ -113,7 +113,7 @@ class RPiCamera:
             self.camera.capture(output, 'rgb')
             self.camera.stop_preview()
             # self.camera.close()
-            self.frame = output.copy()
+            self.frame = cv.CvtColor(output, cv.COLOR_RGB2BGR)
         ret = self.frame is not None
 
         self.stateNum += 1

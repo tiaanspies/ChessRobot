@@ -1,14 +1,14 @@
 import numpy as np
 from IK_Solvers.traditional import ChessMoves
 import matplotlib.pyplot as plt
-from motor_commands import MotorCommands
+#from motor_commands import MotorCommands
 
 def wrap2pi(angles):
     return angles % (2 * np.pi)
 
 # create class instances
 cm = ChessMoves()
-mc = MotorCommands()
+#mc = MotorCommands()
 
 # edit the DH parameters if needed
 '''
@@ -86,11 +86,12 @@ step_len = 10 # mm
 
 # generate a path between them
 # path = cm.quintic_line(start, goal, step_len)
-path = cm.generate_quintic_path(start, goal)
-thetas = cm.inverse_kinematics(path)
+path = cm.generate_quintic_path(start, goal, goal)
+#thetas = cm.inverse_kinematics(path)
 grip_commands = cm.get_gripper_commands(path)
-thetas = mc.sort_commands(thetas, grip_commands)
-
+print(grip_commands)
+#thetas = mc.sort_commands(thetas, grip_commands)
+#cm.plot_robot(thetas, path)
 '''
 thetas = wrap2pi(cm.inverse_kinematics(path))
 
@@ -108,6 +109,7 @@ if any(motor_thetas.ravel() > np.pi):
     raise ValueError('IK solution requires angles greater than the 180-degree limits of motors')
 # run the commands on the physical robot
 '''
+'''
 print(thetas)
 # plot all the angles to confirm they are between 0 - pi
 steps = len(thetas[0,:])
@@ -119,4 +121,4 @@ plt.show()
 
 ans = input("are you ready? (y/n)")
 mc.run(thetas)
-
+'''
