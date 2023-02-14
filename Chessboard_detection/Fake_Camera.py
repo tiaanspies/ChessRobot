@@ -9,6 +9,11 @@ from picamera import PiCamera
 
 # import Chess_Vision
 
+#File seperator depending on OS \\ for Windows
+# / for raspberry pi
+
+SEP = "/"
+
 class FakeCamera:
     def __init__(self, res, absPath) -> None:
 
@@ -20,10 +25,10 @@ class FakeCamera:
     
     def read(self):
         if self.stateNum <0:
-            self.frame = cv.imread(self.path_full + "\\empty.JPG")
+            self.frame = cv.imread(self.path_full + SEP + "empty.JPG")
             self.frame = cv.resize(self.frame, self.cameraRes)
         elif self.stateNum >= 0:
-            self.frame = cv.imread(self.path_full + "\\"+str(self.stateNum) +".JPG")
+            self.frame = cv.imread(self.path_full + SEP +str(self.stateNum) +".JPG")
             if self.frame is not None:
                 self.frame = cv.resize(self.frame, self.cameraRes)
 
@@ -34,7 +39,7 @@ class FakeCamera:
         return ret, self.frame
 
     def isOpened(self):
-        res = cv.imread(self.path_full + "\\empty.JPG")
+        res = cv.imread(self.path_full + SEP + "empty.JPG")
 
         return res is not None
 

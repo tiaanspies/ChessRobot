@@ -51,7 +51,7 @@ def initializeCamera():
     # Open Video camera
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
-    relPath = "\\Chessboard_detection\\TestImages\\Set_2_W_Only"
+    relPath = "/Chessboard_detection/TestImages/Set_2_W_Only"
     cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath) # Change .FakeCamera to .PhoneCamera
 
     if not cam.isOpened():
@@ -403,13 +403,12 @@ def robotsPhysicalMove(robot_move, capture_square):
 
 ### Global variables ###
 # create an instance of of the stockfish engine with the parameters requested
-stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=15, parameters={"UCI_Elo":500})
+#stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=15, parameters={"UCI_Elo":500})
+stockfish = Stockfish(r"/home/tpie/ChessRobot/Stockfish/Stockfish-sf_15/src/stockfish", depth=15, parameters={"UCI_Elo":500})
 
 # create an instance of the cam and board classes for converting input from the camera
 cam, board = initializeCamera()
 
-while 1==1:
-    pass
 
 # create an instance of the ChessMoves class, which holds all functions for converting a algebraic notation move to a theta trajectory
 cm = ChessMoves() # this class takes all the board and robot measurements as optional args

@@ -87,6 +87,7 @@ class ChessBoard:
 
         self.cornersExt = self.estimateExternalCorners(cornersIntReoriented)
         self.flipBoard = False       
+
         
         # # # ====== Uncomment this code to draw chessboardCorners
         # cornersNew = np.reshape(self.cornersExt, (81, 2))
