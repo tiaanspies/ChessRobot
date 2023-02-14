@@ -33,6 +33,9 @@ class MotorCommands:
         self.elbow.set_pulse_width_range(500,2500)
         self.grip.set_pulse_width_range(500,2500) # TODO: this one is probably different
 
+        self.OPEN = np.pi/4 # TODO: replace this with the angle needed for it to be open (in radians)
+        self.CLOSED = 3*np.pi/4 # TODO: replace this with the angle needed for it to be closed (in radians)
+
     def go_to(self, theta, angletype='rad'):
         """moves directly to provided theta configuration"""
         if angletype == 'rad':
@@ -64,20 +67,19 @@ class MotorCommands:
                 self.grip.angle = angle[3]
                 sleep(.1) # will need to decrease eventually
         except KeyboardInterrupt:
+            self.grip.angle = np.rad2deg(self.OPEN)
             pass # TODO: make sure this means gripper is open
 
     def add_gripper_commands(self, sim_thetas):
         """replaces the sim's wrist angles with a list that commands the gripper to open and close"""
         thetas = sim_thetas[:-1,:]
-        open = np.pi/2 # TODO: replace this with the angle needed for it to be open (in radians)
-        closed = 3*np.pi/4 # TODO: replace this with the angle needed for it to be closed (in radians)
         shifted = np.hstack((np.zeros((3,1)),thetas[:,:-1]))
         no_change = thetas==shifted
         idxs = np.nonzero((no_change[0,:]==no_change[1,:])==no_change[2,:])[0]
         grip_commands = np.zeros_like(thetas[0,:])
         for i in range(len(idxs)-1):
-            grip_commands[:idxs[i]] = open
-            grip_commands[idxs[i]:idxs[i+1]] = closed
+            grip_commands[:idxs[i]] = self.OPEN
+            grip_commands[idxs[i]:idxs[i+1]] = self.CLOSED
         return np.vstack((thetas,grip_commands))
     
     def fit_robot_limits(self, thetas):

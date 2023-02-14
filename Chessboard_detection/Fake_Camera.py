@@ -82,32 +82,42 @@ class PhoneCamera:
         return True
 
 
-class PiCamera:
+class RPiCamera:
+
     def __init__(self, res, absPath) -> None:
 
         self.camera = PiCamera()
         self.cameraRes = res
         self.camera.resolution = res
+        self.camera.rotation = 270
 
+        self.path_full = absPath
         self.stateNum = -1
     
     def read(self):
         # self.stateNum = 10 # use this line to skip the saved empty picture and do it by hand
         if self.stateNum <= 0:
-            self.path_full = self.absPath
-            self.frame = cv.imread(self.path_full + "\\empty.JPG")
+            self.frame = cv.imread(self.path_full + SEP +"empty.jpg")
+
+            if self.frame is None:
+                print("Cannot read stored initialization file")
+                exit()
+
             self.frame = cv.resize(self.frame, self.cameraRes)
         elif self.stateNum > 0:
             self.camera.start_preview()
             sleep(5)
-            output = np.empty((self.cameraRes[0], self.cameraRes[1], 3), dtype=np.uint8)
+            output = np.empty((self.cameraRes[1], self.cameraRes[0], 3), dtype=np.uint8)
             self.camera.capture(output, 'rgb')
             self.camera.stop_preview()
-            self.frame = output
+            # self.camera.close()
+            self.frame = output.copy()
+            print(self.frame.shape)
         ret = self.frame is not None
 
         self.stateNum += 1
-        cv.imshow("1", self.frame)
+
+        cv.imwrite(self.path_full + SEP +"initImg.jpg", self.frame)
         return ret, self.frame
 
     def isOpened(self):

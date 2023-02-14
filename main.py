@@ -46,13 +46,14 @@ GAME_COUNTER = 0
 # functions for gameplay
 def initializeCamera():
     """Sets up the camera, needs to calibrate on both empty and starting board. returns cam and board instances"""
-    CAMERA_RESOLUTION = (640, 480)
+    # CAMERA_RESOLUTION = (640, 480)
+    CAMERA_RESOLUTION = (480, 640)
 
     # Open Video camera
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
-    relPath = "/Chessboard_detection/TestImages/Set_2_W_Only"
-    cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath) # Change .FakeCamera to .PhoneCamera
+    relPath = "/Chessboard_detection/TestImages/Temp"
+    cam = Fake_Camera.RPiCamera(CAMERA_RESOLUTION, dirPath + relPath) # Change .FakeCamera to .PhoneCamera
 
     if not cam.isOpened():
         raise("Cannot open camera.")
@@ -150,7 +151,13 @@ def play_again():
         return False
     else:
         play_again()
-        
+
+def turn_on_robot():
+    sim_thetas = cm.inverse_kinematics(cm.HOME.reshape((3,1)))
+    thetas = np.vstack((sim_thetas[:-1,:], mc.OPEN))
+    thetas = mc.fit_robot_limits(thetas)
+    mc.go_to(thetas)    
+
 # functions for handling visboard (the -1, 0, 1 representation)
 def seeBoardReal():
     """Uses CV to determine which squares are occupied, returns -1, 0, 1 representation"""
@@ -406,15 +413,17 @@ def robotsPhysicalMove(robot_move, capture_square):
 #stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=15, parameters={"UCI_Elo":500})
 stockfish = Stockfish(r"/home/tpie/ChessRobot/Stockfish/Stockfish-sf_15/src/stockfish", depth=15, parameters={"UCI_Elo":500})
 
-# create an instance of the cam and board classes for converting input from the camera
-cam, board = initializeCamera()
-
-
 # create an instance of the ChessMoves class, which holds all functions for converting a algebraic notation move to a theta trajectory
 cm = ChessMoves() # this class takes all the board and robot measurements as optional args
 
 # create an instance of the MotorCommands class, which is used to communicate with the raspberry pi
 mc = MotorCommands()
+
+# turn on the robot
+turn_on_robot()
+
+# create an instance of the cam and board classes for converting input from the camera
+cam, board = initializeCamera()
 
 # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
 starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*-1))

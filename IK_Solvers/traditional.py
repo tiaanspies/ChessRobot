@@ -6,7 +6,7 @@ from IK_Solvers.quintic_polynomials_planner import QuinticPolynomial
 
 class ChessMoves():
     
-    def __init__(self, lift=50, square_width=30, base_dist=100, board_height=10, grip_height=20, L1=296, L2=284.76):
+    def __init__(self, lift=50, square_width=30, base_dist=110, board_height=5, grip_height=20, L1=296, L2=284.76):
         self.LIFT = lift # distance to clear the other pieces in mm
         self.SQUARE_WIDTH = square_width # width of one board square in mm
         self.BASE_DIST = base_dist # distance from edge of the board to the robot base in mm
@@ -15,7 +15,7 @@ class ChessMoves():
         self.L1 = L1 # length of the first link in mm
         self.L2 = L2 # length of the second link in mm
         self.BOARD_WIDTH = 8 * self.SQUARE_WIDTH # total width of the board
-        self.HOME = np.array([0, self.BASE_DIST, 500]) # location of home for the robot arm between moves
+        self.HOME = np.array([0, self.BASE_DIST+40, 500]) # location of home for the robot arm between moves
 
         self.generate_coords()
         self.initialize_arm()
@@ -40,7 +40,7 @@ class ChessMoves():
     
         # define array for coords of captured pieces
         self.storage_coords = list(np.vstack((np.linspace(-self.BOARD_WIDTH/2,self.BOARD_WIDTH/2,15,endpoint=True),
-                                np.ones(15)*(self.BASE_DIST - self.SQUARE_WIDTH),
+                                np.ones(15)*(self.BASE_DIST - 40),
                                 np.zeros(15))).T)
 
     def initialize_arm(self, param_list=None):

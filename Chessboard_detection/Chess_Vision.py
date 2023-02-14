@@ -7,10 +7,12 @@ from sklearn.cluster import KMeans
 import cv2 as cv
 from collections import Counter
 
+from Chessboard_detection import pi_debugging as debug
 from Chessboard_detection import Fake_Camera
 # import Fake_Camera
 
-CAMERA_RESOLUTION = (640, 480)
+# CAMERA_RESOLUTION = (640, 480)
+CAMERA_RESOLUTION = (480, 640)
 
 def empty(a):
     pass
@@ -131,6 +133,7 @@ class ChessBoard:
         self.fitKClusters(img, weighted=True)
 
         positions = self.getCurrentPositions(img)
+        print(positions)
 
         meanBottom = np.round(np.mean(positions[-2:, :], axis=(0, 1)))
         meanTop = np.round(np.mean(positions[:2, :]))
@@ -173,7 +176,7 @@ class ChessBoard:
         blur = cv.medianBlur(resizedImg, 7)
         
         # reshape image into a single line for k means fitting
-        self.kmeans = KMeans(n_clusters=4)
+        self.kmeans = KMeans(n_clusters=4, n_init='auto')
         imgReshaped = np.reshape(blur, (blur.shape[0]*blur.shape[1], 3))
 
         # if weighed is true apply a gaussian weight to each block.
@@ -268,6 +271,7 @@ class ChessBoard:
         return ret, corners
 
     def findOptimalThreshold(self, img, blurSize=3, erodeSize=3, onlyFindOne=False):
+        print("Finding Threshold")
         stepSize = 10
 
         #Find gray blurry img
@@ -316,6 +320,7 @@ class ChessBoard:
 
         # return average of minBound and Maxbound to hopefully be most reliable threshold
         thresholdOpt = int((maxBound+minBound)/2)
+        print("Opt Thresh:", thresholdOpt)
         return thresholdOpt 
 
     def estimateExternalCorners(self, cornersInt):
@@ -428,9 +433,9 @@ class ChessBoard:
         masked = self.maskImage(blurredHSV)
         cluster = self.findClusterImg(masked)
         img_new = cv.cvtColor(cluster, cv.COLOR_HSV2RGB)
-        showImg(img_new)
+
+        debug.saveImg(img_new, "test.jpg")
         ## END DEBUG
-        
 
         blocks = self.splitBoardIntoSquares(blurredHSV)
         clustered = self.findBlockClusters(blocks)
