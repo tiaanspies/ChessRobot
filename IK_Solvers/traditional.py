@@ -191,6 +191,20 @@ class ChessMoves():
         
         return path
 
+    def get_gripper_commands(self, waypoints):
+            """replaces the sim's wrist angles with a list that commands the gripper to open and close"""
+            open = np.pi/2 # TODO: replace this with the angle needed for it to be open (in radians)
+            closed = 3*np.pi/4 # TODO: replace this with the angle needed for it to be closed (in radians)
+            shifted = np.hstack((np.zeros((3,1)),waypoints[:,:-1]))
+            err = 1e-2
+            no_change = abs(waypoints-shifted) <= err
+            idxs = np.nonzero((no_change[0,:]==no_change[1,:])==no_change[2,:])[0]
+            grip_commands = np.zeros_like(waypoints[0,:])
+            for i in range(len(idxs)-1):
+                grip_commands[:idxs[i]] = open
+                grip_commands[idxs[i]:idxs[i+1]] = closed
+            return grip_commands
+    
     @staticmethod
     def line(start, goal, step):
         """Creates a 3xN nparray of 3D waypoints roughly 'step' distance apart between two 3D points"""
