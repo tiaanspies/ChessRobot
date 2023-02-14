@@ -154,8 +154,7 @@ def play_again():
 
 def turn_on_robot():
     sim_thetas = cm.inverse_kinematics(cm.HOME.reshape((3,1)))
-    thetas = np.vstack((sim_thetas[:-1,:], mc.OPEN))
-    thetas = mc.fit_robot_limits(thetas)
+    thetas = mc.sort_commands(sim_thetas, mc.OPEN)
     mc.go_to(thetas)    
 
 # functions for handling visboard (the -1, 0, 1 representation)

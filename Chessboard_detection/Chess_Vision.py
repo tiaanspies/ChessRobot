@@ -78,6 +78,8 @@ class ChessBoard:
         # self.setInitialImage(camera)
         self.initialImage = img
 
+        debug.saveImg(img, "initial.jpg")
+
         # see which blak and white threshold makes the board the easiest to find
         # Opt is estimated by middle of min and max
         thresholdOpt = self.findOptimalThreshold(self.initialImage, onlyFindOne=False, erodeSize=3, blurSize=3)
