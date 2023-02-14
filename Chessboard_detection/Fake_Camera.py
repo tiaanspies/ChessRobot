@@ -94,12 +94,13 @@ class RPiCamera:
         self.camera.rotation = 270
 
         self.path_full = absPath
-        self.stateNum = 1
+        self.stateNum = -1
     
     def read(self):
         # self.stateNum = 10 # use this line to skip the saved empty picture and do it by hand
         if self.stateNum <= 0:
             self.frame = cv.imread(self.path_full +"/empty.jpg")
+            self.frame = cv.cvtColor(self.frame, cv.COLOR_RGB2BGR)
 
             if self.frame is None:
                 print("Cannot read stored initialization file")
@@ -113,7 +114,7 @@ class RPiCamera:
             self.camera.capture(output, 'rgb')
             self.camera.stop_preview()
             # self.camera.close()
-            self.frame = cv.CvtColor(output, cv.COLOR_RGB2BGR)
+            self.frame = output.copy()
         ret = self.frame is not None
 
         self.stateNum += 1

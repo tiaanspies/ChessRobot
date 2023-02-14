@@ -6,7 +6,7 @@ from IK_Solvers.quintic_polynomials_planner import QuinticPolynomial
 
 class ChessMoves():
     
-    def __init__(self, lift=50, square_width=30, base_dist=200, board_height=5, grip_height=20, L1=296, L2=284.76):
+    def __init__(self, lift=50, square_width=30, base_dist=230, board_height=20, grip_height=20, L1=296, L2=284.76):
         self.LIFT = lift # distance to clear the other pieces in mm
         self.SQUARE_WIDTH = square_width # width of one board square in mm
         self.BASE_DIST = base_dist # distance from edge of the board to the robot base in mm
@@ -15,7 +15,7 @@ class ChessMoves():
         self.L1 = L1 # length of the first link in mm
         self.L2 = L2 # length of the second link in mm
         self.BOARD_WIDTH = 8 * self.SQUARE_WIDTH # total width of the board
-        self.HOME = np.array([0, self.BASE_DIST+40, 500]) # location of home for the robot arm between moves
+        self.HOME = np.array([0, self.BASE_DIST, 500]) # location of home for the robot arm between moves
 
         self.generate_coords()
         self.initialize_arm()

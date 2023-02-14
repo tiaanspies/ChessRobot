@@ -5,5 +5,4 @@ def saveImg(img, name):
     dirPath = os.path.dirname(os.path.realpath(__file__))
     relPath = "/TestImages/Temp"
     img1 = cv.cvtColor(img, cv.COLOR_BGR2RGB)
-    print(dirPath+relPath+"/"+name)
     cv.imwrite(dirPath+relPath+"/"+name, img1)
