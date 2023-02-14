@@ -51,6 +51,10 @@ def initializeCamera():
     # Open Video camera
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
+
+    # relPath for Raspberry pi uses "/"
+    # relPath for Windows uses "\\"
+    # relPath = "\\Chessboard_detection\\TestImages\\Set_2_W_Only"
     relPath = "/Chessboard_detection/TestImages/Set_2_W_Only"
     cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath) # Change .FakeCamera to .PhoneCamera
 
@@ -61,7 +65,7 @@ def initializeCamera():
     # Board must be empty when this is called
     ans = input("Is the empty board in view? (y/n): ").strip().lower()
     if ans == 'y':
-        s, img = cam.read()
+        _, img = cam.read()
 
         board = Chess_Vision.ChessBoard(img)
     else:
@@ -76,7 +80,7 @@ def identifyColors():
     # Runs kmeans clustering to group piece and board colours
     ans = input("Are all the pieces placed now? (y/n): ").strip().lower()
     if ans== 'y':
-        s, img = cam.read()
+        _, img = cam.read()
         HUMAN, ROBOT = board.initBoardWithStartPos(img)
     else:
         print("Please set up the board")
