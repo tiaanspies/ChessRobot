@@ -69,19 +69,6 @@ class MotorCommands:
         except KeyboardInterrupt:
             self.grip.angle = np.rad2deg(self.OPEN)
             pass # TODO: make sure this means gripper is open
-
-    def add_gripper_commands(self, sim_thetas):
-        """replaces the sim's wrist angles with a list that commands the gripper to open and close"""
-        thetas = sim_thetas[:-1,:]
-        shifted = np.hstack((np.zeros((3,1)),thetas[:,:-1]))
-        err = 1e-2
-        no_change = (thetas-shifted) <= err
-        idxs = np.nonzero((no_change[0,:]==no_change[1,:])==no_change[2,:])[0]
-        grip_commands = np.zeros_like(thetas[0,:])
-        for i in range(len(idxs)-1):
-            grip_commands[:idxs[i]] = self.OPEN
-            grip_commands[idxs[i]:idxs[i+1]] = self.CLOSED
-        return np.vstack((thetas,grip_commands))
     
     def sort_commands(self, thetas, grip_commands):
         thetas[3,:] = grip_commands
