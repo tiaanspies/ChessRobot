@@ -5,7 +5,11 @@ from time import sleep
 import requests
 import numpy as np
 from Chessboard_detection import Chess_Vision
-from picamera import PiCamera
+
+try:
+    from picamera import PiCamera
+except ModuleNotFoundError:
+    print("PiCamera module not found. Ignore if not running on RaspPi")
 
 # import Chess_Vision
 
