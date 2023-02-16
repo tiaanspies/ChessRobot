@@ -52,17 +52,8 @@ def initializeCamera():
     # Open Video camera
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
-<<<<<<< HEAD
     relPath = "/Chessboard_detection/TestImages/Temp"
     cam = Fake_Camera.RPiCamera(CAMERA_RESOLUTION, dirPath + relPath) # Change .FakeCamera to .PhoneCamera
-=======
-
-    # relPath for Raspberry pi uses "/"
-    # relPath for Windows uses "\\"
-    # relPath = "\\Chessboard_detection\\TestImages\\Set_2_W_Only"
-    relPath = "/Chessboard_detection/TestImages/Set_2_W_Only"
-    cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath) # Change .FakeCamera to .PhoneCamera
->>>>>>> refs/remotes/origin/main
 
     if not cam.isOpened():
         raise("Cannot open camera.")
