@@ -198,12 +198,10 @@ class ChessMoves():
         no_change = waypoints-shifted
         idxs = np.where(~no_change.any(axis=0))[0] # finds the indices of all columns where all values are zero
         
-        grip_commands = np.zeros_like(waypoints[0,:])
-        grip_commands[:idxs[0]] = commands[0]
+        grip_commands = np.ones_like(waypoints[0,:]) * commands[0]
         for i in range(len(idxs)-1):
             i_com = (i+1)%2
             grip_commands[idxs[i]:idxs[i+1]] = commands[i_com]
-        grip_commands[idxs[-1]:] = commands[0]
         return grip_commands
     
     @staticmethod
