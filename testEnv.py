@@ -1,5 +1,5 @@
-import Fake_Camera
-import Chess_Vision
+from Chessboard_detection import Fake_Camera
+from Chessboard_detection import Chess_Vision
 import os
 import numpy as np
 import pickle
@@ -8,7 +8,7 @@ CAMERA_RESOLUTION = (640, 480)
 
 def main():
     # "\Test_Images\\b_w_game_2\\"
-    folderNames = findFolders("TestImages")
+    folderNames = findFolders("Chessboard_detection\\TestImages")
     successRate = []
     for folder in folderNames:
         if "Test_Set_" in folder:
@@ -34,7 +34,7 @@ def findFolders(relPath):
     return testFolderNames
 
 def runTest(absFolderPath):
-    cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, absFolderPath)    
+    cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, absFolderPath, SEP="\\")    
 
     if not cam.isOpened():
         raise("Cannot open camera.")
@@ -47,7 +47,7 @@ def runTest(absFolderPath):
     # NB --- Board is setup in starting setup.
     # Runs kmeans clustering to group peice and board colours
     s, img = cam.read()
-    board.fitKClusters(img)
+    board.fitKClusters(img, weighted=True)
 
     # display video of chessboard with corners
     s, img = cam.read()

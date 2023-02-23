@@ -175,7 +175,7 @@ class ChessBoard:
         blur = cv.medianBlur(resizedImg, 7)
         
         # reshape image into a single line for k means fitting
-        self.kmeans = KMeans(n_clusters=4, n_init='auto')
+        self.kmeans = KMeans(n_clusters=4, init='k-means++', n_init=1)
         imgReshaped = np.reshape(blur, (blur.shape[0]*blur.shape[1], 3))
 
         # if weighed is true apply a gaussian weight to each block.
