@@ -5,7 +5,11 @@ from time import sleep
 import requests
 import numpy as np
 from Chessboard_detection import Chess_Vision
-from picamera import PiCamera
+
+try:
+    from picamera import PiCamera
+except ModuleNotFoundError:
+    print("PiCamera module not found. Ignore if not running on RaspPi")
 
 # import Chess_Vision
 
@@ -84,6 +88,7 @@ class RPiCamera:
     def __init__(self, res, absPath) -> None:
 
         self.camera = PiCamera()
+        self.camera.exposure_mode = 'night'
         self.cameraRes = res
         self.camera.resolution = res
         self.camera.rotation = 270
@@ -109,12 +114,10 @@ class RPiCamera:
             self.camera.stop_preview()
             # self.camera.close()
             self.frame = output.copy()
-            print(self.frame.shape)
         ret = self.frame is not None
 
         self.stateNum += 1
 
-        cv.imwrite(self.path_full +"/initImg.jpg", self.frame)
         return ret, self.frame
 
     def isOpened(self):
