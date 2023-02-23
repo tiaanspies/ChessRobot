@@ -193,7 +193,7 @@ class ChessMoves():
 
     def get_gripper_commands(self, waypoints):
             """replaces the sim's wrist angles with a list that commands the gripper to open and close"""
-            open = np.pi/2 # TODO: replace this with the angle needed for it to be open (in radians)
+            open = np.pi/4 # TODO: replace this with the angle needed for it to be open (in radians)
             closed = 3*np.pi/4 # TODO: replace this with the angle needed for it to be closed (in radians)
             shifted = np.hstack((np.zeros((3,1)),waypoints[:,:-1]))
             err = 1e-2
