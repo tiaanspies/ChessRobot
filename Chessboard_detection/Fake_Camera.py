@@ -4,7 +4,10 @@ from time import sleep
 # for PhoneCamera:
 import requests
 import numpy as np
-from Chessboard_detection import Chess_Vision
+try:
+    from Chessboard_detection import Chess_Vision
+except ModuleNotFoundError:
+    import Chess_Vision
 
 try:
     from picamera import PiCamera

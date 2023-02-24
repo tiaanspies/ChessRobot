@@ -1,21 +1,13 @@
 import os
 import math
-
 import numpy as np
-from scipy import signal
-from sklearn.cluster import KMeans
 import cv2 as cv
+from sklearn.cluster import KMeans
+from scipy import signal
 from collections import Counter
+import Fake_Camera
+from matplotlib import pyplot as plt
 
-try:
-    from Chessboard_detection import pi_debugging as debug
-    from Chessboard_detection import Fake_Camera
-except ModuleNotFoundError:
-    import pi_debugging as debug
-    import Fake_Camera
-# import Fake_Camera
-
-# CAMERA_RESOLUTION = (640, 480)
 CAMERA_RESOLUTION = (480, 640)
 
 def empty(a):
@@ -81,8 +73,6 @@ class ChessBoard:
         # save the blank boardS
         # self.setInitialImage(camera)
         self.initialImage = img
-
-        debug.saveImg(img, "initial.jpg")
 
         # see which blak and white threshold makes the board the easiest to find
         # Opt is estimated by middle of min and max
@@ -556,44 +546,208 @@ class ChessBoard:
         else:
             self.whiteID = int(bottomPieceMax)
             self.blackID = int(topPieceMax)
- 
-def showImg(img):
-    # while cv.waitKey(1) != ord('q'):
-    # for i, img in enumerate(images):
-    cv.namedWindow("1", cv.WINDOW_NORMAL)
-    
-    cv.imshow("1", img)
 
+def findClusterImg(kmeans, img):
+    """
+    Assigns pixels to their closest cluster.
+    returns image with all pixels assigned to cluster
+    """
+    imgReshaped = np.reshape(img, (img.shape[0]*img.shape[1], 3))
+
+    predictions = kmeans.predict(imgReshaped)
+    clustersInt = kmeans.cluster_centers_.astype(np.uint8)
+
+    newImg = [clustersInt[x] for x in predictions]
+    newImg = np.reshape(newImg, (img.shape[0], img.shape[1], 3))
+    
+    # return cv.cvtColor(newImg, cv.COLOR_HSV2RGB)
+    # return cv.cvtColor(newImg, cv.COLOR_Lab2RGB)
+    return newImg
+
+def cannyShapes(img):
+    cannyEdges = cv.Canny(img,100,200)
+    cannyEdges = cv.dilate(cannyEdges, (5,5))
+
+    # ret, thresh = cv.threshold(img, 127, 255, 0)
+    # contours, hierarchy = cv.findContours(thresh, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    # i=0
+    # newContours = []
+    # max = 0
+    # for contour in contours:
+    
+    #     # here we are ignoring first counter because 
+    #     # findcontour function detects whole image as shape
+    #     if i == 0:
+    #         i = 1
+    #         continue
+    
+    #     # cv2.approxPloyDP() function to approximate the shape
+    #     approx = cv.approxPolyDP(
+    #         contour, 0.05 * cv.arcLength(contour, True), True)
+        
+    #     area = cv.contourArea(contour)
+    #     if area > max:
+    #         max = area
+    #     # putting shape name at center of each shape
+
+    #     if len(approx) == 4 and area > 2000:
+    #         newContours.append(contour)
+
+        
+    # print("Max area: ", max)
+
+    # img = cv.drawContours(img, newContours, -1, (0,255,0), 2)
+    # cv.imshow("1", thresh)
+
+    cv.imshow("Canny edges dialted", cannyEdges)
+    cv.waitKey()
+    cv.destroyAllWindows()
+
+def findContEdges(img):
+    ret, thresh = cv.threshold(img, 127, 255, 0)
+    contours, hierarchy = cv.findContours(thresh, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    color = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
+
+    i=0
+    newContours = []
+    max = 0
+    for contour in contours:
+    
+        # here we are ignoring first counter because 
+        # findcontour function detects whole image as shape
+        if i == 0:
+            i = 1
+            continue
+    
+        # cv2.approxPloyDP() function to approximate the shape
+        approx = cv.approxPolyDP(
+            contour, 0.05 * cv.arcLength(contour, True), True)
+        
+        area = cv.contourArea(contour)
+        if area > max:
+            max = area
+        # putting shape name at center of each shape
+
+        if len(approx) == 4 and area > 2000:
+            newContours.append(contour)
+
+        
+    print("Max area: ", max)
+
+    img = cv.drawContours(color, newContours, -1, (0,255,0), 2)
+    cv.imshow("1", thresh)
+    cv.waitKey()
+    cv.destroyAllWindows()
+
+def otsu(img):
+     # find normalized_histogram, and its cumulative distribution function
+    hist = cv.calcHist([img],[0],None,[256],[0,256])
+    hist_norm = hist.ravel()/hist.sum()
+    Q = hist_norm.cumsum()
+    bins = np.arange(256)
+    fn_min = np.inf
+    thresh = -1
+    for i in range(1,256):
+        p1,p2 = np.hsplit(hist_norm,[i]) # probabilities
+        q1,q2 = Q[i],Q[255]-Q[i] # cum sum of classes
+        if q1 < 1.e-6 or q2 < 1.e-6:
+            continue
+        b1,b2 = np.hsplit(bins,[i]) # weights
+        # finding means and variances
+        m1,m2 = np.sum(p1*b1)/q1, np.sum(p2*b2)/q2
+        v1,v2 = np.sum(((b1-m1)**2)*p1)/q1,np.sum(((b2-m2)**2)*p2)/q2
+        # calculates the minimization function
+        fn = v1*q1 + v2*q2
+        if fn < fn_min:
+            fn_min = fn
+            thresh = i
+    # find otsu's threshold value with OpenCV function
+    ret, otsu = cv.threshold(img,0,255,cv.THRESH_BINARY+cv.THRESH_OTSU)
+    print( "{} {}".format(thresh,ret) )
+    return otsu
+
+def showImg(images):
+    while cv.waitKey(1) != ord('q'):
+        for i, img in enumerate(images):
+            cv.namedWindow(str(i), cv.WINDOW_NORMAL)
+            
+            cv.imshow(str(i), img)
 
 def main():
-    # Open Video camera
-    # cam = cv.VideoCapture(0)
+    # find path for where test images will be read
     dirPath = os.path.dirname(os.path.realpath(__file__))
-    relPath = "\\TestImages\\Test_Set_1"
-    cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath)    
+    relPath = "\\TestImages\\Set_2_W_Only"
+
+    # read test image
+    cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath) 
+    s, img = cam.read()   
 
     if not cam.isOpened():
         raise("Cannot open camera.")
 
-    # Initialize ChessBoard object and select optimal thresh
-    # Board must be empty when this is called
-    s, img = cam.read()
+    # img = cv.imread('Chessboard_detection\TestImages\Temp\\empty.JPG')
     board = ChessBoard(img)
 
-    # NB --- Board is setup in starting setup.
-    # Runs kmeans clustering to group peice and board colours
-    s, img = cam.read()
-    board.fitKClusters(img, True)
+    # get the edges of chess board that got calculated from empty chess board
+    corner0 = board.cornersExt[0, 0, :].astype(np.int32)
+    corner1 = board.cornersExt[-1, 0, :].astype(np.int32)
+    corner2 = board.cornersExt[-1, -1, :].astype(np.int32)
+    corner3 = board.cornersExt[0, -1, :].astype(np.int32)
 
-    # display video of chessboard with corners
-    s, img = cam.read()  
-    while s is True:  
-        positions = board.getCurrentPositions(img)
-        s, img = cam.read()  
-        print(positions)
+    # draw circles on the corners of the chessboard
+    imgCircle = cv.circle(img, corner0, radius=2, color=(0, 0, 255), thickness=-1)
+    imgCircle = cv.circle(img, corner1, radius=2, color=(0, 0, 255), thickness=-1)
+    imgCircle = cv.circle(img, corner2, radius=2, color=(0, 0, 255), thickness=-1)
+    imgCircle = cv.circle(img, corner3, radius=2, color=(0, 0, 255), thickness=-1)
 
-    cam.release()
-    cv.destroyAllWindows()
+    # draw a bounding box around the outer corners
+    # this basically puts an aligned square around everything
+    # would be better to use the exact points and stretch it into a square
+    x,y,w,h = cv.boundingRect(np.array([corner0, corner1, corner2, corner3]))
+
+    # different methods for comparing the accuracy of template matching
+    # from what I saw the TM_CCOEFF works the best. It is the only one
+    # that is able to match an empty chessboard with one with pieces on.
+    # script runs through all the different methods in methods array
+
+    # methods = ['cv.TM_CCOEFF', 'cv.TM_CCOEFF_NORMED', 'cv.TM_CCORR',
+    #         'cv.TM_CCORR_NORMED', 'cv.TM_SQDIFF', 'cv.TM_SQDIFF_NORMED']
+    methods = ['cv.TM_CCOEFF']
+
+    while s:
+        # take cropped image of chessboard from previous image where it was found.
+        imgCropped = img[y:y+h, x:x+w]
+        cv.imshow('cropped', imgCropped)
+
+        # read new image
+        s, img = cam.read()
+
+        # find image using different methods
+        for meth in methods:
+            img1 = img.copy()
+            method = eval(meth)
+            # Apply template Matching
+            res = cv.matchTemplate(img1,imgCropped,method)
+            min_val, max_val, min_loc, max_loc = cv.minMaxLoc(res)
+            # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
+            if method in [cv.TM_SQDIFF, cv.TM_SQDIFF_NORMED]:
+                top_left = min_loc
+            else:
+                top_left = max_loc
+            bottom_right = (top_left[0] + w, top_left[1] + h)
+
+            # plot results
+            cv.rectangle(1,top_left, bottom_right, 255, 2)
+            plt.subplot(121),plt.imshow(res,cmap = 'gray')
+            plt.title('Matching Result'), plt.xticks([]), plt.yticks([])
+
+            # Draw a circle in the top left of matching area
+            img1 = cv.circle(img1, top_left, radius=4, color=(255, 255, 255), thickness=-1)
+            plt.subplot(122),plt.imshow(img1,cmap = 'gray')
+            plt.title('Detected Point'), plt.xticks([]), plt.yticks([])
+            plt.suptitle(meth)
+            plt.show()
+
 
 
 if __name__ == "__main__":
