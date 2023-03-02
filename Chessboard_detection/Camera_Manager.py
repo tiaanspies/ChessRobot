@@ -22,19 +22,18 @@ except ModuleNotFoundError:
 # / for raspberry pi
 
 class FakeCamera:
-    def __init__(self, res, absPath, SEP = "/") -> None:
+    def __init__(self, res, absPath) -> None:
 
         self.path_full = absPath
-        self.SEP = SEP
         self.cameraRes = res
         self.stateNum = -1
     
     def read(self):
         if self.stateNum <0:
-            self.frame = cv.imread(self.path_full + self.SEP + "empty.JPG")
+            self.frame = cv.imread(os.path.join(self.path_full, "empty.JPG"))
             self.frame = cv.resize(self.frame, self.cameraRes)
         elif self.stateNum >= 0:
-            self.frame = cv.imread(self.path_full + self.SEP +str(self.stateNum) +".JPG")
+            self.frame = cv.imread(os.path.join(self.path_full, str(self.stateNum)+".JPG"))
             if self.frame is not None:
                 self.frame = cv.resize(self.frame, self.cameraRes)
 
@@ -45,7 +44,7 @@ class FakeCamera:
         return ret, self.frame
 
     def isOpened(self):
-        res = cv.imread(self.path_full + self.SEP + "empty.JPG")
+        res = cv.imread(os.path.join(self.path_full, "empty.JPG"))
 
         return res is not None
 
@@ -67,7 +66,7 @@ class PhoneCamera:
         # self.stateNum = 10 # use this line to skip the saved empty picture and do it by hand
         if self.stateNum <= 0:
             self.path_full = self.absPath
-            self.frame = cv.imread(self.path_full + "\\empty.JPG")
+            self.frame = cv.imread(os.path.join(self.path_full, "empty.JPG"))
             self.frame = cv.resize(self.frame, self.cameraRes)
         elif self.stateNum > 0:
             img_resp = requests.get(self.url)
@@ -106,7 +105,7 @@ class RPiCamera:
     def read(self):
         # self.stateNum = 10 # use this line to skip the saved empty picture and do it by hand
         if self.stateNum <= 0:
-            self.frame = cv.imread(self.path_full +"/empty.jpg")
+            self.frame = cv.imread(os.path.join(self.path_full, "empty.jpg"))
             self.frame = cv.cvtColor(self.frame, cv.COLOR_RGB2BGR)
 
             if self.frame is None:
