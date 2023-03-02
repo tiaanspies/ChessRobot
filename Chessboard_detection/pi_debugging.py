@@ -36,13 +36,13 @@ class imgDBManager:
             pathDate.mkdir()
         
         # find the highest date id.
-        maxID = 2
+        maxID = 0
         for dir in pathDate.iterdir():
-            if dir.name == str(maxID):
-                
-                maxID = dir.name
+            if int(dir.name) > maxID:
+                maxID = int(dir.name)
 
         maxID += 1
+
         bottomPath = Path(pathDate, str(maxID))
         bottomPath.mkdir(exist_ok=True)
 
@@ -55,11 +55,14 @@ class imgDBManager:
         Format Data>Number.
         Add image to the 
         """
-        imgPath = Path.joinpath(self.folderPath, str(self.imgID)+".jpg")
+        imgPath = Path(self.folderPath, str(self.imgID)+".jpg")
+
+        if imgPath.exists():
+            print("Error: Logfile image already exists in: "+str(imgPath.resolve()))
+            return
 
         img1 = cv.cvtColor(img, cv.COLOR_BGR2RGB)
-        print(imgPath.absolute())
-        cv.imwrite(str(imgPath.absolute()), img1)
+        cv.imwrite(str(imgPath.resolve()), img1)
         self.imgID += 1
 
 def findFolders(relPath):

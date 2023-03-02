@@ -15,6 +15,8 @@ sleep(5)
 output = np.empty((640, 480, 3), dtype=np.uint8)
 camera.capture(output, 'rgb')
 pathManager.saveDBImage(output)
+pathManager.saveDBImage(output)
+pathManager.saveDBImage(output)
 camera.stop_preview()
 
 camera.close()
