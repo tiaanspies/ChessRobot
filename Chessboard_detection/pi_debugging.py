@@ -17,8 +17,7 @@ class imgDBManager:
     """
     def __init__(self) -> None:
         """
-        A new path is created for every runtime.
-        Each image is saved with a numerical ID.
+        Finds the initial folder and zeros the img name ID.
         """
         self.imgID = 0
         self.folderPath = self.findStartPath()
@@ -44,7 +43,7 @@ class imgDBManager:
         maxID += 1
 
         bottomPath = Path(pathDate, str(maxID))
-        bottomPath.mkdir(exist_ok=True)
+        bottomPath.mkdir(exist_ok=False)
 
         return bottomPath
 
@@ -64,16 +63,3 @@ class imgDBManager:
         img1 = cv.cvtColor(img, cv.COLOR_BGR2RGB)
         cv.imwrite(str(imgPath.resolve()), img1)
         self.imgID += 1
-
-def findFolders(relPath):
-    """Find all folder in subfolder"""
-    dirPath = os.path.dirname(os.path.realpath(__file__))
-    fullTestPath = os.path.join(dirPath, relPath)
-
-    testFolderNames = []
-    for name in os.listdir(fullTestPath):
-        fullPath = os.path.join(fullTestPath, name)
-        if os.path.isdir(fullPath):
-            testFolderNames.append(fullPath)
-    
-    return testFolderNames

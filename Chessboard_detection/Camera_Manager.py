@@ -6,8 +6,10 @@ import requests
 import numpy as np
 try:
     from Chessboard_detection import Chess_Vision
+    from Chessboard_detection import pi_debugging
 except ModuleNotFoundError:
     import Chess_Vision
+    import pi_debugging
 
 try:
     from picamera import PiCamera
@@ -88,7 +90,8 @@ class PhoneCamera:
 
 class RPiCamera:
 
-    def __init__(self, res, absPath) -> None:
+    def __init__(self, res, absPath, storeImgHist=True) -> None:
+        self.imgHistDB = pi_debugging.imgDBManager()
 
         self.camera = PiCamera()
         self.camera.exposure_mode = 'night'
@@ -98,6 +101,7 @@ class RPiCamera:
 
         self.path_full = absPath
         self.stateNum = -1
+        self.storeImgHist = storeImgHist
     
     def read(self):
         # self.stateNum = 10 # use this line to skip the saved empty picture and do it by hand
@@ -121,6 +125,9 @@ class RPiCamera:
         ret = self.frame is not None
 
         self.stateNum += 1
+
+        if self.storeImgHist:
+            self.imgHistDB.saveDBImage(self.frame)
 
         return ret, self.frame
 

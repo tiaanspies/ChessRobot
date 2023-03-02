@@ -9,10 +9,10 @@ from collections import Counter
 
 try:
     from Chessboard_detection import pi_debugging as debug
-    from Chessboard_detection import Fake_Camera
+    from Chessboard_detection import Camera_Manager
 except ModuleNotFoundError:
     import pi_debugging as debug
-    import Fake_Camera
+    import Chessboard_detection.Camera_Manager as Camera_Manager
 # import Fake_Camera
 
 # CAMERA_RESOLUTION = (640, 480)
@@ -81,8 +81,6 @@ class ChessBoard:
         # save the blank boardS
         # self.setInitialImage(camera)
         self.initialImage = img
-
-        debug.saveTempImg(img, "initial.jpg")
 
         # see which blak and white threshold makes the board the easiest to find
         # Opt is estimated by middle of min and max
@@ -570,7 +568,7 @@ def main():
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
     relPath = "\\TestImages\\Test_Set_1"
-    cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath)    
+    cam = Camera_Manager.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath)    
 
     if not cam.isOpened():
         raise("Cannot open camera.")

@@ -5,7 +5,7 @@ import cv2 as cv
 from sklearn.cluster import KMeans
 from scipy import signal
 from collections import Counter
-import Fake_Camera
+import Chessboard_detection.Camera_Manager as Camera_Manager
 from matplotlib import pyplot as plt
 
 CAMERA_RESOLUTION = (480, 640)
@@ -679,7 +679,7 @@ def main():
     relPath = "\\TestImages\\Set_2_W_Only"
 
     # read test image
-    cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath) 
+    cam = Camera_Manager.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath) 
     s, img = cam.read()   
 
     if not cam.isOpened():
