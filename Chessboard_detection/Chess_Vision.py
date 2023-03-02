@@ -82,7 +82,7 @@ class ChessBoard:
         # self.setInitialImage(camera)
         self.initialImage = img
 
-        debug.saveImg(img, "initial.jpg")
+        debug.saveTempImg(img, "initial.jpg")
 
         # see which blak and white threshold makes the board the easiest to find
         # Opt is estimated by middle of min and max
@@ -439,7 +439,7 @@ class ChessBoard:
         cluster = self.findClusterImg(masked)
         img_new = cv.cvtColor(cluster, cv.COLOR_HSV2RGB)
 
-        debug.saveImg(img_new, "test.jpg")
+        debug.saveTempImg(img_new, "test.jpg")
         ## END DEBUG
 
         blocks = self.splitBoardIntoSquares(blurredHSV)
