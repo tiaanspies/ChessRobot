@@ -99,11 +99,14 @@ class RPiCamera:
         self.camera.rotation = 270
 
         self.path_full = absPath
-        self.stateNum = -1
+
+        # Change statenum to -1 to use saved picture as first picture.
+        # Change statenum to 1 to used camera for all pictures
+        self.stateNum = 1
         self.storeImgHist = storeImgHist
     
     def read(self):
-        # self.stateNum = 10 # use this line to skip the saved empty picture and do it by hand
+        
         if self.stateNum <= 0:
             self.frame = cv.imread(os.path.join(self.path_full, "empty.jpg"))
             self.frame = cv.cvtColor(self.frame, cv.COLOR_RGB2BGR)

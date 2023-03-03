@@ -44,7 +44,7 @@ class imgDBManager:
 
         bottomPath = Path(pathDate, str(maxID))
         bottomPath.mkdir(exist_ok=False)
-
+        
         return bottomPath
 
 
@@ -60,6 +60,6 @@ class imgDBManager:
             print("Error: Logfile image already exists in: "+str(imgPath.resolve()))
             return
 
-        img1 = cv.cvtColor(img, cv.COLOR_BGR2RGB)
-        cv.imwrite(str(imgPath.resolve()), img1)
+        img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+        cv.imwrite(str(imgPath.resolve()), img)
         self.imgID += 1

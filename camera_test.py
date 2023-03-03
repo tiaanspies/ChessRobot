@@ -1,20 +1,11 @@
-from picamera import PiCamera
-from time import sleep
-import numpy as np
-import cv2 as cv
-from Chessboard_detection import pi_debugging
+import os
+from Chessboard_detection import pi_debugging, Camera_Manager
 
-camera = PiCamera()
-camera.resolution = (480, 640)
-camera.rotation = 270
+# start camera
+dirPath = os.path.dirname(os.path.realpath(__file__))
+relPath = "/Chessboard_detection/TestImages/Temp"
+cam = Camera_Manager.RPiCamera(res=(480, 640), absPath=dirPath+relPath)
 
-pathManager = pi_debugging.imgDBManager()
-
-camera.start_preview()
-sleep(5)
-output = np.empty((640, 480, 3), dtype=np.uint8)
-camera.capture(output, 'rgb')
-pathManager.saveDBImage(output)
-camera.stop_preview()
-
-camera.close()
+#Read camera image (should automaticcaly save one as well)
+_, img = cam.read()
+print("saved img")
