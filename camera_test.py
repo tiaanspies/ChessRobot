@@ -7,5 +7,9 @@ relPath = "/Chessboard_detection/TestImages/Temp"
 cam = Camera_Manager.RPiCamera(res=(480, 640), absPath=dirPath+relPath)
 
 #Read camera image (should automaticcaly save one as well)
-_, img = cam.read()
-print("saved img")
+
+inputTxt = ''
+while inputTxt != 'q':
+    _, img = cam.read()
+    print("saved img")
+    inputTxt = input("q to quit. Anything to take picture: ").strip().lower()
