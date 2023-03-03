@@ -4,7 +4,7 @@ from Chessboard_detection import pi_debugging, Camera_Manager
 # start camera
 dirPath = os.path.dirname(os.path.realpath(__file__))
 relPath = "/Chessboard_detection/TestImages/Temp"
-cam = Camera_Manager.RPiCamera(res=(480, 640), absPath=dirPath+relPath)
+cam = Camera_Manager.RPiCamera(res=(480, 640), absPath=dirPath+relPath, storeImgHist=False)
 
 #Read camera image (should automaticcaly save one as well)
 
