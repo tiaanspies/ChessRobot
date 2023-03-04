@@ -1,4 +1,4 @@
-from Chessboard_detection import Fake_Camera
+from Chessboard_detection import Camera_Manager
 from Chessboard_detection import Chess_Vision
 import os
 import numpy as np
@@ -34,7 +34,7 @@ def findFolders(relPath):
     return testFolderNames
 
 def runTest(absFolderPath):
-    cam = Fake_Camera.FakeCamera(CAMERA_RESOLUTION, absFolderPath, SEP="\\")    
+    cam = Camera_Manager.FakeCamera(CAMERA_RESOLUTION, absFolderPath, SEP="\\")    
 
     if not cam.isOpened():
         raise("Cannot open camera.")

@@ -32,7 +32,7 @@ from stockfish import Stockfish
 import numpy as np
 import chess
 import matplotlib.pyplot as plt
-from Chessboard_detection import Fake_Camera, Chess_Vision
+from Chessboard_detection import Camera_Manager, Chess_Vision
 from IK_Solvers.traditional import ChessMoves
 from motor_commands import MotorCommands
 
@@ -53,7 +53,7 @@ def initializeCamera():
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
     relPath = "/Chessboard_detection/TestImages/Temp"
-    cam = Fake_Camera.RPiCamera(CAMERA_RESOLUTION, dirPath + relPath) # Change .FakeCamera to .PhoneCamera
+    cam = Camera_Manager.RPiCamera(CAMERA_RESOLUTION, dirPath + relPath) # Change .FakeCamera to .PhoneCamera
 
     if not cam.isOpened():
         raise("Cannot open camera.")
