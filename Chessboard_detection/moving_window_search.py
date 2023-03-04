@@ -719,8 +719,12 @@ def main():
         imgCropped = img[y:y+h, x:x+w]
         cv.imshow('cropped', imgCropped)
 
-        # read new image
+        # read new image and roll it to move the chessboard around randomly
         s, img = cam.read()
+        x_rand = np.random.randint(-40, 40)
+        y_rand = np.random.randint(-100, 100)
+        print("Roll Amounts:", x_rand, y_rand)
+        img = np.roll(img, [y_rand, x_rand], axis=(0,1))
 
         # find image using different methods
         for meth in methods:
@@ -734,10 +738,11 @@ def main():
                 top_left = min_loc
             else:
                 top_left = max_loc
+            x, y = top_left
             bottom_right = (top_left[0] + w, top_left[1] + h)
 
             # plot results
-            cv.rectangle(1,top_left, bottom_right, 255, 2)
+            cv.rectangle(img1,top_left, bottom_right, 255, 2)
             plt.subplot(121),plt.imshow(res,cmap = 'gray')
             plt.title('Matching Result'), plt.xticks([]), plt.yticks([])
 
