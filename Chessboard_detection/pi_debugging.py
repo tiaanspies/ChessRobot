@@ -9,6 +9,13 @@ def saveTempImg(img, name):
     img1 = cv.cvtColor(img, cv.COLOR_BGR2RGB)
     cv.imwrite(dirPath+relPath+"/"+name, img1)
 
+def showImg(images):
+    while cv.waitKey(1) != ord('q'):
+        for i, img in enumerate(images):
+            cv.namedWindow(str(i), cv.WINDOW_NORMAL)
+            
+            cv.imshow(str(i), img)
+
 class imgDBManager:
     """
     Class to manage saving images to correct paths while testing.
@@ -63,3 +70,5 @@ class imgDBManager:
         img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
         cv.imwrite(str(imgPath.resolve()), img)
         self.imgID += 1
+
+

@@ -5,16 +5,14 @@ from time import sleep
 import requests
 import numpy as np
 try:
-    from Chessboard_detection import Chess_Vision
     from Chessboard_detection import pi_debugging
 except ModuleNotFoundError:
-    import Chess_Vision
     import pi_debugging
 
 try:
     from picamera import PiCamera
 except ModuleNotFoundError:
-    print("PiCamera module not found. Ignore if not running on RaspPi")
+    print("Can only use RPICam if on raspberry pi")
 
 # import Chess_Vision
 
@@ -22,18 +20,20 @@ except ModuleNotFoundError:
 # / for raspberry pi
 
 class FakeCamera:
-    def __init__(self, res, absPath) -> None:
+    def __init__(self, res, absPath, startNum = 1) -> None:
 
         self.path_full = absPath
         self.cameraRes = res
-        self.stateNum = -1
+        self.stateNum = startNum
     
     def read(self):
         if self.stateNum <0:
             self.frame = cv.imread(os.path.join(self.path_full, "empty.JPG"))
+            self.frame = cv.cvtColor(self.frame, cv.COLOR_RGB2BGR)
             self.frame = cv.resize(self.frame, self.cameraRes)
         elif self.stateNum >= 0:
             self.frame = cv.imread(os.path.join(self.path_full, str(self.stateNum)+".JPG"))
+            # self.frame = cv.cvtColor(self.frame, cv.COLOR_RGB2BGR)
             if self.frame is not None:
                 self.frame = cv.resize(self.frame, self.cameraRes)
 
