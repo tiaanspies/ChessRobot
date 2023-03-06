@@ -39,31 +39,63 @@ def siftMatching(cam):
         img1 = img2.copy()
 
 def main():
-    imgPath = Path("Chessboard_detection", "TestImages", "03_03_2023", "4")
+    imgPath = Path("Chessboard_detection", "TestImages", "03_03_2023", "5")
 
     cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
 
-    patternSize = (7, 5)
+    patternSize = (7, 3)
 
     _, img = cam.read()
-    img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
 
+    # convert image to a grayscale image
+    img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+    
+    # threshhold it into a binary image
+    # a large window size is used 71 to only change
+    # threshold slowly
     img1 = cv.adaptiveThreshold(
         img,
         255,
         cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv.THRESH_BINARY,
-        121,
+        cv.THRESH_BINARY_INV,
+        71,
         2
     )
-    retVal, corners = cv.findChessboardCornersSB(img1, patternSize)
-    
-    print(retVal)
+
+    # dilate the image to grow the white areas
+    # leaving small black squares in the centre of open squares
+    kernSize = 3
+    img2 = cv.dilate(img1, np.ones((kernSize, kernSize)))
+
+    # find the points of contours aproximate contours
+    contours, hierarchy = cv.findContours(img2, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+
+    # check each contours and save squares
+    squares = []
+    for cnt in contours:
+        x1,y1 = cnt[0][0]
+        approx = cv.approxPolyDP(cnt, 0.03*cv.arcLength(cnt, True), True)
+        if approx.shape[0] == 4 and cv.contourArea(cnt) > 100 and cv.contourArea(cnt) < 2000:
+            x, y, w, h = cv.boundingRect(cnt)
+            ratio = float(w)/h
+            if ratio >= 0.8 and ratio <= 1.2:
+                img = cv.drawContours(img, [cnt], -1, (0,255,255), 3)
+                # cv.putText(img, 'Square', (x1, y1), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+                squares.append(cnt)
+
+    # Create fully white image and fill poly with black.
+    # this leaves only the black squares of the chessboard in the image
+    img3 = np.ones((480, 640), dtype=np.uint8)*255
+    cv.fillPoly(img3, squares, 0)
+
+    #Dilate the area to return the squares to their original size
+    img3 = cv.erode(img3, np.ones((kernSize, kernSize)))
+    retVal, corners = cv.findChessboardCorners(img3, patternSize)
     
     # if retVal:
     cv.drawChessboardCorners(img, patternSize, corners, retVal)
-    debug.showImg([img, img1])
-        # corners = cv.cornerSubPix(img, corners)
+    debug.showImg([img, img1, img2, img3])
+
 
 if __name__ == "__main__":
     main()
