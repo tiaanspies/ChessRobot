@@ -38,14 +38,62 @@ def siftMatching(cam):
 
         img1 = img2.copy()
 
-def main():
-    imgPath = Path("Chessboard_detection", "TestImages", "03_03_2023", "5")
+def findSquareContours(img, contours, minArea, maxArea, drawCorners):
+    """
+    Receives list of contours and filters out squares
+    To be a square a contours must:
+        - Have 4 lines approximating it
+        - have an area between min and max
+        - have an aspect ratio between 0.8 and 1.2
+    """
+    squares = []
+    for cnt in contours:
+        x1,y1 = cnt[0][0]
+        approx = cv.approxPolyDP(cnt, 0.03*cv.arcLength(cnt, True), True)
+        area = cv.contourArea(cnt)
+        if approx.shape[0] == 4 and area > minArea and area < maxArea:
+            x, y, w, h = cv.boundingRect(cnt)
+            ratio = float(w)/h
+            if ratio >= 0.8 and ratio <= 1.2:
+                squares.append(cnt)
+                if drawCorners:
+                    img = cv.drawContours(img, [cnt], -1, (0,255,255), 3)
 
-    cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
+    return img, squares
 
+def estimate_coef(x, y):
+    """
+    Calculate linear regresion coef
+    """
+    # number of observations/points
+    n = np.size(x)
+  
+    # mean of x and y vector
+    m_x = np.mean(x)
+    m_y = np.mean(y)
+  
+    # calculating cross-deviation and deviation about x
+    SS_xy = np.sum(y*x) - n*m_y*m_x
+    SS_xx = np.sum(x*x) - n*m_x*m_x
+  
+    # calculating regression coefficients
+    b_1 = SS_xy / SS_xx
+    b_0 = m_y - b_1*m_x
+  
+    return (b_0, b_1)
+
+def findBoardCentreSquares(img, printImgs):
+    """
+    Finds the centre of chessboard.
+    1. applies adaptive threshold to find grayscale image
+    2. dilates image to seperate different squares from each other
+    3. finds square contours
+    4. delete everything except square contours
+    5. erode image to return squares to original size
+    6. use findChessboardcorner function
+
+    """
     patternSize = (7, 3)
-
-    _, img = cam.read()
 
     # convert image to a grayscale image
     img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
@@ -54,7 +102,7 @@ def main():
     # a large window size is used 71 to only change
     # threshold slowly
     img1 = cv.adaptiveThreshold(
-        img,
+        img, 
         255,
         cv.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv.THRESH_BINARY_INV,
@@ -71,17 +119,7 @@ def main():
     contours, hierarchy = cv.findContours(img2, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
     # check each contours and save squares
-    squares = []
-    for cnt in contours:
-        x1,y1 = cnt[0][0]
-        approx = cv.approxPolyDP(cnt, 0.03*cv.arcLength(cnt, True), True)
-        if approx.shape[0] == 4 and cv.contourArea(cnt) > 100 and cv.contourArea(cnt) < 2000:
-            x, y, w, h = cv.boundingRect(cnt)
-            ratio = float(w)/h
-            if ratio >= 0.8 and ratio <= 1.2:
-                img = cv.drawContours(img, [cnt], -1, (0,255,255), 3)
-                # cv.putText(img, 'Square', (x1, y1), cv.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
-                squares.append(cnt)
+    img, squares = findSquareContours(img, contours, minArea=100, maxArea=6000, drawCorners=printImgs)
 
     # Create fully white image and fill poly with black.
     # this leaves only the black squares of the chessboard in the image
@@ -92,9 +130,35 @@ def main():
     img3 = cv.erode(img3, np.ones((kernSize, kernSize)))
     retVal, corners = cv.findChessboardCorners(img3, patternSize)
     
-    # if retVal:
-    cv.drawChessboardCorners(img, patternSize, corners, retVal)
-    debug.showImg([img, img1, img2, img3])
+    # Debug lines to plot different image stages
+    if printImgs:
+        cv.drawChessboardCorners(img, patternSize, corners, retVal)
+        debug.showImg([img, img1, img2, img3])
+
+    return retVal, corners
+
+def main():
+    imgPath = Path("Chessboard_detection", "TestImages", "03_03_2023", "5")
+
+    cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
+
+    _, img = cam.read()
+
+    # Find center strip on starting position of chess board
+    retVal, corners = findBoardCentreSquares(img, printImgs=False)
+
+    # calculate the linear regression of each row to find the 
+    # rotation of the board.
+    rows = np.zeros(shape=(3, 7, 2))
+    coef = np.zeros(shape=(3,2))
+    for i in range(3):
+        rows[i] = np.reshape(corners[7*i:7*i+7, :, :], (7, 2))
+        coef[i] = estimate_coef(rows[i, :, 0], rows[i, :, 1])
+    
+    gradient = np.mean(coef[:, 1])
+    print(retVal)
+    print(gradient)
+    
 
 
 if __name__ == "__main__":
