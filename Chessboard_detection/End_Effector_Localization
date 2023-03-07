@@ -62,12 +62,12 @@ def siftMatching(cam, matcherType='SIFT'):
         )
         img3 = cv.cvtColor(img3, cv.COLOR_BGR2RGB)
 
-        # distances = [x.distance for x in matches]
-        # h = np.histogram(distances)
-        # plt.hist(distances, )
-        # plt.show()
-        # plt.imshow(img3)
-        # plt.show()
+        distances = [x.distance for x in matches]
+        h = np.histogram(distances)
+        plt.hist(distances, )
+        plt.show()
+        plt.imshow(img3)
+        plt.show()
         # TODO: #2 Write better function for selecting the number of features to keep
 
         img1 = img2.copy()
@@ -176,6 +176,12 @@ def getRotationMatrix(corners):
     Finds the rotation matrix using the interior corners of the chessboard.
     The rotation matrix rotates the image around the center of the board.
     To align the board with the horizontal axis.
+
+    
+    Find the transformation matrix to transform the image frame to the base
+    co-ordinate frame.
+
+    The transformation moves the centerpoint to the origin and flips the y axis.
     """
     # calculate the linear regression of each row to find the 
     # rotation of the board.
@@ -188,13 +194,41 @@ def getRotationMatrix(corners):
     # the orgin is the centre corner point of the chessboard.
     # the rotation angle is in degrees and positive CCW.
     gradient = np.mean(coef[:, 1])
-    angle= np.arctan2(gradient, 1)*180/np.pi
+    angle= np.arctan2(gradient, 1)
     origin = corners[10, 0, :]
 
     # Find a rotation matrix to rotate the image around the origin.
-    rotationMatrix = cv.getRotationMatrix2D(origin, angle, scale=1)
+    # it also flips the image along the vertical axis
+    # b0 = (1-np.cos(angle))*origin[0]-np.sin(angle)*origin[1]-origin[0]
+    # b1 = np.sin(angle)*origin[0]+(1-np.cos(angle))*origin[1]-origin[1]
 
-    return origin, rotationMatrix
+    R = np.array([
+        [np.cos(angle), np.sin(angle)],
+        [np.sin(angle), -np.cos(angle)]
+    ])
+
+    # T = np.reshape(-(R@origin), (2,1))
+    T = np.reshape(origin, (2,1))
+
+    # affine tranformation for image transformation
+    M = cv.getRotationMatrix2D(origin, angle*180/np.pi, 1)
+    # move origin to zero
+    M[:, 2] -= origin
+    # flip y axis
+    M[1, :] = M[1, :]*-1 
+
+    return R, T, M
+
+def drawImgInBaseCoords(img, rotationMatrix):
+    (h, w) = img.shape[:2]
+    imgOffset = np.array([[0, 0, w], [0, 0, h]])
+    imgRot = cv.warpAffine(img, rotationMatrix+imgOffset, dsize=(w*2, h*2))
+
+    # draw lines on axis of image
+    cv.line(imgRot, [0, 640], [480*2, 640], (255,255,255), thickness=2)
+    cv.line(imgRot, [480, 0], [480, 640*2], (255,255,255), thickness=2)
+
+    return imgRot
 
 def main():
     imgPath = Path("Chessboard_detection", "TestImages", "03_03_2023", "5")
@@ -204,7 +238,7 @@ def main():
     _, img = cam.read()
 
     # Find center strip on starting position of chess board
-    retVal, corners = findBoardCentreSquares(img, printImgs=True)
+    retVal, corners = findBoardCentreSquares(img, printImgs=False)
 
     # raise exception when board not found
     if not retVal:
@@ -213,9 +247,23 @@ def main():
 
     # Find rotation matrix to align image with axes. 
     # assume centerpoint is origin
-    origin, rotationMatrix = getRotationMatrix(corners)
-    (h, w) = img.shape[:2]
-    imgRot = cv.warpAffine(img, rotationMatrix, dsize=(w, h))
+    R, T, rotationMatrix = getRotationMatrix(corners)
+
+    imgRot = drawImgInBaseCoords(img, rotationMatrix)
+
+    corners1 = np.reshape(corners, (21, 2))
+
+    cornersTransformed = (R @ (corners1.T - T)).T
+
+    for corner in cornersTransformed:
+        pos=np.rint(corner).astype(int)+np.array([480, 640])
+        cv.drawMarker(imgRot,(pos[0], pos[1]), color=(255, 255, 255), markerSize=5,thickness=2)
+        # cv.drawMarker()
+    # debug.showImg([imgRot])
+
+    (h, w) = imgRot.shape[:2]
+    plt.imshow(imgRot, origin='lower', extent=([-w/2, w/2, -h/2, h/2]))
+    plt.show()
 
     siftMatching(cam)
 
