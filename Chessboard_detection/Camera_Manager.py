@@ -12,7 +12,7 @@ except ModuleNotFoundError:
 try:
     from picamera import PiCamera
 except ModuleNotFoundError:
-    print("Can only use RPICam if on raspberry pi")
+    print("Can only use RPICam when on raspberry pi")
 
 # import Chess_Vision
 
