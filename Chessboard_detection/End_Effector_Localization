@@ -5,10 +5,35 @@ import pi_debugging as debug
 import numpy as np
 import matplotlib.pyplot as plt
 
+class matchEngine:
+    """ Scale invariant feature transform manager"""
+    def __init__(self, matcherType='SIFT') -> None:
+        """ Can use SIFT or ORB matching, sift is more accurate but requires a lot
+        more runtime ~5x increase. 
+        """
+        if matcherType=='SIFT':
+            self.matcher = cv.SIFT_create()
+            self.bf = cv.BFMatcher(cv.NORM_L2, crossCheck=True)
+        elif matcherType=='ORB':
+            self.matcher = cv.ORB_create()
+            self.bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
+        else:
+            raise("Invalid matrhcerType, currently support'SIFT' and 'ORB'.")
+        
+        # initialize descriptors and key points
+        self.kpCurrent = None
+        self.des = None
+    
 
-def siftMatching(cam):
+def siftMatching(cam, matcherType='SIFT'):
     # Initiate ORB detector
-    orb = cv.ORB_create()
+    
+    if matcherType=='SIFT':
+        matcher = cv.SIFT_create()
+        bf = cv.BFMatcher(cv.NORM_L2, crossCheck=True)
+    elif matcherType=='ORB':
+        matcher = cv.ORB_create()
+        bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
 
     ret, img1 = cam.read()
     while ret:
@@ -16,25 +41,34 @@ def siftMatching(cam):
         imgGray1 = cv.cvtColor(img1, cv.COLOR_BGR2GRAY)
         imgGray2 = cv.cvtColor(img2, cv.COLOR_BGR2GRAY)
 
-        # find the keypoints and descriptors with ORB
-        kp1, des1 = orb.detectAndCompute(imgGray1,None)
-        kp2, des2 = orb.detectAndCompute(imgGray2,None)
+        # # find the keypoints and descriptors with ORB
+        # kp1, des1 = orb.detectAndCompute(imgGray1,None)
+        # kp2, des2 = orb.detectAndCompute(imgGray2,None)
 
-        # create BFMatcher object
-        bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
+        kp1, des1 = matcher.detectAndCompute(imgGray1,None)
+        kp2, des2 = matcher.detectAndCompute(imgGray2,None)
+
         # Match descriptors.
         matches = bf.match(des1,des2)
         # Sort them in the order of their distance.
-        matches = sorted(matches, key = lambda x:x.distance)
-
+        # matches = sorted(matches, key = lambda x:x.distance)
+        valid = [x for x in matches if x.distance < 100]
+        print("Number of matches: ", len(valid))
         # Draw first 10 matches.
         img3 = cv.drawMatches(
-            img1,kp1,img2,kp2,matches,
+            img1,kp1,img2,kp2,valid[:100],
             None,
             flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
         )
-        plt.imshow(img3)
-        plt.show()
+        img3 = cv.cvtColor(img3, cv.COLOR_BGR2RGB)
+
+        # distances = [x.distance for x in matches]
+        # h = np.histogram(distances)
+        # plt.hist(distances, )
+        # plt.show()
+        # plt.imshow(img3)
+        # plt.show()
+        # TODO: #2 Write better function for selecting the number of features to keep
 
         img1 = img2.copy()
 
@@ -137,16 +171,12 @@ def findBoardCentreSquares(img, printImgs):
 
     return retVal, corners
 
-def main():
-    imgPath = Path("Chessboard_detection", "TestImages", "03_03_2023", "5")
-
-    cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
-
-    _, img = cam.read()
-
-    # Find center strip on starting position of chess board
-    retVal, corners = findBoardCentreSquares(img, printImgs=False)
-
+def getRotationMatrix(corners):
+    """
+    Finds the rotation matrix using the interior corners of the chessboard.
+    The rotation matrix rotates the image around the center of the board.
+    To align the board with the horizontal axis.
+    """
     # calculate the linear regression of each row to find the 
     # rotation of the board.
     rows = np.zeros(shape=(3, 7, 2))
@@ -155,10 +185,39 @@ def main():
         rows[i] = np.reshape(corners[7*i:7*i+7, :, :], (7, 2))
         coef[i] = estimate_coef(rows[i, :, 0], rows[i, :, 1])
     
+    # the orgin is the centre corner point of the chessboard.
+    # the rotation angle is in degrees and positive CCW.
     gradient = np.mean(coef[:, 1])
-    print(retVal)
-    print(gradient)
-    
+    angle= np.arctan2(gradient, 1)*180/np.pi
+    origin = corners[10, 0, :]
+
+    # Find a rotation matrix to rotate the image around the origin.
+    rotationMatrix = cv.getRotationMatrix2D(origin, angle, scale=1)
+
+    return origin, rotationMatrix
+
+def main():
+    imgPath = Path("Chessboard_detection", "TestImages", "03_03_2023", "5")
+
+    cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
+
+    _, img = cam.read()
+
+    # Find center strip on starting position of chess board
+    retVal, corners = findBoardCentreSquares(img, printImgs=True)
+
+    # raise exception when board not found
+    if not retVal:
+        raise("Could not find the chessboard pattern within the starting position \
+              chess Board. Check that the board is visible.")
+
+    # Find rotation matrix to align image with axes. 
+    # assume centerpoint is origin
+    origin, rotationMatrix = getRotationMatrix(corners)
+    (h, w) = img.shape[:2]
+    imgRot = cv.warpAffine(img, rotationMatrix, dsize=(w, h))
+
+    siftMatching(cam)
 
 
 if __name__ == "__main__":
