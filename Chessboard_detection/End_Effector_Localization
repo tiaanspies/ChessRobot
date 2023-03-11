@@ -238,7 +238,7 @@ def main():
     _, img = cam.read()
 
     # Find center strip on starting position of chess board
-    retVal, corners = findBoardCentreSquares(img, printImgs=True)
+    retVal, corners = findBoardCentreSquares(img, printImgs=False)
 
     # raise exception when board not found
     if not retVal:
