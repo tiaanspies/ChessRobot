@@ -1,5 +1,6 @@
 import os
 import cv2 as cv
+import numpy as np
 from pathlib import Path
 from datetime import date
 
@@ -9,12 +10,32 @@ def saveTempImg(img, name):
     img1 = cv.cvtColor(img, cv.COLOR_BGR2RGB)
     cv.imwrite(dirPath+relPath+"/"+name, img1)
 
-def showImg(images):
-    while cv.waitKey(1) != ord('q'):
-        for i, img in enumerate(images):
-            cv.namedWindow(str(i), cv.WINDOW_NORMAL)
-            
-            cv.imshow(str(i), img)
+def showImg(images, variables):
+    # while cv.waitKey(1) != ord('q'):
+    img_stacked = np.zeros(shape=(images[0].shape[0], 0))
+    for i, img in enumerate(images):
+        var_name = [name for name in variables if variables[name] is img][0]
+        co_ord = (0, 40)
+        mean_val = np.mean(img[0:80, 40:80])
+
+        if mean_val > 125:
+            color_in = (0, 0, 0)
+            color_out = (255, 255, 255)
+        else:
+            color_in = (255, 255, 255)
+            color_out = (0,0,0)
+
+        img1 = cv.putText(img.copy(), var_name, co_ord, cv.FONT_HERSHEY_SIMPLEX, 1.5, color_out, 16)
+        img1 = cv.putText(img1, var_name, co_ord, cv.FONT_HERSHEY_SIMPLEX, 1.5, color_in, 4)
+
+        # img_stacked = cv.hconcat([img_stacked, img1])
+        cv.namedWindow(var_name, cv.WINDOW_NORMAL)
+        cv.imshow(var_name, img1)
+        
+    # cv.namedWindow('0', cv.WINDOW_NORMAL)
+    # cv.imshow('0', img_stacked)
+    cv.waitKey(1)
+    # cv.destroyAllWindows()
 
 class imgDBManager:
     """
