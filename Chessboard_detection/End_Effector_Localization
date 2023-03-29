@@ -4,6 +4,7 @@ import cv2 as cv
 import pi_debugging as debug
 import numpy as np
 import matplotlib.pyplot as plt
+import heapq
 
 class matchEngine:
     """ Scale invariant feature transform manager"""
@@ -27,83 +28,70 @@ class matchEngine:
 DEBUG_LEVEL = 0
 MATCHES_TO_KEEP = 150
 
-def siftMatching(cam, matcherType='SIFT'):
+def detectAccurateMatches(img1, img2, descriptor, matcher):
+    key_points1, des1 = descriptor.detectAndCompute(img1,None)
+    key_Points2, des2 = descriptor.detectAndCompute(img2,None)
+
+    if DEBUG_LEVEL > 1:
+        img4=cv.drawKeypoints(img1,key_points1,img2,flags=cv.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        debug.showImg([img4], locals())
+
+    # Calculate the best matches for each point key_point pair.
+    matches = matcher.match(des1,des2)
+
+    # filter out best matches.
+    # filter by distance
+    # valid_matches = np.array([x for x in matches if x.distance < 50])
+
+    # filter by portion of best matches
+    valid_matches = heapq.nsmallest(MATCHES_TO_KEEP, matches, key = lambda x: x.distance)
+    valid_matches = np.array(valid_matches)
+    print("Number of matches: ", len(valid_matches))
+
+    # TODO: #2 Write better function for selecting the number of features to keep
+
+    # Get the co-ordinated of the selected matches
+    point1_coords = np.zeros((len(valid_matches), 2), dtype=np.float32)
+    point2_coords = np.zeros((len(valid_matches), 2), dtype=np.float32)
+    for i, match in enumerate(valid_matches):
+        point1_coords[i] = key_points1[match.queryIdx].pt
+        point2_coords[i] = key_Points2[match.trainIdx].pt
+    
+    # Find the best homography using a modified RANSAC algorithm
+    H, _ = cv.findHomography(point2_coords, point1_coords, cv.USAC_ACCURATE)
+
+    return H
+
+
+def siftMatching(cam, img_original, matcherType='SIFT'):
     # Initiate detector    
     if matcherType=='SIFT':
-        matcher = cv.SIFT_create()
-        bf = cv.BFMatcher(cv.NORM_L2, crossCheck=True)
+        descriptor = cv.SIFT_create()
+        matcher = cv.BFMatcher(cv.NORM_L2, crossCheck=True)
     elif matcherType=='ORB':
-        matcher = cv.ORB_create()
-        bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
+        descriptor = cv.ORB_create()
+        matcher = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
+    
+    while 1:
 
-    ret, img1 = cam.read()
-    while ret:
-        ret, img2 = cam.read()
+        _, img = cam.read()
+        # debug.showImg([img_original, img2], locals())
 
-        ## Find the key Points using SIFT
-        kp1, des1 = matcher.detectAndCompute(img1,None)
-        kp2, des2 = matcher.detectAndCompute(img2,None)
+        # finds the Homography matrix to tranform img onto img_original        
+        H = detectAccurateMatches(img_original, img, descriptor, matcher)
 
-        if DEBUG_LEVEL > 1:
-            img4=cv.drawKeypoints(img1,kp1,img2,flags=cv.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-            debug.showImg([img4], locals())
+        # Warp img onto the position of img_original
+        height, width, _ = img_original.shape
+        img2_rot = cv.warpPerspective(img, H , (width, height))
 
-        # Match descriptors.
-        matches = bf.match(des1,des2)
-        # Sort them in the order of their distance.
-        matches = sorted(matches, key = lambda x:x.distance)
-
-        # filter out matches within inlier tolerance.
-        # valid_matches = np.array([x for x in matches if x.distance < 50])
-        valid_matches = np.array(matches[:MATCHES_TO_KEEP])
-        print("Number of matches: ", len(valid_matches))
-
-        # draw a histogram of the match quality for all matches.
-        # distances = [x.distance for x in matches]
-        # h = np.histogram(distances)
-        # plt.hist(distances, )
-        # plt.show()
-
-        # TODO: #2 Write better function for selecting the number of features to keep
-
-        # Calculate homography in image
-        points1 = np.zeros((len(valid_matches)), dtype=cv.KeyPoint)
-        points2 = np.zeros((len(valid_matches)), dtype=cv.KeyPoint)
-        for i, match in enumerate(valid_matches):
-            points1[i] = kp1[match.queryIdx]
-            points2[i] = kp2[match.trainIdx]
-
-        point1_coords = np.array([x.pt for x in points1])
-        point2_coords = np.array([x.pt for x in points2])
-        
-        H = cv.findHomography(point1_coords, point2_coords, cv.USAC_ACCURATE)
-        points1_padded = np.hstack([point1_coords, np.ones((point1_coords.shape[0],1))])
-        predicted_points = H[0] @ points1_padded.T
-        print("Valid count: ", len(valid_matches))
-        print("Zero COunt: ", len(H[1])-np.count_nonzero(H[1].flatten()))
-        # Draw first matches.
-        correct_mask = H[1].astype(bool).flatten()
-        img3 = cv.drawMatches(
-            img1, kp1, 
-            img2, kp2,
-            valid_matches[correct_mask],
-            None,
-            flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
-        )
-        img3 = cv.cvtColor(img3, cv.COLOR_BGR2RGB)
-        
-        img4 = cv.drawMatches(
-            img1, kp1, 
-            img2, kp2,
-            valid_matches[np.invert(correct_mask)],
-            None,
-            flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
-        )
-        img4 = cv.cvtColor(img4, cv.COLOR_BGR2RGB)
-        plt.imshow(np.hstack([img3, img4]))
+        # draw lines on the warped image to compare the matches
+        cv.line(img2_rot, [0, 640], [480*2, 640], (255,255,255), thickness=2)
+        cv.line(img2_rot, [480, 0], [480, 640*2], (255,255,255), thickness=2)
+        img2_rot = cv.cvtColor(img2_rot, cv.COLOR_BGR2RGB)
+        figManager = plt.get_current_fig_manager()
+        figManager.full_screen_toggle()
+        plt.imshow(np.hstack([img_original, img2_rot]))
         plt.show()
-
-        img1 = img2.copy()
 
 def findSquareContours(img, contours, minArea, maxArea, drawCorners):
     """
@@ -248,7 +236,7 @@ def getRotationMatrix(corners):
     # move origin to zero
     M[:, 2] -= origin
     # flip y axis
-    M[1, :] = M[1, :]*-1 
+    # M[1, :] = M[1, :]*-1 
 
     return R, T, M
 
@@ -299,7 +287,7 @@ def main():
     # plt.imshow(imgRot, origin='lower', extent=([-w/2, w/2, -h/2, h/2]))
     # plt.show()
 
-    siftMatching(cam)
+    siftMatching(cam, imgRot)
 
 
 if __name__ == "__main__":
