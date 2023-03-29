@@ -24,6 +24,7 @@ class matchEngine:
         self.kpCurrent = None
         self.des = None
     
+DEBUG_LEVEL = 0
 
 def siftMatching(cam, matcherType='SIFT'):
     # Initiate ORB detector
@@ -38,21 +39,22 @@ def siftMatching(cam, matcherType='SIFT'):
     ret, img1 = cam.read()
     while ret:
         ret, img2 = cam.read()
-        imgGray1 = cv.cvtColor(img1, cv.COLOR_BGR2GRAY)
-        imgGray2 = cv.cvtColor(img2, cv.COLOR_BGR2GRAY)
 
-        # # find the keypoints and descriptors with ORB
-        # kp1, des1 = orb.detectAndCompute(imgGray1,None)
-        # kp2, des2 = orb.detectAndCompute(imgGray2,None)
+        ## Find the key Points using SIFT
+        kp1, des1 = matcher.detectAndCompute(img1,None)
+        kp2, des2 = matcher.detectAndCompute(img2,None)
 
-        kp1, des1 = matcher.detectAndCompute(imgGray1,None)
-        kp2, des2 = matcher.detectAndCompute(imgGray2,None)
+        if DEBUG_LEVEL > 1:
+            img4=cv.drawKeypoints(img1,kp1,img2,flags=cv.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+            debug.showImg([img4], locals())
 
         # Match descriptors.
         matches = bf.match(des1,des2)
         # Sort them in the order of their distance.
         # matches = sorted(matches, key = lambda x:x.distance)
-        valid = [x for x in matches if x.distance < 100]
+
+        # filter out matches within inlier tolerance.
+        valid = [x for x in matches if x.distance < 50]
         print("Number of matches: ", len(valid))
         # Draw first 10 matches.
         img3 = cv.drawMatches(
@@ -130,13 +132,13 @@ def findBoardCentreSquares(img, printImgs):
     patternSize = (7, 3)
 
     # convert image to a grayscale image
-    img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+    img_gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
     
     # threshhold it into a binary image
     # a large window size is used 71 to only change
     # threshold slowly
-    img1 = cv.adaptiveThreshold(
-        img, 
+    img_adpt_thresh = cv.adaptiveThreshold(
+        img_gray, 
         255,
         cv.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv.THRESH_BINARY_INV,
@@ -147,27 +149,27 @@ def findBoardCentreSquares(img, printImgs):
     # dilate the image to grow the white areas
     # leaving small black squares in the centre of open squares
     kernSize = 3
-    img2 = cv.dilate(img1, np.ones((kernSize, kernSize)))
+    img_dilate = cv.dilate(img_adpt_thresh, np.ones((kernSize, kernSize)))
 
     # find the points of contours aproximate contours
-    contours, hierarchy = cv.findContours(img2, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv.findContours(img_dilate, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
     # check each contours and save squares
-    img, squares = findSquareContours(img, contours, minArea=100, maxArea=6000, drawCorners=printImgs)
+    img_gray, squares = findSquareContours(img_gray, contours, minArea=100, maxArea=6000, drawCorners=printImgs)
 
     # Create fully white image and fill poly with black.
     # this leaves only the black squares of the chessboard in the image
-    img3 = np.ones((480, 640), dtype=np.uint8)*255
-    cv.fillPoly(img3, squares, 0)
+    img_mask = np.ones((480, 640), dtype=np.uint8)*255
+    cv.fillPoly(img_mask, squares, 0)
 
     #Dilate the area to return the squares to their original size
-    img3 = cv.erode(img3, np.ones((kernSize, kernSize)))
-    retVal, corners = cv.findChessboardCorners(img3, patternSize)
+    img_mask = cv.erode(img_mask, np.ones((kernSize, kernSize)))
+    retVal, corners = cv.findChessboardCorners(img_mask, patternSize)
     
     # Debug lines to plot different image stages
     if printImgs:
-        cv.drawChessboardCorners(img, patternSize, corners, retVal)
-        debug.showImg([img, img1, img2, img3])
+        cv.drawChessboardCorners(img_gray, patternSize, corners, retVal)
+        debug.showImg([img_gray, img_adpt_thresh, img_dilate, img_mask], locals())
 
     return retVal, corners
 
@@ -238,7 +240,7 @@ def main():
     _, img = cam.read()
 
     # Find center strip on starting position of chess board
-    retVal, corners = findBoardCentreSquares(img, printImgs=False)
+    retVal, corners = findBoardCentreSquares(img, printImgs=True)
 
     # raise exception when board not found
     if not retVal:
