@@ -25,10 +25,10 @@ class matchEngine:
         self.des = None
     
 DEBUG_LEVEL = 0
+MATCHES_TO_KEEP = 150
 
 def siftMatching(cam, matcherType='SIFT'):
-    # Initiate ORB detector
-    
+    # Initiate detector    
     if matcherType=='SIFT':
         matcher = cv.SIFT_create()
         bf = cv.BFMatcher(cv.NORM_L2, crossCheck=True)
@@ -51,26 +51,57 @@ def siftMatching(cam, matcherType='SIFT'):
         # Match descriptors.
         matches = bf.match(des1,des2)
         # Sort them in the order of their distance.
-        # matches = sorted(matches, key = lambda x:x.distance)
+        matches = sorted(matches, key = lambda x:x.distance)
 
         # filter out matches within inlier tolerance.
-        valid = [x for x in matches if x.distance < 50]
-        print("Number of matches: ", len(valid))
-        # Draw first 10 matches.
+        # valid_matches = np.array([x for x in matches if x.distance < 50])
+        valid_matches = np.array(matches[:MATCHES_TO_KEEP])
+        print("Number of matches: ", len(valid_matches))
+
+        # draw a histogram of the match quality for all matches.
+        # distances = [x.distance for x in matches]
+        # h = np.histogram(distances)
+        # plt.hist(distances, )
+        # plt.show()
+
+        # TODO: #2 Write better function for selecting the number of features to keep
+
+        # Calculate homography in image
+        points1 = np.zeros((len(valid_matches)), dtype=cv.KeyPoint)
+        points2 = np.zeros((len(valid_matches)), dtype=cv.KeyPoint)
+        for i, match in enumerate(valid_matches):
+            points1[i] = kp1[match.queryIdx]
+            points2[i] = kp2[match.trainIdx]
+
+        point1_coords = np.array([x.pt for x in points1])
+        point2_coords = np.array([x.pt for x in points2])
+        
+        H = cv.findHomography(point1_coords, point2_coords, cv.USAC_ACCURATE)
+        points1_padded = np.hstack([point1_coords, np.ones((point1_coords.shape[0],1))])
+        predicted_points = H[0] @ points1_padded.T
+        print("Valid count: ", len(valid_matches))
+        print("Zero COunt: ", len(H[1])-np.count_nonzero(H[1].flatten()))
+        # Draw first matches.
+        correct_mask = H[1].astype(bool).flatten()
         img3 = cv.drawMatches(
-            img1,kp1,img2,kp2,valid[:100],
+            img1, kp1, 
+            img2, kp2,
+            valid_matches[correct_mask],
             None,
             flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
         )
         img3 = cv.cvtColor(img3, cv.COLOR_BGR2RGB)
-
-        distances = [x.distance for x in matches]
-        h = np.histogram(distances)
-        plt.hist(distances, )
+        
+        img4 = cv.drawMatches(
+            img1, kp1, 
+            img2, kp2,
+            valid_matches[np.invert(correct_mask)],
+            None,
+            flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
+        )
+        img4 = cv.cvtColor(img4, cv.COLOR_BGR2RGB)
+        plt.imshow(np.hstack([img3, img4]))
         plt.show()
-        plt.imshow(img3)
-        plt.show()
-        # TODO: #2 Write better function for selecting the number of features to keep
 
         img1 = img2.copy()
 
@@ -240,7 +271,7 @@ def main():
     _, img = cam.read()
 
     # Find center strip on starting position of chess board
-    retVal, corners = findBoardCentreSquares(img, printImgs=True)
+    retVal, corners = findBoardCentreSquares(img, printImgs=False)
 
     # raise exception when board not found
     if not retVal:
@@ -265,8 +296,8 @@ def main():
 
     (h, w) = imgRot.shape[:2]
     imgRot = cv.cvtColor(imgRot, cv.COLOR_BGR2RGB)
-    plt.imshow(imgRot, origin='lower', extent=([-w/2, w/2, -h/2, h/2]))
-    plt.show()
+    # plt.imshow(imgRot, origin='lower', extent=([-w/2, w/2, -h/2, h/2]))
+    # plt.show()
 
     siftMatching(cam)
 
