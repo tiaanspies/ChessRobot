@@ -71,6 +71,8 @@ def siftMatching(cam, img_original, matcherType='SIFT'):
     elif matcherType=='ORB':
         descriptor = cv.ORB_create()
         matcher = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
+
+    img_original_rgb = cv.cvtColor(img_original, cv.COLOR_BGR2RGB)
     
     while 1:
 
@@ -88,9 +90,12 @@ def siftMatching(cam, img_original, matcherType='SIFT'):
         cv.line(img2_rot, [0, 640], [480*2, 640], (255,255,255), thickness=2)
         cv.line(img2_rot, [480, 0], [480, 640*2], (255,255,255), thickness=2)
         img2_rot = cv.cvtColor(img2_rot, cv.COLOR_BGR2RGB)
-        figManager = plt.get_current_fig_manager()
-        figManager.full_screen_toggle()
-        plt.imshow(np.hstack([img_original, img2_rot]))
+
+        ## Display Image
+        # figManager = plt.get_current_fig_manager()
+        # figManager.full_screen_toggle()
+        
+        plt.imshow(np.hstack([img_original_rgb, img2_rot]))
         plt.show()
 
 def findSquareContours(img, contours, minArea, maxArea, drawCorners):
@@ -234,7 +239,7 @@ def getRotationMatrix(corners):
     # affine tranformation for image transformation
     M = cv.getRotationMatrix2D(origin, angle*180/np.pi, 1)
     # move origin to zero
-    M[:, 2] -= origin
+    # M[:, 2] -= origin
     # flip y axis
     # M[1, :] = M[1, :]*-1 
 
@@ -242,23 +247,16 @@ def getRotationMatrix(corners):
 
 def drawImgInBaseCoords(img, rotationMatrix):
     (h, w) = img.shape[:2]
-    imgOffset = np.array([[0, 0, w], [0, 0, h]])
-    imgRot = cv.warpAffine(img, rotationMatrix+imgOffset, dsize=(w*2, h*2))
-
+    # imgOffset = np.array([[0, 0, w], [0, 0, h]])
+    imgRot = cv.warpAffine(img, rotationMatrix, dsize=(w, h))
+    imgDrawn = imgRot.copy()
     # draw lines on axis of image
-    cv.line(imgRot, [0, 640], [480*2, 640], (255,255,255), thickness=2)
-    cv.line(imgRot, [480, 0], [480, 640*2], (255,255,255), thickness=2)
+    cv.line(imgDrawn, [0, 640], [480*2, 640], (255,255,255), thickness=2)
+    cv.line(imgDrawn, [480, 0], [480, 640*2], (255,255,255), thickness=2)
 
-    return imgRot
+    return imgRot, imgDrawn
 
-def main():
-    imgPath = Path("Chessboard_detection", "TestImages", "03_03_2023", "5")
-
-    cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
-
-    _, img = cam.read()
-
-    # Find center strip on starting position of chess board
+def processInitialImg(img):
     retVal, corners = findBoardCentreSquares(img, printImgs=False)
 
     # raise exception when board not found
@@ -267,23 +265,35 @@ def main():
               chess Board. Check that the board is visible.")
 
     # Find rotation matrix to align image with axes. 
-    # assume centerpoint is origin
+    # assume centerpoint is originqq
     R, T, rotationMatrix = getRotationMatrix(corners)
 
-    imgRot = drawImgInBaseCoords(img, rotationMatrix)
+    imgRot, imgDrawn = drawImgInBaseCoords(img, rotationMatrix)
 
     corners1 = np.reshape(corners, (21, 2))
 
     cornersTransformed = (R @ (corners1.T - T)).T
 
-    for corner in cornersTransformed:
-        pos=np.rint(corner).astype(int)+np.array([480, 640])
-        cv.drawMarker(imgRot,(pos[0], pos[1]), color=(255, 255, 255), markerSize=5,thickness=2)
-        # cv.drawMarker()
-    # debug.showImg([imgRot])
+    return imgRot, cornersTransformed
 
-    (h, w) = imgRot.shape[:2]
-    imgRot = cv.cvtColor(imgRot, cv.COLOR_BGR2RGB)
+
+def main():
+    imgPath = Path("Chessboard_detection", "TestImages", "03_03_2023", "5")
+
+    cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
+
+    _, img = cam.read()
+
+    # Find the chessboard center and rotate the image to lie on the center
+    imgRotated, cornersTransformed = processInitialImg(img)
+
+    # for corner in cornersTransformed:
+    #     pos=np.rint(corner).astype(int)+np.array([480, 640])
+    #     cv.drawMarker(imgDrawn,(pos[0], pos[1]), color=(255, 255, 255), markerSize=5,thickness=2)
+    #     # cv.drawMarker()
+
+    # (h, w) = imgDrawn.shape[:2]
+    # imgDrawn = cv.cvtColor(imgDrawn, cv.COLOR_BGR2RGB)
     # plt.imshow(imgRot, origin='lower', extent=([-w/2, w/2, -h/2, h/2]))
     # plt.show()
 
