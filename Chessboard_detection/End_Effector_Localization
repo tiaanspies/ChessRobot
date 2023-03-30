@@ -63,11 +63,24 @@ def detectAccurateMatches(img1, img2, descriptor, matcher):
 
     print("Inliers: ", np.count_nonzero(mask))
 
-    if np.count_nonzero(mask) < 140:
+    if np.count_nonzero(mask) < 1:
         mask = (np.array(mask).flatten()).astype(bool)
         img_matches = cv.drawMatches(img1, key_points1, img2, key_Points2, valid_matches[mask], None, flags=2)
         debug.showImg([img_matches], locals())
     return H
+
+def padCoordinates(coords):
+    corners_len = coords.shape[0]
+    corners_padded = np.hstack([coords, np.ones((corners_len, 1))])
+    return corners_padded
+
+def drawCorners(img, corners):
+    img_corners = img.copy()
+    for corner in corners.T:
+        pos=np.rint(corner).astype(int)
+        cv.drawMarker(img_corners,(pos[0], pos[1]), color=(255, 255, 255), markerSize=5,thickness=2)
+
+    return img_corners
 
 
 def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
@@ -81,47 +94,56 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
 
     img_original_rgb = cv.cvtColor(img_original, cv.COLOR_BGR2RGB)
     
-    
+    img1 = img_original
     while 1:
 
-        _, img = cam.read()
+        _, img2 = cam.read()
+        img2_orig = img2.copy()
         # debug.showImg([img_original, img2], locals())
         
         start_time = time.time()
 
         # finds the Homography matrix to tranform img onto img_original        
-        H = detectAccurateMatches(img_original, img, descriptor, matcher)
-
-        corners_len = corners_original.shape[0]
-        corners_original_padded = np.hstack([corners_original, np.ones((corners_len, 1))])
+        H = detectAccurateMatches(img1, img2, descriptor, matcher)
+        H_original = detectAccurateMatches(img_original, img2, descriptor, matcher)
         Hinv = np.linalg.inv(H)
-        cornersProjected = (Hinv @ corners_original_padded.T)[0:2, :]
+        H_inv_orig = np.linalg.inv(H_original)
+
+        # Padd the corners to be transformed using homograpgy matrix
+        corners_original_padded = padCoordinates(corners_original)
+        corners_Projected = (Hinv @ corners_original_padded.T)[0:2, :]
+        corners_Projected_Orig = (H_inv_orig @ corners_original_padded.T)[0:2, :]
 
         end_time = time.time()
         print("Feature detection Time (s): ", end_time-start_time)
 
-        img2 = img.copy()
-        for corner in cornersProjected.T:
-            pos=np.rint(corner).astype(int)
-            cv.drawMarker(img2,(pos[0], pos[1]), color=(255, 255, 255), markerSize=5,thickness=2)
-
-        debug.showImg([img2], locals())
+        ## print corners
+        img_corners = drawCorners(img2, corners_Projected)
+        img_corners_orig = drawCorners(img2_orig, corners_Projected_Orig)
         
-        # Warp img onto the position of img_original
-        height, width, _ = img_original.shape
-        img2_rot = cv.warpPerspective(img, H , (width, height))
-
-        # draw lines on the warped image to compare the matches
-        cv.line(img2_rot, [0, 640], [480*2, 640], (255,255,255), thickness=2)
-        cv.line(img2_rot, [480, 0], [480, 640*2], (255,255,255), thickness=2)
-        img2_rot = cv.cvtColor(img2_rot, cv.COLOR_BGR2RGB)
-
-        ## Display Image
-        # figManager = plt.get_current_fig_manager()
-        # figManager.full_screen_toggle()
+        debug.showImg([img_corners, img_corners_orig], locals())
         
-        plt.imshow(np.hstack([img_original_rgb, img2_rot]))
+        # Warp img onto the position of previous image
+        height, width, _ = img2.shape
+        img2_rot = cv.warpPerspective(img2, H , (width, height))
+
+        # # draw lines on the warped image to compare the matches
+        # cv.line(img2_rot, [0, 640], [480*2, 640], (255,255,255), thickness=2)
+        # cv.line(img2_rot, [480, 0], [480, 640*2], (255,255,255), thickness=2)
+        # img2_rot = cv.cvtColor(img2_rot, cv.COLOR_BGR2RGB)
+
+        	
+        dist_coeffs = np.zeros((4,1))
+        # success, rotation_vector, translation_vector = cv.solvePnP(
+        #     corners_original_padded,
+        #     corners_Projected,
+        #     Camera_Matrix,
+        #     dist_coeffs)
+
+        plt.imshow(np.hstack([img1, img2_rot]))
         plt.show()
+        cropImgToBoard(img2_rot, corners_original)
+        img1 = img2_rot.copy()
 
 def findSquareContours(img, contours, minArea, maxArea, drawCorners):
     """
@@ -301,6 +323,27 @@ def processInitialImg(img):
 
     return imgRot, cornersTransformed, Origin
 
+def cropImgToBoard(img, corners):
+    """
+    Crops the image to slightly larger than the chessboard.
+    Does not change the image shize. Only changes outside pixels
+    to black.
+    """
+    horizontal_corners = np.array([corners[0, 0], corners[6, 0]])
+    vertical_corners = np.array([corners[0, 1], corners[14, 1]])
+
+    min_h, max_h = sorted(horizontal_corners.astype(int))
+    min_y, max_y = sorted(vertical_corners.astype(int))
+
+    d = 40;
+
+    img[: , 0:min_h-32-d, :] = 0
+    img[: , max_h+32+d:-1, :] = 0
+
+    img[0:min_y-32*3 -d,:, :] = 0
+    img[max_y+32*3+d:-1 ,:, :] = 0
+
+    # return img
 
 def main():
     imgPath = Path("Chessboard_detection", "TestImages", "03_03_2023", "5")
@@ -322,25 +365,7 @@ def main():
     # debug.showImg([imgRotated], locals())
     # plt.imshow(imgRotated, origin='lower', extent=([-w/2, w/2, -h/2, h/2]))
     # plt.show()
-    horizontal_corners = np.array([cornersOrigin[0, 0], cornersOrigin[6, 0]])
-    vertical_corners = np.array([cornersOrigin[0, 1], cornersOrigin[14, 1]])
-
-    horizontal_corners = sorted(horizontal_corners)
-    vertical_corners = sorted(vertical_corners)
-
-    min_h = horizontal_corners[0].astype(int)
-    max_h = horizontal_corners[1].astype(int)
-
-    min_y = vertical_corners[0].astype(int)
-    max_y = vertical_corners[1].astype(int)
-
-    d = 40;
-
-    imgRotated[: , 0:min_h-32-d, :] = 0
-    imgRotated[: , max_h+32+d:-1, :] = 0
-
-    imgRotated[0:min_y-32*3 -d,:, :] = 0
-    imgRotated[max_y+32*3+d:-1 ,:, :] = 0
+    cropImgToBoard(imgRotated, cornersOrigin)
 
     siftMatching(cam, imgRotated, cornersOrigin, matcherType='ORB')
 
