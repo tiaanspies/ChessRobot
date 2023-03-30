@@ -26,7 +26,7 @@ class matchEngine:
         self.des = None
     
 DEBUG_LEVEL = 0
-MATCHES_TO_KEEP = 150
+MATCHES_TO_KEEP = 200
 
 def detectAccurateMatches(img1, img2, descriptor, matcher):
     key_points1, des1 = descriptor.detectAndCompute(img1,None)
@@ -58,12 +58,18 @@ def detectAccurateMatches(img1, img2, descriptor, matcher):
         point2_coords[i] = key_Points2[match.trainIdx].pt
     
     # Find the best homography using a modified RANSAC algorithm
-    H, _ = cv.findHomography(point2_coords, point1_coords, cv.USAC_ACCURATE)
+    H, mask = cv.findHomography(point2_coords, point1_coords, cv.USAC_ACCURATE)
 
+    print("Inliers: ", np.count_nonzero(mask))
+
+    if np.count_nonzero(mask) < 140:
+        mask = (np.array(mask).flatten()).astype(bool)
+        img_matches = cv.drawMatches(img1, key_points1, img2, key_Points2, valid_matches[mask], None, flags=2)
+        debug.showImg([img_matches], locals())
     return H
 
 
-def siftMatching(cam, img_original, matcherType='SIFT'):
+def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
     # Initiate detector    
     if matcherType=='SIFT':
         descriptor = cv.SIFT_create()
@@ -82,6 +88,18 @@ def siftMatching(cam, img_original, matcherType='SIFT'):
         # finds the Homography matrix to tranform img onto img_original        
         H = detectAccurateMatches(img_original, img, descriptor, matcher)
 
+        corners_len = corners_original.shape[0]
+        corners_original_padded = np.hstack([corners_original, np.ones((corners_len, 1))])
+        Hinv = np.linalg.inv(H)
+        cornersProjected = (Hinv @ corners_original_padded.T)[0:2, :]
+
+        img2 = img.copy()
+        for corner in cornersProjected.T:
+            pos=np.rint(corner).astype(int)
+            cv.drawMarker(img2,(pos[0], pos[1]), color=(255, 255, 255), markerSize=5,thickness=2)
+
+        debug.showImg([img2], locals())
+        
         # Warp img onto the position of img_original
         height, width, _ = img_original.shape
         img2_rot = cv.warpPerspective(img, H , (width, height))
@@ -266,38 +284,56 @@ def processInitialImg(img):
 
     # Find rotation matrix to align image with axes. 
     # assume centerpoint is originqq
-    R, T, rotationMatrix = getRotationMatrix(corners)
+    R, Origin, rotationMatrix = getRotationMatrix(corners)
 
     imgRot, imgDrawn = drawImgInBaseCoords(img, rotationMatrix)
 
     corners1 = np.reshape(corners, (21, 2))
 
-    cornersTransformed = (R @ (corners1.T - T)).T
+    cornersTransformed = (R @ (corners1.T - Origin)).T + Origin.T
 
-    return imgRot, cornersTransformed
+    return imgRot, cornersTransformed, Origin
 
 
 def main():
-    imgPath = Path("Chessboard_detection", "TestImages", "03_03_2023", "5")
+    imgPath = Path("Chessboard_detection", "TestImages", "03_03_2023", "4")
 
     cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
 
     _, img = cam.read()
 
     # Find the chessboard center and rotate the image to lie on the center
-    imgRotated, cornersTransformed = processInitialImg(img)
+    imgRotated, cornersOrigin, BoardOrigin = processInitialImg(img)
 
-    # for corner in cornersTransformed:
-    #     pos=np.rint(corner).astype(int)+np.array([480, 640])
-    #     cv.drawMarker(imgDrawn,(pos[0], pos[1]), color=(255, 255, 255), markerSize=5,thickness=2)
+    # for corner in cornersOrigin:
+    #     pos=np.rint(corner).astype(int)
+    #     cv.drawMarker(imgRotated,(pos[0], pos[1]), color=(255, 255, 255), markerSize=5,thickness=2)
     #     # cv.drawMarker()
 
-    # (h, w) = imgDrawn.shape[:2]
-    # imgDrawn = cv.cvtColor(imgDrawn, cv.COLOR_BGR2RGB)
-    # plt.imshow(imgRot, origin='lower', extent=([-w/2, w/2, -h/2, h/2]))
+    # (h, w) = imgRotated.shape[:2]
+    # imgRotated = cv.cvtColor(imgRotated, cv.COLOR_BGR2RGB)
+    # debug.showImg([imgRotated], locals())
+    # plt.imshow(imgRotated, origin='lower', extent=([-w/2, w/2, -h/2, h/2]))
     # plt.show()
+    horizontal_corners = np.array([cornersOrigin[0, 0], cornersOrigin[6, 0]])
+    vertical_corners = np.array([cornersOrigin[0, 1], cornersOrigin[14, 1]])
 
-    siftMatching(cam, imgRot)
+    horizontal_corners = sorted(horizontal_corners)
+    vertical_corners = sorted(vertical_corners)
+
+    min_h = horizontal_corners[0].astype(int)
+    max_h = horizontal_corners[1].astype(int)
+
+    min_y = vertical_corners[0].astype(int)
+    max_y = vertical_corners[1].astype(int)
+
+    imgRotated[: , 0:min_h-32, :] = 0
+    imgRotated[: , max_h+32:-1, :] = 0
+
+    imgRotated[0:min_y-32*3 ,:, :] = 0
+    imgRotated[max_y+32*3:-1 ,:, :] = 0
+
+    siftMatching(cam, imgRotated, cornersOrigin, matcherType='SIFT')
 
 
 if __name__ == "__main__":
