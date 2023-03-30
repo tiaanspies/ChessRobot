@@ -5,6 +5,7 @@ import pi_debugging as debug
 import numpy as np
 import matplotlib.pyplot as plt
 import heapq
+import time
 
 class matchEngine:
     """ Scale invariant feature transform manager"""
@@ -58,7 +59,7 @@ def detectAccurateMatches(img1, img2, descriptor, matcher):
         point2_coords[i] = key_Points2[match.trainIdx].pt
     
     # Find the best homography using a modified RANSAC algorithm
-    H, mask = cv.findHomography(point2_coords, point1_coords, cv.USAC_ACCURATE)
+    H, mask = cv.findHomography(point2_coords, point1_coords, cv.USAC_ACCURATE, confidence=1)
 
     print("Inliers: ", np.count_nonzero(mask))
 
@@ -80,10 +81,13 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
 
     img_original_rgb = cv.cvtColor(img_original, cv.COLOR_BGR2RGB)
     
+    
     while 1:
 
         _, img = cam.read()
         # debug.showImg([img_original, img2], locals())
+        
+        start_time = time.time()
 
         # finds the Homography matrix to tranform img onto img_original        
         H = detectAccurateMatches(img_original, img, descriptor, matcher)
@@ -92,6 +96,9 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
         corners_original_padded = np.hstack([corners_original, np.ones((corners_len, 1))])
         Hinv = np.linalg.inv(H)
         cornersProjected = (Hinv @ corners_original_padded.T)[0:2, :]
+
+        end_time = time.time()
+        print("Feature detection Time (s): ", end_time-start_time)
 
         img2 = img.copy()
         for corner in cornersProjected.T:
@@ -296,7 +303,7 @@ def processInitialImg(img):
 
 
 def main():
-    imgPath = Path("Chessboard_detection", "TestImages", "03_03_2023", "4")
+    imgPath = Path("Chessboard_detection", "TestImages", "03_03_2023", "5")
 
     cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
 
@@ -327,13 +334,15 @@ def main():
     min_y = vertical_corners[0].astype(int)
     max_y = vertical_corners[1].astype(int)
 
-    imgRotated[: , 0:min_h-32, :] = 0
-    imgRotated[: , max_h+32:-1, :] = 0
+    d = 40;
 
-    imgRotated[0:min_y-32*3 ,:, :] = 0
-    imgRotated[max_y+32*3:-1 ,:, :] = 0
+    imgRotated[: , 0:min_h-32-d, :] = 0
+    imgRotated[: , max_h+32+d:-1, :] = 0
 
-    siftMatching(cam, imgRotated, cornersOrigin, matcherType='SIFT')
+    imgRotated[0:min_y-32*3 -d,:, :] = 0
+    imgRotated[max_y+32*3+d:-1 ,:, :] = 0
+
+    siftMatching(cam, imgRotated, cornersOrigin, matcherType='ORB')
 
 
 if __name__ == "__main__":
