@@ -89,7 +89,7 @@ class PhoneCamera:
 
 class RPiCamera:
 
-    def __init__(self, res, absPath, storeImgHist=True) -> None:
+    def __init__(self, res, absPath, storeImgHist=True, loadSavedFirst=True) -> None:
         self.imgHistDB = pi_debugging.imgDBManager()
 
         self.camera = PiCamera()
@@ -99,11 +99,14 @@ class RPiCamera:
         self.camera.rotation = 270
 
         self.path_full = absPath
+        self.storeImgHist = storeImgHist
 
         # Change statenum to -1 to use saved picture as first picture.
         # Change statenum to 1 to used camera for all pictures
-        self.stateNum = 1
-        self.storeImgHist = storeImgHist
+        if loadSavedFirst:
+            self.stateNum = -1
+        else:
+            self.stateNum = 1
     
     def read(self):
         
@@ -118,7 +121,7 @@ class RPiCamera:
             self.frame = cv.resize(self.frame, self.cameraRes)
         elif self.stateNum > 0:
             self.camera.start_preview()
-            sleep(5)
+            sleep(2)
             output = np.empty((self.cameraRes[1], self.cameraRes[0], 3), dtype=np.uint8)
             self.camera.capture(output, 'rgb')
             self.camera.stop_preview()
