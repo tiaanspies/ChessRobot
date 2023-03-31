@@ -19,4 +19,4 @@ while inputTxt != 'q':
     _, img = cam.read()
     print("saved img")
     # inputTxt = input("q to quit. Anything to take picture: ").strip().lower()
-    sleep(1000)
+    sleep(1)
