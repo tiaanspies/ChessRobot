@@ -27,7 +27,7 @@ class matchEngine:
         self.des = None
     
 DEBUG_LEVEL = 0
-MATCHES_TO_KEEP = 200
+MATCHES_TO_KEEP = 100
 
 def detectAccurateMatches(img1, img2, descriptor, matcher):
     key_points1, des1 = descriptor.detectAndCompute(img1,None)
@@ -335,7 +335,7 @@ def cropImgToBoard(img, corners):
     min_h, max_h = sorted(horizontal_corners.astype(int))
     min_y, max_y = sorted(vertical_corners.astype(int))
 
-    d = 40;
+    d = 40
 
     img[: , 0:min_h-32-d, :] = 0
     img[: , max_h+32+d:-1, :] = 0
