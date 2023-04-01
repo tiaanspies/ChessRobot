@@ -65,7 +65,7 @@ class MotorCommands:
                 self.shoulder.angle = angle[1]
                 self.elbow.angle = angle[2]
                 self.grip.angle = angle[3]
-                sleep(.1) # will need to decrease eventually
+                sleep(.05) # will need to decrease eventually
         except KeyboardInterrupt:
             self.grip.angle = np.rad2deg(self.OPEN)
             pass # TODO: make sure this means gripper is open
