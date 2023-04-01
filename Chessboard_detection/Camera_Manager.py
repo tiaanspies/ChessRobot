@@ -8,7 +8,6 @@ try:
     from Chessboard_detection import pi_debugging
 except ModuleNotFoundError:
     import pi_debugging
-
 try:
     from picamera import PiCamera
 except ModuleNotFoundError:
