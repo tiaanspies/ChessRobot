@@ -27,11 +27,14 @@ class matchEngine:
         self.des = None
     
 DEBUG_LEVEL = 0
-MATCHES_TO_KEEP = 100
+MATCHES_TO_KEEP = 200
 
 def detectAccurateMatches(img1, img2, descriptor, matcher):
     key_points1, des1 = descriptor.detectAndCompute(img1,None)
     key_Points2, des2 = descriptor.detectAndCompute(img2,None)
+
+    # debug.showImg([img1, img2], locals())
+    # cv.waitKey(0)
 
     if DEBUG_LEVEL > 1:
         img4=cv.drawKeypoints(img1,key_points1,img2,flags=cv.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
@@ -85,6 +88,9 @@ def drawCorners(img, corners):
 
 def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
     # Initiate detector    
+    # MATCH TO ORIGINAL
+    MATCH_ORIG = False
+
     if matcherType=='SIFT':
         descriptor = cv.SIFT_create()
         matcher = cv.BFMatcher(cv.NORM_L2, crossCheck=True)
@@ -105,23 +111,29 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
 
         # finds the Homography matrix to tranform img onto img_original        
         H = detectAccurateMatches(img1, img2, descriptor, matcher)
-        H_original = detectAccurateMatches(img_original, img2, descriptor, matcher)
         Hinv = np.linalg.inv(H)
-        H_inv_orig = np.linalg.inv(H_original)
 
         # Padd the corners to be transformed using homograpgy matrix
         corners_original_padded = padCoordinates(corners_original)
         corners_Projected = (Hinv @ corners_original_padded.T)[0:2, :]
-        corners_Projected_Orig = (H_inv_orig @ corners_original_padded.T)[0:2, :]
-
+        
         end_time = time.time()
         print("Feature detection Time (s): ", end_time-start_time)
 
+        ## Match to original image
+        if MATCH_ORIG:
+            H_original = detectAccurateMatches(img_original, img2, descriptor, matcher)
+            H_inv_orig = np.linalg.inv(H_original)
+
+            corners_Projected_Orig = (H_inv_orig @ corners_original_padded.T)[0:2, :]
+
+            img_corners_orig = drawCorners(img2_orig, corners_Projected_Orig)
+            debug.showImg([img_corners_orig], locals())
+
         ## print corners
         img_corners = drawCorners(img2, corners_Projected)
-        img_corners_orig = drawCorners(img2_orig, corners_Projected_Orig)
         
-        debug.showImg([img_corners, img_corners_orig], locals())
+        debug.showImg([img_corners], locals())
         
         # Warp img onto the position of previous image
         height, width, _ = img2.shape
@@ -142,8 +154,8 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
 
         plt.imshow(np.hstack([img1, img2_rot]))
         plt.show()
-        cropImgToBoard(img2_rot, corners_original)
-        img1 = img2_rot.copy()
+        img2_cropped = cropImgToBoard(img2_rot, corners_Projected.T)
+        img1 = img2_cropped.copy()
 
 def findSquareContours(img, contours, minArea, maxArea, drawCorners):
     """
@@ -203,6 +215,7 @@ def findBoardCentreSquares(img, printImgs):
     patternSize = (7, 3)
 
     # convert image to a grayscale image
+    img = cv.GaussianBlur(img, (5,5), 0.5)
     img_gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
     
     # threshhold it into a binary image
@@ -219,7 +232,7 @@ def findBoardCentreSquares(img, printImgs):
 
     # dilate the image to grow the white areas
     # leaving small black squares in the centre of open squares
-    kernSize = 3
+    kernSize = 7
     img_dilate = cv.dilate(img_adpt_thresh, np.ones((kernSize, kernSize)))
 
     # find the points of contours aproximate contours
@@ -234,7 +247,7 @@ def findBoardCentreSquares(img, printImgs):
     cv.fillPoly(img_mask, squares, 0)
 
     #Dilate the area to return the squares to their original size
-    img_mask = cv.erode(img_mask, np.ones((kernSize, kernSize)))
+    img_mask = cv.erode(img_mask, np.ones((kernSize-2, kernSize-2)))
     retVal, corners = cv.findChessboardCorners(img_mask, patternSize)
     
     # Debug lines to plot different image stages
@@ -308,6 +321,7 @@ def processInitialImg(img):
 
     # raise exception when board not found
     if not retVal:
+        cv.waitKey(0)
         raise("Could not find the chessboard pattern within the starting position \
               chess Board. Check that the board is visible.")
 
@@ -323,30 +337,36 @@ def processInitialImg(img):
 
     return imgRot, cornersTransformed, Origin
 
-def cropImgToBoard(img, corners):
+def cropImgToBoard(img_orig, corners):
     """
     Crops the image to slightly larger than the chessboard.
     Does not change the image shize. Only changes outside pixels
     to black.
     """
-    horizontal_corners = np.array([corners[0, 0], corners[6, 0]])
-    vertical_corners = np.array([corners[0, 1], corners[14, 1]])
-
-    min_h, max_h = sorted(horizontal_corners.astype(int))
-    min_y, max_y = sorted(vertical_corners.astype(int))
+    img = img_orig.copy()
+    height, width, _ = img.shape
+    min_h, max_h = np.min(corners[:, 0]), np.max(corners[:, 0])
+    min_y, max_y =  np.min(corners[:, 1]), np.max(corners[:, 1])
 
     d = 40
+    y_diff = np.diff([corners[0:7,0], corners[7:14,0], corners[14:,0]])
+    y_diff = np.mean(y_diff).astype(int)
 
-    img[: , 0:min_h-32-d, :] = 0
-    img[: , max_h+32+d:-1, :] = 0
+    min_h = np.clip(min_h-y_diff-d, 0, width).astype(int)
+    max_h = np.clip(max_h+y_diff+d, 0, width).astype(int)
+    min_y = np.clip(min_y-y_diff*3 -d, 0, height).astype(int)
+    max_y = np.clip(max_y+y_diff*3+d, 0, height).astype(int)
 
-    img[0:min_y-32*3 -d,:, :] = 0
-    img[max_y+32*3+d:-1 ,:, :] = 0
+    img[: , 0:min_h, :] = 0
+    img[: , max_h:, :] = 0
 
-    # return img
+    img[0:min_y,:, :] = 0
+    img[max_y: ,:, :] = 0
+
+    return img
 
 def main():
-    imgPath = Path("Chessboard_detection", "TestImages", "03_03_2023", "5")
+    imgPath = Path("Chessboard_detection", "TestImages", "31_03_2023", "8")
 
     cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
 
@@ -365,7 +385,7 @@ def main():
     # debug.showImg([imgRotated], locals())
     # plt.imshow(imgRotated, origin='lower', extent=([-w/2, w/2, -h/2, h/2]))
     # plt.show()
-    cropImgToBoard(imgRotated, cornersOrigin)
+    imgRotated = cropImgToBoard(imgRotated, cornersOrigin)
 
     siftMatching(cam, imgRotated, cornersOrigin, matcherType='ORB')
 
