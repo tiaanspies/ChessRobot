@@ -1,5 +1,6 @@
 import os
 from Chessboard_detection import pi_debugging, Camera_Manager
+from time import sleep
 
 # start camera
 dirPath = os.path.dirname(os.path.realpath(__file__))
@@ -12,4 +13,5 @@ inputTxt = ''
 while inputTxt != 'q':
     _, img = cam.read()
     print("saved img")
-    inputTxt = input("q to quit. Anything to take picture: ").strip().lower()
+    # inputTxt = input("q to quit. Anything to take picture: ").strip().lower()
+    sleep(1000)
