@@ -19,7 +19,7 @@ except ModuleNotFoundError:
 # / for raspberry pi
 
 class FakeCamera:
-    def __init__(self, res, absPath, startNum = 1) -> None:
+    def __init__(self, res, absPath, startNum = 0) -> None:
 
         self.path_full = absPath
         self.cameraRes = res
