@@ -115,7 +115,8 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
 
         # Padd the corners to be transformed using homograpgy matrix
         corners_original_padded = padCoordinates(corners_original)
-        corners_Projected = (Hinv @ corners_original_padded.T)[0:2, :]
+        corners_Projected_padded = (Hinv @ corners_original_padded.T)
+        corners_Projected = corners_Projected_padded[0:2, :]
         
         end_time = time.time()
         print("Feature detection Time (s): ", end_time-start_time)
@@ -129,11 +130,6 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
 
             img_corners_orig = drawCorners(img2_orig, corners_Projected_Orig)
             debug.showImg([img_corners_orig], locals())
-
-        ## print corners
-        img_corners = drawCorners(img2, corners_Projected)
-        
-        debug.showImg([img_corners], locals())
         
         # Warp img onto the position of previous image
         height, width, _ = img2.shape
@@ -143,20 +139,49 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
         # cv.line(img2_rot, [0, 640], [480*2, 640], (255,255,255), thickness=2)
         # cv.line(img2_rot, [480, 0], [480, 640*2], (255,255,255), thickness=2)
         # img2_rot = cv.cvtColor(img2_rot, cv.COLOR_BGR2RGB)
+        objp = np.zeros((3*7,3), np.float32)
+        objp[:,:2] = np.mgrid[0:7,0:3].T.reshape(-1,2)*40/15
+        objp = np.array([[0, 2, 0], [1, 2, 0], [2, 2, 0], [3, 2, 0], [4, 2, 0],
+                        [5, 2, 0], [6, 2, 0],
+                        [0, 1, 0], [1, 1, 0], [2, 1, 0], [3, 1, 0], [4, 1, 0],
+                        [5, 1, 0], [6, 1, 0],
+                        [0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0], [4, 0, 0],
+                        [5, 0, 0], [6, 0, 0]])*40/15
 
-        	
-        dist_coeffs = np.zeros((4,1))
-        # success, rotation_vector, translation_vector = cv.solvePnP(
-        #     corners_original_padded,
-        #     corners_Projected,
-        #     Camera_Matrix,
-        #     dist_coeffs)
+        camera_matrix, dist_coeffs = cam.readCalibMatrix()
+        success, rotation_vector, translation_vector = cv.solvePnP(
+            objp,
+            corners_Projected.T,
+            camera_matrix,
+            dist_coeffs)
+        
+        print(translation_vector*15)
+
+        
+        axis = np.float32([[1,0,0], [0,1,0], [0,0,-1]]).reshape(-1,3)*40/15
+        imgpts, jac = cv.projectPoints(
+            axis, rotation_vector, translation_vector,
+            camera_matrix, dist_coeffs)
+        
+        ## print corners
+        img_corners = drawCorners(img2, corners_Projected)
+        img_corners = draw(img_corners, corners_Projected[:,14].T,imgpts)
+        debug.showImg([img_corners], locals())
 
         plt.imshow(np.hstack([img1, img2_rot]))
         plt.show()
         img2_cropped = cropImgToBoard(img2_rot, corners_Projected.T)
         img1 = img2_cropped.copy()
 
+def draw(img, corner, imgpts):
+    imgpts = imgpts.astype(int)
+    pt1 = tuple(corner.astype(int))
+    print("BLUE", imgpts[0].ravel())
+    img = cv.line(img, pt1, tuple(imgpts[0].ravel()), (255,0,0), 5)
+    img = cv.line(img, pt1, tuple(imgpts[1].ravel()), (0,255,0), 5)
+    img = cv.line(img, pt1, tuple(imgpts[2].ravel()), (0,0,255), 5)
+
+    return img
 def findSquareContours(img, contours, minArea, maxArea, drawCorners):
     """
     Receives list of contours and filters out squares
