@@ -1,22 +1,18 @@
-import os
+import os, requests
 import cv2 as cv
 from time import sleep
-# for PhoneCamera:
-import requests
+
 import numpy as np
+from pathlib import Path
 try:
     from Chessboard_detection import pi_debugging
 except ModuleNotFoundError:
     import pi_debugging
+
 try:
     from picamera import PiCamera
 except ModuleNotFoundError:
     print("Can only use RPICam when on raspberry pi")
-
-# import Chess_Vision
-
-#File seperator depending on OS \\ for Windows
-# / for raspberry pi
 
 class FakeCamera:
     def __init__(self, res, absPath, startNum = 0) -> None:
@@ -24,6 +20,20 @@ class FakeCamera:
         self.path_full = absPath
         self.cameraRes = res
         self.stateNum = startNum
+
+    def readCalibMatrix(self):
+        """
+        Return the calibration matrix that was saved to cameraProperties.out
+        """
+        camera_calib_file = Path("Chessboard_detection", "cameraProperties.out")
+        print(camera_calib_file.exists())
+        with open(str(camera_calib_file.resolve()), 'rb') as f:
+            camera_calib = np.load(f, allow_pickle=True)
+
+        camera_matrix = camera_calib[0]
+        dist_matrix = camera_calib[1]
+
+        return camera_matrix, dist_matrix
     
     def read(self):
         if self.stateNum <0:
@@ -106,6 +116,20 @@ class RPiCamera:
             self.stateNum = -1
         else:
             self.stateNum = 1
+
+    def readCalibMatrix(self):
+        """
+        Return the calibration matrix that was saved to cameraProperties.out
+        """
+        camera_calib_file = Path("Chessboard_detection", "cameraProperties.out")
+        print(camera_calib_file.exists())
+        with open(str(camera_calib_file.resolve()), 'rb') as f:
+            camera_calib = np.load(f, allow_pickle=True)
+
+        camera_matrix = camera_calib[0]
+        dist_matrix = camera_calib[1]
+
+        return camera_matrix, dist_matrix
     
     def read(self):
         
