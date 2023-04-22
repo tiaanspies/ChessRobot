@@ -52,6 +52,9 @@ def detectAccurateMatches(img1, img2, descriptor, matcher):
     valid_matches = np.array(valid_matches)
     print("Number of matches: ", len(valid_matches))
 
+    matched_image = cv.drawMatches(img1, key_points1, img2, key_Points2, valid_matches, None, flags=2)
+    debug.showImg([matched_image], locals())
+
     # TODO: #2 Write better function for selecting the number of features to keep
 
     # Get the co-ordinated of the selected matches
@@ -85,6 +88,17 @@ def drawCorners(img, corners):
 
     return img_corners
 
+def getWorldCoordOfChessboard():
+    objp = np.zeros((3*7,3), np.float32)
+    objp[:,:2] = np.mgrid[0:7,0:3].T.reshape(-1,2)*40/15
+    objp = np.array([[0, 2, 0], [1, 2, 0], [2, 2, 0], [3, 2, 0], [4, 2, 0],
+                    [5, 2, 0], [6, 2, 0],
+                    [0, 1, 0], [1, 1, 0], [2, 1, 0], [3, 1, 0], [4, 1, 0],
+                    [5, 1, 0], [6, 1, 0],
+                    [0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0], [4, 0, 0],
+                    [5, 0, 0], [6, 0, 0]])*40/15
+    
+    return objp
 
 def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
     # Initiate detector    
@@ -100,6 +114,9 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
 
     img_original_rgb = cv.cvtColor(img_original, cv.COLOR_BGR2RGB)
     
+    #Read camera matrix
+    camera_matrix, dist_coeffs = cam.readCalibMatrix()
+
     img1 = img_original
     while 1:
 
@@ -139,24 +156,15 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
         # cv.line(img2_rot, [0, 640], [480*2, 640], (255,255,255), thickness=2)
         # cv.line(img2_rot, [480, 0], [480, 640*2], (255,255,255), thickness=2)
         # img2_rot = cv.cvtColor(img2_rot, cv.COLOR_BGR2RGB)
-        objp = np.zeros((3*7,3), np.float32)
-        objp[:,:2] = np.mgrid[0:7,0:3].T.reshape(-1,2)*40/15
-        objp = np.array([[0, 2, 0], [1, 2, 0], [2, 2, 0], [3, 2, 0], [4, 2, 0],
-                        [5, 2, 0], [6, 2, 0],
-                        [0, 1, 0], [1, 1, 0], [2, 1, 0], [3, 1, 0], [4, 1, 0],
-                        [5, 1, 0], [6, 1, 0],
-                        [0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0], [4, 0, 0],
-                        [5, 0, 0], [6, 0, 0]])*40/15
+        objp = getWorldCoordOfChessboard()
 
-        camera_matrix, dist_coeffs = cam.readCalibMatrix()
         success, rotation_vector, translation_vector = cv.solvePnP(
             objp,
             corners_Projected.T,
             camera_matrix,
             dist_coeffs)
         
-        print(translation_vector*15)
-
+        print("Camera Position: ", translation_vector.ravel()*15)
         
         axis = np.float32([[1,0,0], [0,1,0], [0,0,-1]]).reshape(-1,3)*40/15
         imgpts, jac = cv.projectPoints(
@@ -171,12 +179,11 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
         plt.imshow(np.hstack([img1, img2_rot]))
         plt.show()
         img2_cropped = cropImgToBoard(img2_rot, corners_Projected.T)
-        img1 = img2_cropped.copy()
+        # img1 = img2_cropped.copy()
 
 def draw(img, corner, imgpts):
     imgpts = imgpts.astype(int)
     pt1 = tuple(corner.astype(int))
-    print("BLUE", imgpts[0].ravel())
     img = cv.line(img, pt1, tuple(imgpts[0].ravel()), (255,0,0), 5)
     img = cv.line(img, pt1, tuple(imgpts[1].ravel()), (0,255,0), 5)
     img = cv.line(img, pt1, tuple(imgpts[2].ravel()), (0,0,255), 5)
