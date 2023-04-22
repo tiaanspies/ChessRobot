@@ -1,12 +1,19 @@
-import platform
-import Camera_Manager
+import Camera_Manager, platform, threading, queue
 from pathlib import Path
 import cv2 as cv
 import pi_debugging as debug
 import numpy as np
 import matplotlib.pyplot as plt
-import heapq
-import time
+import heapq, time
+
+import sys
+sys.path.append('./')
+from IK_Solvers.traditional import ChessMoves
+from motor_commands import MotorCommands
+
+
+xflip = 0
+yflip = 0
 
 class matchEngine:
     """ Scale invariant feature transform manager"""
@@ -53,7 +60,7 @@ def detectAccurateMatches(img1, img2, descriptor, matcher):
     # filter by portion of best matches
     valid_matches = heapq.nsmallest(MATCHES_TO_KEEP, matches, key = lambda x: x.distance)
     valid_matches = np.array(valid_matches)
-    print("Number of matches: ", len(valid_matches))
+    # print("Number of matches: ", len(valid_matches))
 
     matched_image = cv.drawMatches(img1, key_points1, img2, key_Points2, valid_matches, None, flags=2)
     debug.showImg([matched_image], locals())
@@ -71,7 +78,7 @@ def detectAccurateMatches(img1, img2, descriptor, matcher):
     H, mask = cv.findHomography(point2_coords, point1_coords, cv.USAC_ACCURATE, confidence=1)
     
     num_inliers = np.count_nonzero(mask)
-    print("Inliers: ", num_inliers)
+    # print("Inliers: ", num_inliers)
 
     if np.count_nonzero(mask) < 1:
         mask = (np.array(mask).flatten()).astype(bool)
@@ -116,7 +123,7 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
         descriptor = cv.SIFT_create()
         matcher = cv.BFMatcher(cv.NORM_L2, crossCheck=True)
     elif matcherType=='ORB':
-        print("Using ORB detection")
+        # print("Using ORB detection")
         descriptor = cv.ORB_create()
         matcher = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
 
@@ -124,10 +131,11 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
     
     #Read camera matrix
     camera_matrix, dist_coeffs = cam.readCalibMatrix()
-
+    translation_vector = 0
     img1 = img_original
-    while 1:
-        print("__________")
+    i = 0
+    while i == 0:
+
         _, img2 = cam.read()
         img2_orig = img2.copy()
         # debug.showImg([img_original, img2], locals())
@@ -149,7 +157,7 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
         corners_Projected = corners_Projected_padded[0:2, :]
         
         end_time = time.time()
-        print("Feature detection Time (s): ", end_time-start_time)
+        # print("Feature detection Time (s): ", end_time-start_time)
 
         ## Match to original image
         if MATCH_ORIG:
@@ -177,7 +185,7 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
             camera_matrix,
             dist_coeffs)
         
-        print("Camera Position: ", translation_vector.ravel()*15)
+        # print("Camera Position: ", translation_vector.ravel()*15)
         
         axis = np.float32([[1,0,0], [0,1,0], [0,0,-1]]).reshape(-1,3)*40/15
         imgpts, jac = cv.projectPoints(
@@ -185,14 +193,28 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
             camera_matrix, dist_coeffs)
         
         ## print corners
-        img_corners = drawCorners(img2, corners_Projected)
-        img_corners = draw(img_corners, corners_Projected[:,14].T,imgpts)
-        debug.showImg([img_corners], locals())
+        # img_corners = drawCorners(img2, corners_Projected)
+        # img_corners = draw(img_corners, corners_Projected[:,14].T,imgpts)
+        # debug.showImg([img_corners], locals())
 
-        plt.imshow(np.hstack([img1, img2_rot]))
-        plt.show()
+        # plt.imshow(np.hstack([img1, img2_rot]))
+        # plt.show()
         # img2_cropped = cropImgToBoard(img2_rot, corners_Projected.T)
         # img1 = img2_cropped.copy()
+        i += 1
+
+    board_pos = translation_vector.reshape((1,3))
+
+    global xflip
+    global yflip
+    if xflip == 0:
+        xflip = -1 if board_pos[0, 0] < 0 else 1
+        yflip = -1 if board_pos[0, 1] < 0 else 1
+        print("FLIPPPP")
+
+    board_pos = 15 * board_pos * np.array([xflip, yflip, 1]).reshape((1,3))
+
+    return board_pos
 
 def draw(img, corner, imgpts):
     imgpts = imgpts.astype(int)
@@ -414,9 +436,15 @@ def cropImgToBoard(img_orig, corners):
 
     return img
 
-def main():
-    print(platform.system())
 
+boardOffset = np.array([-120, 200, 0]).reshape((-1, 1));
+def convertBoardToRobotCoords(boardCoords):
+    return boardCoords + boardOffset
+
+def convertRobottoBoardCoords(robotCoords):
+    return robotCoords - boardOffset
+
+def getCam():
     if platform.system() == "Windows":
         imgPath = Path("Chessboard_detection", "TestImages", "22_04_2023", "1")
         cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
@@ -425,30 +453,80 @@ def main():
         cam = Camera_Manager.RPiCamera((480, 640), imgPath.resolve(), storeImgHist=False, loadSavedFirst=False)
     else:
         raise("UNKNOWN OPERATING SYSTEM TYPE")
+    
+    return cam
 
+def get_input(queue):
+    while True:
+        user_input = sys.stdin.readline().rstrip('\n')
+        queue.put(user_input)
 
+def string_to_array(s: str) -> np.ndarray:
+    # Split the string into a list of strings
+    str_list = s.split(',')
+    
+    # Convert the strings to integers
+    int_list = [int(s.strip()) for s in str_list]
+    
+    # Convert the list of integers to a NumPy array
+    int_array = np.array(int_list)
+    
+    return int_array
+
+def main():
+    cam = getCam()
+
+    # intialize robot pos
+    cm = ChessMoves(lift=200)
+    mc = MotorCommands()
+
+    start_pos_robot = np.array([0, 230, 500]).reshape((-1, 1))
+    target_pos_board = np.array([150, -50, 400]).reshape((-1, 1))
+    target_robot_pos = convertBoardToRobotCoords(target_pos_board)
+
+    # save initial position
     _, img = cam.read()
     debug.saveTempImg(img, "Start_Pos.png")
 
+    # go to start position
+    angles = cm.inverse_kinematics(start_pos_robot)
+    mc.go_to(mc.sort_commands(angles, 0))
+
+    time.sleep(5)
     # Find the chessboard center and rotate the image to lie on the center
     imgRotated, cornersOrigin, BoardOrigin = processInitialImg(img)
-
-    # for corner in cornersOrigin:
-    #     pos=np.rint(corner).astype(int)
-    #     cv.drawMarker(imgRotated,(pos[0], pos[1]), color=(255, 255, 255), markerSize=5,thickness=2)
-    #     # cv.drawMarker()
-
-    # (h, w) = imgRotated.shape[:2]
-    # imgRotated = cv.cvtColor(imgRotated, cv.COLOR_BGR2RGB)
-    # debug.showImg([imgRotated], locals())
-    # plt.imshow(imgRotated, origin='lower', extent=([-w/2, w/2, -h/2, h/2]))
-    # plt.show()
-    debug.saveTempImg(imgRotated, "pre_crop.png")
-
     # imgRotated = cropImgToBoard(imgRotated, cornersOrigin)
-    debug.saveTempImg(imgRotated, "post_crop.png")
-    siftMatching(cam, imgRotated, cornersOrigin, matcherType='ORB')
 
+    # input_queue = queue.Queue()
+    # input_thread = threading.Thread(target=get_input, args=(input_queue,))
+    # input_thread.daemon = True
+    # input_thread.start()
+
+    current_board_pos = convertRobottoBoardCoords(start_pos_robot)
+    error = np.array([0])
+    while 1:
+        if (error == 0).all():
+            value = input("Enter new target:")
+            print("Target Pos: ", value)
+            target_pos_board = string_to_array(value).reshape((-1, 1))
+
+        board_pos = siftMatching(cam, imgRotated, cornersOrigin, matcherType='ORB')
+        # print("Detected pos: ", board_pos)
+
+        error = target_pos_board - board_pos.reshape((-1, 1))
+        error[np.abs(error)<8] = 0
+        error = np.clip(error, -20, 20)
+
+        print("error: ", error.ravel())
+        current_board_pos = current_board_pos + error*0.5
+        robot_coords = convertBoardToRobotCoords(current_board_pos)
+        angles = cm.inverse_kinematics(robot_coords)
+        mc.go_to(mc.sort_commands(angles, 0))
+        
+        # time.sleep(2)
+        
+        
+    return 0
 
 if __name__ == "__main__":
     main()
