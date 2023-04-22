@@ -280,8 +280,9 @@ def findBoardCentreSquares(img, printImgs):
     cv.fillPoly(img_mask, squares, 0)
 
     #Dilate the area to return the squares to their original size
-    img_mask = cv.erode(img_mask, np.ones((kernSize-2, kernSize-2)))
+    img_mask = cv.erode(img_mask, np.ones((kernSize-1, kernSize-1)))
     retVal, corners = cv.findChessboardCorners(img_mask, patternSize)
+    print("Board found: ", retVal)
     
     # Debug lines to plot different image stages
     if printImgs:
@@ -350,7 +351,7 @@ def drawImgInBaseCoords(img, rotationMatrix):
     return imgRot, imgDrawn
 
 def processInitialImg(img):
-    retVal, corners = findBoardCentreSquares(img, printImgs=False)
+    retVal, corners = findBoardCentreSquares(img, printImgs=True)
 
     # raise exception when board not found
     if not retVal:
@@ -402,7 +403,7 @@ def main():
     print(platform.system())
 
     if platform.system() == "Windows":
-        imgPath = Path("Chessboard_detection", "TestImages", "31_03_2023", "8")
+        imgPath = Path("Chessboard_detection", "TestImages", "22_04_2023", "1")
         cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
     elif platform.system() == "Linux":
         imgPath = Path("Chessboard_detection", "TestImages", "Temp")
