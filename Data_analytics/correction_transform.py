@@ -77,7 +77,7 @@ def from_optitrack_sys(pts):
 def get_transform(filename_real, filename_ideal):
     # Load the numpy files for current and actual positions
     try:
-        prefix = "Data_analytics\\"
+        prefix = "Data_analytics/"
         pts_real = np.load(prefix+filename_real)[:-1, :]
         pts_ideal = to_optitrack_sys(np.load(prefix+filename_ideal))
     except FileNotFoundError:
