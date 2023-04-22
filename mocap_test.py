@@ -89,7 +89,7 @@ def main():
     # # cm.plot_robot(thetas, projected_points)
 
     # np.save("mocap_test/plan_day3_2.npy",plan)
-    plan = np.load("mocap_test/plan_day3_2.npy",plan)
+    plan = np.load("mocap_test/plan_day3_2.npy")
     
     mc.run(plan)
 

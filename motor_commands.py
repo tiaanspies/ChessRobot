@@ -73,7 +73,7 @@ class MotorCommands:
                 self.elbow.angle = angle[2]
                 self.grip.angle = angle[3]
                 sleep(.1) # will need to decrease eventually
-                input(f"count: {count}. move to next pos?")
+                # input(f"count: {count}. move to next pos?")
                 count += 1
         except KeyboardInterrupt:
             self.grip.angle = np.rad2deg(self.OPEN)
