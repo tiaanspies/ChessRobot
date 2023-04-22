@@ -57,6 +57,7 @@ class MotorCommands:
         self.grip.angle = angle[3]
 
     def run(self, thetas, angletype='rad', record=False):
+        count = 0
         """runs the full set of theta commands"""
         if angletype == 'rad':
             angles = np.rad2deg(thetas)
@@ -72,7 +73,8 @@ class MotorCommands:
                 self.elbow.angle = angle[2]
                 self.grip.angle = angle[3]
                 sleep(.05) # will need to decrease eventually
-                input("move to next pos?")
+                input(f"count: {count}. move to next pos?")
+                count += 1
         except KeyboardInterrupt:
             self.grip.angle = np.rad2deg(self.OPEN)
             pass # TODO: make sure this means gripper is open
