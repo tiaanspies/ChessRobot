@@ -1,4 +1,4 @@
-import os, requests
+import os, requests, io
 import cv2 as cv
 from time import sleep
 
@@ -102,7 +102,6 @@ class RPiCamera:
         self.imgHistDB = pi_debugging.imgDBManager()
 
         self.camera = PiCamera()
-        self.camera.exposure_mode = 'night'
         self.cameraRes = res
         self.camera.resolution = res
         self.camera.rotation = 270
@@ -116,6 +115,8 @@ class RPiCamera:
             self.stateNum = -1
         else:
             self.stateNum = 1
+
+        sleep(2)
 
     def readCalibMatrix(self):
         """
@@ -143,13 +144,20 @@ class RPiCamera:
 
             self.frame = cv.resize(self.frame, self.cameraRes)
         elif self.stateNum > 0:
-            self.camera.start_preview()
-            sleep(2)
+            # self.camera.start_preview()
+            # sleep(2)
+            # output = np.empty((self.cameraRes[1], self.cameraRes[0], 3), dtype=np.uint8)
+            # self.camera.capture(output, 'rgb')
+            # self.camera.stop_preview()
+            # # self.camera.close()
+            # self.frame = output.copy()
+
+            # Read Stream Method
             output = np.empty((self.cameraRes[1], self.cameraRes[0], 3), dtype=np.uint8)
-            self.camera.capture(output, 'rgb')
-            self.camera.stop_preview()
-            # self.camera.close()
+            self.camera.capture(output, 'rgb', use_video_port=True)
+
             self.frame = output.copy()
+
         ret = self.frame is not None
 
         self.stateNum += 1

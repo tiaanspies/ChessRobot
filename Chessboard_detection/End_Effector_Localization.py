@@ -36,6 +36,8 @@ def detectAccurateMatches(img1, img2, descriptor, matcher):
 
     # debug.showImg([img1, img2], locals())
     # cv.waitKey(0)
+    debug.saveTempImg(img1, "img1_matches.png")
+    debug.saveTempImg(img2, "img2_matches.png")
 
     if DEBUG_LEVEL > 1:
         img4=cv.drawKeypoints(img1,key_points1,img2,flags=cv.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
@@ -67,14 +69,17 @@ def detectAccurateMatches(img1, img2, descriptor, matcher):
     
     # Find the best homography using a modified RANSAC algorithm
     H, mask = cv.findHomography(point2_coords, point1_coords, cv.USAC_ACCURATE, confidence=1)
-
-    print("Inliers: ", np.count_nonzero(mask))
+    
+    num_inliers = np.count_nonzero(mask)
+    print("Inliers: ", num_inliers)
 
     if np.count_nonzero(mask) < 1:
         mask = (np.array(mask).flatten()).astype(bool)
         img_matches = cv.drawMatches(img1, key_points1, img2, key_Points2, valid_matches[mask], None, flags=2)
         debug.showImg([img_matches], locals())
-    return H
+
+    retVal = num_inliers > 20
+    return retVal, H
 
 def padCoordinates(coords):
     corners_len = coords.shape[0]
@@ -107,9 +112,11 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
     MATCH_ORIG = False
 
     if matcherType=='SIFT':
+        print("Using SIFT feature detection")
         descriptor = cv.SIFT_create()
         matcher = cv.BFMatcher(cv.NORM_L2, crossCheck=True)
     elif matcherType=='ORB':
+        print("Using ORB detection")
         descriptor = cv.ORB_create()
         matcher = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
 
@@ -120,7 +127,7 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
 
     img1 = img_original
     while 1:
-        time.sleep(5)
+        print("__________")
         _, img2 = cam.read()
         img2_orig = img2.copy()
         # debug.showImg([img_original, img2], locals())
@@ -128,7 +135,12 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
         start_time = time.time()
 
         # finds the Homography matrix to tranform img onto img_original        
-        H = detectAccurateMatches(img1, img2, descriptor, matcher)
+        match_ret, H = detectAccurateMatches(img1, img2, descriptor, matcher)
+
+        # not enough inliers found
+        if not match_ret:
+            continue
+
         Hinv = np.linalg.inv(H)
 
         # Padd the corners to be transformed using homograpgy matrix
@@ -141,7 +153,7 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
 
         ## Match to original image
         if MATCH_ORIG:
-            H_original = detectAccurateMatches(img_original, img2, descriptor, matcher)
+            match_ret, H_original = detectAccurateMatches(img_original, img2, descriptor, matcher)
             H_inv_orig = np.linalg.inv(H_original)
 
             corners_Projected_Orig = (H_inv_orig @ corners_original_padded.T)[0:2, :]
@@ -179,7 +191,7 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
 
         plt.imshow(np.hstack([img1, img2_rot]))
         plt.show()
-        img2_cropped = cropImgToBoard(img2_rot, corners_Projected.T)
+        # img2_cropped = cropImgToBoard(img2_rot, corners_Projected.T)
         # img1 = img2_cropped.copy()
 
 def draw(img, corner, imgpts):
@@ -391,6 +403,9 @@ def cropImgToBoard(img_orig, corners):
     min_y = np.clip(min_y-y_diff*3 -d, 0, height).astype(int)
     max_y = np.clip(max_y+y_diff*3+d, 0, height).astype(int)
 
+    print(min_h, max_h)
+    print(min_y, max_y)
+
     img[: , 0:min_h, :] = 0
     img[: , max_h:, :] = 0
 
@@ -407,7 +422,7 @@ def main():
         cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
     elif platform.system() == "Linux":
         imgPath = Path("Chessboard_detection", "TestImages", "Temp")
-        cam = Camera_Manager.RPiCamera((480, 640), imgPath.resolve(),loadSavedFirst=False)
+        cam = Camera_Manager.RPiCamera((480, 640), imgPath.resolve(), storeImgHist=False, loadSavedFirst=False)
     else:
         raise("UNKNOWN OPERATING SYSTEM TYPE")
 
@@ -428,8 +443,10 @@ def main():
     # debug.showImg([imgRotated], locals())
     # plt.imshow(imgRotated, origin='lower', extent=([-w/2, w/2, -h/2, h/2]))
     # plt.show()
-    imgRotated = cropImgToBoard(imgRotated, cornersOrigin)
+    debug.saveTempImg(imgRotated, "pre_crop.png")
 
+    # imgRotated = cropImgToBoard(imgRotated, cornersOrigin)
+    debug.saveTempImg(imgRotated, "post_crop.png")
     siftMatching(cam, imgRotated, cornersOrigin, matcherType='ORB')
 
 

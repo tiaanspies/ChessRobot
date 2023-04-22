@@ -3,6 +3,7 @@ import cv2 as cv
 import numpy as np
 from pathlib import Path
 from datetime import date
+import platform
 
 def saveTempImg(img, name):
     dirPath = os.path.dirname(os.path.realpath(__file__))
@@ -13,6 +14,11 @@ def saveTempImg(img, name):
     cv.imwrite(str(absPath.resolve()), img1)
 
 def showImg(images, variables):
+
+    # don't show on linux
+    if platform.system() == "Linux":
+        return 0
+
     # while cv.waitKey(1) != ord('q'):
     img_stacked = np.zeros(shape=(images[0].shape[0], 0))
     for i, img in enumerate(images):
