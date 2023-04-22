@@ -1,3 +1,4 @@
+import platform
 import Camera_Manager
 from pathlib import Path
 import cv2 as cv
@@ -119,7 +120,7 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
 
     img1 = img_original
     while 1:
-
+        time.sleep(5)
         _, img2 = cam.read()
         img2_orig = img2.copy()
         # debug.showImg([img_original, img2], locals())
@@ -398,11 +399,20 @@ def cropImgToBoard(img_orig, corners):
     return img
 
 def main():
-    imgPath = Path("Chessboard_detection", "TestImages", "31_03_2023", "8")
+    print(platform.system())
 
-    cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
+    if platform.system() == "Windows":
+        imgPath = Path("Chessboard_detection", "TestImages", "31_03_2023", "8")
+        cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
+    elif platform.system() == "Linux":
+        imgPath = Path("Chessboard_detection", "TestImages", "Temp")
+        cam = Camera_Manager.RPiCamera((480, 640), imgPath.resolve(),loadSavedFirst=False)
+    else:
+        raise("UNKNOWN OPERATING SYSTEM TYPE")
+
 
     _, img = cam.read()
+    debug.saveTempImg(img, "Start_Pos.png")
 
     # Find the chessboard center and rotate the image to lie on the center
     imgRotated, cornersOrigin, BoardOrigin = processInitialImg(img)

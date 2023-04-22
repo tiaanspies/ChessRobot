@@ -6,9 +6,11 @@ from datetime import date
 
 def saveTempImg(img, name):
     dirPath = os.path.dirname(os.path.realpath(__file__))
-    relPath = "/TestImages/Temp"
+    relPath = Path("TestImages","Temp")
+    absPath = Path(dirPath, relPath,name)
+    
     img1 = cv.cvtColor(img, cv.COLOR_BGR2RGB)
-    cv.imwrite(dirPath+relPath+"/"+name, img1)
+    cv.imwrite(str(absPath.resolve()), img1)
 
 def showImg(images, variables):
     # while cv.waitKey(1) != ord('q'):
