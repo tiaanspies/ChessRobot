@@ -6,6 +6,8 @@ from datetime import date
 import platform
 
 def saveTempImg(img, name):
+    if platform.system() == 'Windows':
+        return
     dirPath = os.path.dirname(os.path.realpath(__file__))
     relPath = Path("TestImages","Temp")
     absPath = Path(dirPath, relPath,name)
@@ -32,9 +34,9 @@ def showImg(images, variables):
         else:
             color_in = (255, 255, 255)
             color_out = (0,0,0)
-
-        img1 = cv.putText(img.copy(), var_name, co_ord, cv.FONT_HERSHEY_SIMPLEX, 1.5, color_out, 16)
-        img1 = cv.putText(img1, var_name, co_ord, cv.FONT_HERSHEY_SIMPLEX, 1.5, color_in, 4)
+        img1 = img.copy()
+        # img1 = cv.putText(img.copy(), var_name, co_ord, cv.FONT_HERSHEY_SIMPLEX, 1.5, color_out, 16)
+        # img1 = cv.putText(img1, var_name, co_ord, cv.FONT_HERSHEY_SIMPLEX, 1.5, color_in, 4)
 
         # img_stacked = cv.hconcat([img_stacked, img1])
         cv.namedWindow(var_name, cv.WINDOW_NORMAL)
