@@ -125,7 +125,7 @@ def main():
     global pts_real_subset
     global pts_ideal_subset
 
-    name_real = "positions.npy"
+    name_real = "positions_day3_2.npy"
 
     # Load the numpy files for current and actual positions
     try:
