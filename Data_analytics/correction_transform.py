@@ -1,5 +1,4 @@
 import numpy as np
-import plotly.graph_objects as go
 from scipy.optimize import minimize
 
 def objective_function(X:np.array, pts_ideal:np.array, pts_real:np.array):
