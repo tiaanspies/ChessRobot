@@ -123,7 +123,7 @@ class RPiCamera:
         Return the calibration matrix that was saved to cameraProperties.out
         """
         camera_calib_file = Path("Chessboard_detection", "cameraProperties.out")
-        print(camera_calib_file.exists())
+
         with open(str(camera_calib_file.resolve()), 'rb') as f:
             camera_calib = np.load(f, allow_pickle=True)
 
