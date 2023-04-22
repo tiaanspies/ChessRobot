@@ -92,7 +92,7 @@ class ChessMoves():
         if cap_sq is not None:
             storage = np.array(self.storage_coords.pop(0))
             first_moves = np.hstack((self.quintic_line(self.HOME, cap_sq, step),
-                                    cap_sq.reshape((3,1)),
+                                    np.ones((3,10)) * cap_sq.reshape((3,1)),
                                     self.quintic_line(cap_sq, cap_sq + lift_vector, step),
                                     self.quintic_line(cap_sq + lift_vector, storage + lift_vector, step),
                                     self.quintic_line(storage + lift_vector, storage, step),
@@ -102,11 +102,11 @@ class ChessMoves():
         else:
             first_moves = self.quintic_line(self.HOME, start, step)
         
-        second_moves = np.hstack((start.reshape((3,1)),
+        second_moves = np.hstack((np.ones((3,10)) * start.reshape((3,1)),
                                 self.quintic_line(start, start + lift_vector, step),
                                 self.quintic_line(start + lift_vector, goal + lift_vector, step),
                                 self.quintic_line(goal + lift_vector, goal, step),
-                                goal.reshape((3,1)),
+                                np.ones((3,10)) * goal.reshape((3,1)),
                                 self.quintic_line(goal, self.HOME, step)))
 
         return np.hstack((first_moves, second_moves))
@@ -198,6 +198,21 @@ class ChessMoves():
         no_change = waypoints-shifted
         idxs = np.where(~no_change.any(axis=0))[0] # finds the indices of all columns where all values are zero
         
+        grip_commands = np.ones_like(waypoints[0,:]) * commands[0]
+        for i in range(len(idxs)-1):
+            i_com = (i+1)%2
+            grip_commands[idxs[i]:idxs[i+1]] = commands[i_com]
+        return grip_commands
+    
+    def get_gripper_commands2(self, waypoints):
+        """2nd attempt: replaces the sim's wrist angles with a list that commands the gripper to open and close"""
+        commands = [np.pi/4, 3*np.pi/4] # angles needed for open and closed (in radians)
+        shifted = np.hstack((np.zeros((3,1)),waypoints[:,:-1]))
+        no_change = waypoints-shifted
+        idxs = np.where(~no_change.any(axis=0))[0] # finds the indices of all columns where all values are zero
+        idxs_shifted = np.hstack((0,idxs[:-1]))
+        idxs = idxs[np.abs(idxs-idxs_shifted) != 1]
+
         grip_commands = np.ones_like(waypoints[0,:]) * commands[0]
         for i in range(len(idxs)-1):
             i_com = (i+1)%2
