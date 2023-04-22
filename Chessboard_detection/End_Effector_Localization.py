@@ -60,7 +60,7 @@ def detectAccurateMatches(img1, img2, descriptor, matcher):
     # filter by portion of best matches
     valid_matches = heapq.nsmallest(MATCHES_TO_KEEP, matches, key = lambda x: x.distance)
     valid_matches = np.array(valid_matches)
-    # print("Number of matches: ", len(valid_matches))
+    print("Number of matches: ", len(valid_matches))
 
     matched_image = cv.drawMatches(img1, key_points1, img2, key_Points2, valid_matches, None, flags=2)
     debug.showImg([matched_image], locals())
@@ -209,7 +209,7 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
     global yflip
     if xflip == 0:
         xflip = -1 if board_pos[0, 0] < 0 else 1
-        yflip = -1 if board_pos[0, 1] < 0 else 1
+        yflip = -1 if board_pos[0, 1] > 0 else 1
         print("FLIPPPP")
 
     board_pos = 15 * board_pos * np.array([xflip, yflip, 1]).reshape((1,3))
@@ -317,6 +317,8 @@ def findBoardCentreSquares(img, printImgs):
     img_mask = cv.erode(img_mask, np.ones((kernSize-1, kernSize-1)))
     retVal, corners = cv.findChessboardCorners(img_mask, patternSize)
     print("Board found: ", retVal)
+
+    debug.saveTempImg(img_mask, "board_mask.png")
     
     # Debug lines to plot different image stages
     if printImgs:
@@ -503,25 +505,33 @@ def main():
     # input_thread.start()
 
     current_board_pos = convertRobottoBoardCoords(start_pos_robot)
-    error = np.array([0])
+    error_temp = np.array([0])
+    print("detected_pos, \t error, \t current_target")
     while 1:
-        if (error == 0).all():
+        if (error_temp == 0).all():
             value = input("Enter new target:")
             print("Target Pos: ", value)
             target_pos_board = string_to_array(value).reshape((-1, 1))
 
-        board_pos = siftMatching(cam, imgRotated, cornersOrigin, matcherType='ORB')
+        detected_board_pos = siftMatching(cam, imgRotated, cornersOrigin, matcherType='ORB')
         # print("Detected pos: ", board_pos)
 
-        error = target_pos_board - board_pos.reshape((-1, 1))
-        error[np.abs(error)<8] = 0
-        error = np.clip(error, -20, 20)
+        error = target_pos_board - detected_board_pos.reshape((-1, 1))
+        error_temp = error.copy()
+        error_temp[np.abs(error_temp)<8] = 0
+        error_temp = np.clip(error_temp, -20, 20)
 
-        print("error: ", error.ravel())
-        current_board_pos = current_board_pos + error*0.5
+        # print("error: ", error.ravel())
+        print_detected_pos = detected_board_pos.ravel()
+        print_error = error.ravel()
+        print_current_pos = current_board_pos.ravel()
+        # print(print_detected_pos, print_error, print_current_pos)
+        print(print_detected_pos)
+
+        current_board_pos = current_board_pos + error_temp*0.5
         robot_coords = convertBoardToRobotCoords(current_board_pos)
-        angles = cm.inverse_kinematics(robot_coords)
-        mc.go_to(mc.sort_commands(angles, 0))
+        # angles = cm.inverse_kinematics(robot_coords)
+        # mc.go_to(mc.sort_commands(angles, 0))
         
         # time.sleep(2)
         
