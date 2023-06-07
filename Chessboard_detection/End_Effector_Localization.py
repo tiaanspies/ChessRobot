@@ -9,7 +9,20 @@ import heapq, time
 import sys
 sys.path.append('./')
 from IK_Solvers.traditional import ChessMoves
-from motor_commands import MotorCommands
+
+try:
+    from motor_commands import MotorCommands
+except ModuleNotFoundError:
+    print("cannot import motorCommands")
+    class MotorCommands:
+        def __init__(self) -> None:
+            pass
+
+        def go_to(self, pos):
+            return
+
+        def sort_commands(self, a, b):
+            return 0
 
 
 xflip = 0
@@ -40,11 +53,6 @@ MATCHES_TO_KEEP = 200
 def detectAccurateMatches(img1, img2, descriptor, matcher):
     key_points1, des1 = descriptor.detectAndCompute(img1,None)
     key_Points2, des2 = descriptor.detectAndCompute(img2,None)
-
-    # debug.showImg([img1, img2], locals())
-    # cv.waitKey(0)
-    debug.saveTempImg(img1, "img1_matches.png")
-    debug.saveTempImg(img2, "img2_matches.png")
 
     if DEBUG_LEVEL > 1:
         img4=cv.drawKeypoints(img1,key_points1,img2,flags=cv.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
@@ -133,6 +141,7 @@ def siftMatching(cam, img_original, corners_original, matcherType='SIFT'):
     camera_matrix, dist_coeffs = cam.readCalibMatrix()
     translation_vector = 0
     img1 = img_original
+    
     i = 0
     while i == 0:
 
@@ -385,7 +394,7 @@ def drawImgInBaseCoords(img, rotationMatrix):
     return imgRot, imgDrawn
 
 def processInitialImg(img):
-    retVal, corners = findBoardCentreSquares(img, printImgs=True)
+    retVal, corners = findBoardCentreSquares(img, printImgs=False)
 
     # raise exception when board not found
     if not retVal:
@@ -446,7 +455,7 @@ def convertRobottoBoardCoords(robotCoords):
 
 def getCam():
     if platform.system() == "Windows":
-        imgPath = Path("Chessboard_detection", "TestImages", "22_04_2023", "1")
+        imgPath = Path("Chessboard_detection", "TestImages", "22_04_2023", "2")
         cam = Camera_Manager.FakeCamera((480, 640), str(imgPath.resolve()))
     elif platform.system() == "Linux":
         imgPath = Path("Chessboard_detection", "TestImages", "Temp")
@@ -492,7 +501,6 @@ def main():
     angles = cm.inverse_kinematics(start_pos_robot)
     mc.go_to(mc.sort_commands(angles, 0))
 
-    time.sleep(5)
     # Find the chessboard center and rotate the image to lie on the center
     imgRotated, cornersOrigin, BoardOrigin = processInitialImg(img)
     # imgRotated = cropImgToBoard(imgRotated, cornersOrigin)
@@ -523,6 +531,7 @@ def main():
         angles = cm.inverse_kinematics(robot_coords)
         mc.go_to(mc.sort_commands(angles, 0))
         
+        cv.waitKey(0)
         # time.sleep(2)
         
         
