@@ -40,12 +40,12 @@ def draw_cube(v, slice_num):
 def main():
 
     vertices = {
-        "top" : 260,
+        "top" : 340,
         "bottom" : 100,
-        "right" : 80,
-        "left" : -80,
+        "right" : 100,
+        "left" : -100,
         "close" : 100,
-        "far" : 260}
+        "far" : 340}
 
     path = draw_cube(vertices, 4) # generate waypoints
     print("path generated")
