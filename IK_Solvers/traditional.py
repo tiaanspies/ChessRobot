@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from chess import FILE_NAMES, RANK_NAMES
+try:
+    from chess import FILE_NAMES, RANK_NAMES
+except ModuleNotFoundError:
+    print("Could not install 'chess' module")
 from IK_Solvers.NLinkArm3d import NLinkArm
 from IK_Solvers.quintic_polynomials_planner import QuinticPolynomial
 
