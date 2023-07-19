@@ -51,21 +51,21 @@ def main():
     np.save("path_smallXs.npy", path) # CHANGE THIS SO YOU DON'T OVERWRITE PREVIOUS!
     print("path generated")
     
-    ax = plt.axes(projection='3d')
-    ax.scatter(path[0,:], path[1,:], path[2,:])
-    plt.show()
+    # ax = plt.axes(projection='3d')
+    # ax.scatter(path[0,:], path[1,:], path[2,:])
+    # plt.show()
 
-    # print("solving inverse kinematics...")
-    # thetas = cm.inverse_kinematics(path) # convert to joint angles
-    # grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
-    # plan = mc.sort_commands(thetas, grip_commands)
-    # print("solved!")
-    # cm.plot_robot(thetas, path)
+    print("solving inverse kinematics...")
+    thetas = cm.inverse_kinematics(path) # convert to joint angles
+    grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
+    plan = mc.sort_commands(thetas, grip_commands)
+    print("solved!")
+    cm.plot_robot(thetas, path)
 
     # np.save("plan.npy",plan)
     # plan = np.load("plan.npy",)
     
-    # # mc.run(plan)
+    mc.run(plan)
 
 if __name__ == "__main__":
     main()

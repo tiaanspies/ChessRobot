@@ -56,7 +56,7 @@ class MotorCommands:
         self.elbow.angle = angle[2]
         self.grip.angle = angle[3]
 
-    def run(self, thetas, angletype='rad'):
+    def run(self, thetas, angletype='rad', record=False):
         """runs the full set of theta commands"""
         if angletype == 'rad':
             angles = np.rad2deg(thetas)
