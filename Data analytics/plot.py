@@ -36,14 +36,18 @@ def plot_3data(pts_real, fig, lab):
     y = pts_real[:, 2]
     z = pts_real[:, 1]
 
+    shapes = ['circle', 'cross', 'diamond', 'square', 'x']
+    shape = np.random.choice(shapes)
+
     fig.add_trace(go.Scatter3d(
         x=x,
         y=y,
         z=z,
         mode='markers',
         marker=dict(
-            size=3,
+            size=4,
             # color='blue',
+            symbol=shape,
             opacity=0.8
         ),
         name=lab

@@ -143,9 +143,10 @@ while True:
     print(f"Packets received {pack_count}", end="\r")
 
     # Check for user input without blocking
-    if msvcrt.kbhit():
-        input_text = msvcrt.getche().decode()
-        if input_text:
-            break
+    input("is bot ready. Enter anything to record next pos \r")
+    # if msvcrt.kbhit():
+    #     input_text = msvcrt.getche().decode()
+    #     if input_text:
+    #         break
 
 np.save("positions.npy", positions)
