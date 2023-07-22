@@ -14,7 +14,7 @@ def draw_cube(v, slice_num):
     bottom_left = np.array([v["left"],v["close"],v["bottom"]])
     top_right = np.array([v["right"],v["close"],v["top"]])
     bottom_right = np.array([v["right"],v["close"],v["bottom"]])
-    step = 10
+    step = 20
     path = cm.quintic_line(cm.HOME, top_left, step)
     
     slice_width = (v["far"] - v["close"]) / slice_num
@@ -26,7 +26,7 @@ def draw_cube(v, slice_num):
                           cm.quintic_line(bottom_right, bottom_left, step), \
                           cm.quintic_line(bottom_left, top_right, step), \
                           cm.quintic_line(top_right, top_left, step)))
-        if i < (slice_num): # - 1):
+        if i < (slice_num)-1: # - 1):
             path = np.hstack((path, cm.quintic_line(top_left, top_left + slice_step, step)))
             top_left += slice_step
             top_right += slice_step
@@ -40,15 +40,15 @@ def draw_cube(v, slice_num):
 def main():
 
     vertices = {
-        "top" : 260,
-        "bottom" : 100,
-        "right" : 80,
-        "left" : -80,
-        "close" : 100,
-        "far" : 260}
+        "top" : 340,
+        "bottom" : 120,
+        "right" : 120,
+        "left" : -120,
+        "close" : 120,
+        "far" : 520}
 
     path = draw_cube(vertices, 4) # generate waypoints
-    np.save("path_smallXs.npy", path) # CHANGE THIS SO YOU DON'T OVERWRITE PREVIOUS!
+    np.save("mocap_test/path_big_day2.npy", path) # CHANGE THIS SO YOU DON'T OVERWRITE PREVIOUS!
     print("path generated")
     
     # ax = plt.axes(projection='3d')
@@ -62,10 +62,10 @@ def main():
     print("solved!")
     cm.plot_robot(thetas, path)
 
-    # np.save("plan.npy",plan)
-    # plan = np.load("plan.npy",)
+    np.save("mocap_test/plan_big_z.npy",plan)
+    # plan = np.load("mocap_test/plan_big_z.npy",)
     
-    mc.run(plan)
+    # mc.run(plan)
 
 if __name__ == "__main__":
     main()
