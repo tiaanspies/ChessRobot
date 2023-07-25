@@ -39,33 +39,33 @@ def draw_cube(v, slice_num):
         
 def main():
 
-    # vertices = {
-    #     "top" : 340,
-    #     "bottom" : 120,
-    #     "right" : 120,
-    #     "left" : -120,
-    #     "close" : 120,
-    #     "far" : 520}
+    vertices = {
+        "top" : 340,
+        "bottom" : 120,
+        "right" : 120,
+        "left" : -120,
+        "close" : 120,
+        "far" : 520}
 
-    # path = draw_cube(vertices, 4) # generate waypoints
-    # np.save("mocap_test/path_big_day2.npy", path) # CHANGE THIS SO YOU DON'T OVERWRITE PREVIOUS!
-    # print("path generated")
+    path = draw_cube(vertices, 4) # generate waypoints
+    np.save("mocap_test/path_big_day2.npy", path) # CHANGE THIS SO YOU DON'T OVERWRITE PREVIOUS!
+    print("path generated")
     
-    # # ax = plt.axes(projection='3d')
-    # # ax.scatter(path[0,:], path[1,:], path[2,:])
-    # # plt.show()
+    # ax = plt.axes(projection='3d')
+    # ax.scatter(path[0,:], path[1,:], path[2,:])
+    # plt.show()
 
-    # print("solving inverse kinematics...")
-    # thetas = cm.inverse_kinematics(path) # convert to joint angles
-    # grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
-    # plan = mc.sort_commands(thetas, grip_commands)
-    # print("solved!")
-    # cm.plot_robot(thetas, path)
+    print("solving inverse kinematics...")
+    thetas = cm.inverse_kinematics(path) # convert to joint angles
+    grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
+    plan = mc.sort_commands(thetas, grip_commands)
+    print("solved!")
+    cm.plot_robot(thetas, path)
 
-    # np.save("mocap_test/plan_big_z.npy",plan)
-    plan = np.load("mocap_test/plan_big_z.npy",)
+    np.save("mocap_test/plan_big_z.npy",plan)
+    # plan = np.load("mocap_test/plan_big_z.npy",)
     
-    mc.run(plan)
+    # mc.run(plan)
 
 if __name__ == "__main__":
     main()
