@@ -125,14 +125,16 @@ def main():
     global pts_real_subset
     global pts_ideal_subset
 
+    name_real = "positions.npy"
+
     # Load the numpy files for current and actual positions
     try:
         prefix = "Data Analytics\\"
-        pts_real = np.load(prefix+'positions_day2.npy')[:-1, :]
+        pts_real = np.load(prefix+name_real)[:-1, :]
         pts_ideal = (np.load(prefix+'path_big_day2.npy').T)[:, [1, 2, 0]]
     except FileNotFoundError:
         prefix = ""
-        pts_real = np.load(prefix+'positions_day2.npy')[:-1, :]
+        pts_real = np.load(prefix+name_real)[:-1, :]
         pts_ideal = (np.load(prefix+'path_big_day2.npy').T)[:, [1, 2, 0]]
     
     
@@ -148,7 +150,7 @@ def main():
 
     # find predictions and plot
     # plot_3data(project_points(pts_real_subset, pts_real_mean, T, H), fig, "projected_subset")
-    plot_3data(project_points(pts_real, pts_real_mean, T, H), fig, "Projected")
+    # plot_3data(project_points(pts_real, pts_real_mean, T, H), fig, "Projected")
     plot_3data(pts_real, fig, "Pts_real")
     # plot_3data(pts_real_subset, fig, "Pts_real_subset")
 
