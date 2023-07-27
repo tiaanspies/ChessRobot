@@ -128,7 +128,9 @@ start = np.array([x,y,z])
 start_pos = np.array([230, 500, 0])
 
 print("\n Press anything to stop recording")
-while True:
+a = "n"
+count = 0
+while a != "y":
     try:
         x, y, z, _ = req_bot_pos(BOT_ID)
     except TimeoutError:
@@ -143,7 +145,8 @@ while True:
     print(f"Packets received {pack_count}", end="\r")
 
     # Check for user input without blocking
-    input("is bot ready. Enter anything to record next pos \r")
+    a = input(f"Count: {count}. Enter anything to record next pos \r")
+    count += 1
     # if msvcrt.kbhit():
     #     input_text = msvcrt.getche().decode()
     #     if input_text:
