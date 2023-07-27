@@ -129,7 +129,7 @@ def main():
 
     # Load the numpy files for current and actual positions
     try:
-        prefix = "Data Analytics\\"
+        prefix = "Data_analytics\\"
         pts_real = np.load(prefix+name_real)[:-1, :]
         pts_ideal = (np.load(prefix+'path_big_day2.npy').T)[:, [1, 2, 0]]
     except FileNotFoundError:
@@ -139,7 +139,7 @@ def main():
     
     
     # H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal_subset, pts_real_subset)
-    H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal, pts_real)
+    # H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal, pts_real)
     # ===================================================================
     # Create a 3D scatter plot
     fig = go.Figure()

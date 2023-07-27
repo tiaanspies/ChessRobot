@@ -15,7 +15,7 @@ def draw_cube(v, slice_num):
     bottom_left = np.array([v["left"],v["close"],v["bottom"]])
     top_right = np.array([v["right"],v["close"],v["top"]])
     bottom_right = np.array([v["right"],v["close"],v["bottom"]])
-    step = 20
+    step = 10
     path = cm.quintic_line(cm.HOME, top_left, step)
     
     slice_width = (v["far"] - v["close"]) / slice_num
@@ -88,8 +88,8 @@ def main():
 
     # # cm.plot_robot(thetas, projected_points)
 
-    # np.save("mocap_test/plan_day3_1.npy",plan)
-    plan = np.load("mocap_test/plan_day3_1.npy",plan)
+    # np.save("mocap_test/plan_day3_2.npy",plan)
+    plan = np.load("mocap_test/plan_day3_2.npy",plan)
     
     mc.run(plan)
 
