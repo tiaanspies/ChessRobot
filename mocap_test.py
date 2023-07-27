@@ -69,27 +69,27 @@ def main():
     # mc.run(plan)
 
     # ==================Corrected values ============
-    print("finding transform")
-    H, T, real_mean = correction_transform.get_transform("positions_day2.npy", "path_big_day2.npy")
-    print("Updating points")
-    path_optitrack_sys = correction_transform.to_optitrack_sys(path)
-    projected_points = correction_transform.project_points(path_optitrack_sys, real_mean, T, H)
-    projected_points = correction_transform.from_optitrack_sys(projected_points)
+    # print("finding transform")
+    # H, T, real_mean = correction_transform.get_transform("positions_day2.npy", "path_big_day2.npy")
+    # print("Updating points")
+    # path_optitrack_sys = correction_transform.to_optitrack_sys(path)
+    # projected_points = correction_transform.project_points(path_optitrack_sys, real_mean, T, H)
+    # projected_points = correction_transform.from_optitrack_sys(projected_points)
     
-    # ax = plt.axes(projection='3d')
-    # ax.scatter(projected_points[0,:], projected_points[1,:], projected_points[2,:])
-    # plt.show()
+    # # ax = plt.axes(projection='3d')
+    # # ax.scatter(projected_points[0,:], projected_points[1,:], projected_points[2,:])
+    # # plt.show()
 
-    print("solving inverse kinematics...")
-    thetas = cm.inverse_kinematics(projected_points) # convert to joint angles
-    grip_commands = cm.get_gripper_commands2(projected_points) # remove unnecessary wrist commands, add gripper open close instead
-    plan = mc.sort_commands(thetas, grip_commands)
-    print("solved!")
+    # print("solving inverse kinematics...")
+    # thetas = cm.inverse_kinematics(projected_points) # convert to joint angles
+    # grip_commands = cm.get_gripper_commands2(projected_points) # remove unnecessary wrist commands, add gripper open close instead
+    # plan = mc.sort_commands(thetas, grip_commands)
+    # print("solved!")
 
-    # cm.plot_robot(thetas, projected_points)
+    # # cm.plot_robot(thetas, projected_points)
 
-    np.save("mocap_test/plan_day3_1.npy",plan)
-    # plan = np.load("mocap_test/plan_big_z.npy",)
+    # np.save("mocap_test/plan_day3_1.npy",plan)
+    plan = np.load("mocap_test/plan_day3_1.npy",plan)
     
     mc.run(plan)
 
