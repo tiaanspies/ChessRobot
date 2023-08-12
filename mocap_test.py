@@ -7,6 +7,8 @@ from Data_analytics import correction_transform
 cm = ChessMoves()
 mc = MotorCommands()
 
+
+
 def fake_inverse_kinematics(path):
     return np.vstack((path,np.zeros_like(path[0,:])))
 
@@ -68,17 +70,17 @@ def main():
     
     # mc.run(plan)
 
-    # ==================Corrected values ============
-    # print("finding transform")
-    # H, T, real_mean = correction_transform.get_transform("positions_day2.npy", "path_big_day2.npy")
-    # print("Updating points")
-    # path_optitrack_sys = correction_transform.to_optitrack_sys(path)
-    # projected_points = correction_transform.project_points(path_optitrack_sys, real_mean, T, H)
-    # projected_points = correction_transform.from_optitrack_sys(projected_points)
+    # ==================Using transformation matrix============
+    print("finding transform")
+    H, T, real_mean = correction_transform.get_transform("positions_day2.npy", "path_big_day2.npy")
+    print("Updating points")
+    path_optitrack_sys = correction_transform.to_optitrack_sys(path)
+    projected_points = correction_transform.project_points(path_optitrack_sys, real_mean, T, H)
+    projected_points = correction_transform.from_optitrack_sys(projected_points)
     
-    # # ax = plt.axes(projection='3d')
-    # # ax.scatter(projected_points[0,:], projected_points[1,:], projected_points[2,:])
-    # # plt.show()
+    ax = plt.axes(projection='3d')
+    ax.scatter(projected_points[0,:], projected_points[1,:], projected_points[2,:])
+    plt.show()
 
     # print("solving inverse kinematics...")
     # thetas = cm.inverse_kinematics(projected_points) # convert to joint angles
@@ -86,12 +88,12 @@ def main():
     # plan = mc.sort_commands(thetas, grip_commands)
     # print("solved!")
 
-    # # cm.plot_robot(thetas, projected_points)
+    # cm.plot_robot(thetas, projected_points)
 
     # np.save("mocap_test/plan_day3_2.npy",plan)
-    plan = np.load("mocap_test/plan_day3_2.npy")
+    # plan = np.load("mocap_test/plan_day3_2.npy")
     
-    mc.run(plan)
+    # mc.run(plan)
 
 
 if __name__ == "__main__":

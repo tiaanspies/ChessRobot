@@ -192,3 +192,56 @@ while True:
   
 cv.destroyAllWindows()
 '''
+def read_images_from_webcam():
+    # Create a VideoCapture object to access the webcam (0 represents the default camera)
+    cap = cv.VideoCapture(0)
+
+    while True:
+        # Capture a frame from the webcam
+        ret, frame = cap.read()
+
+        # Check if the frame was captured successfully
+        if not ret:
+            print("Failed to capture frame.")
+            break
+
+        # Display the frame in a window
+        cv.imshow("Webcam", frame)
+
+        # Exit the loop if the 'q' key is pressed
+        if cv.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    # Release the webcam and close the window
+    cap.release()
+    cv.destroyAllWindows()
+
+class LaptopCamera:
+    def __init__(self, camera_num=0) -> None:
+        self.cam = cv.VideoCapture(camera_num)
+
+    def readCalibMatrix(self):
+        """
+        Return the calibration matrix that was saved to cameraProperties.out
+        """
+        camera_calib_file = Path("Chessboard_detection", "laptopCalib.npy")
+
+        with open(str(camera_calib_file.resolve()), 'rb') as f:
+            camera_calib = np.load(f, allow_pickle=True)
+
+        camera_matrix = camera_calib[0]
+        dist_matrix = camera_calib[1]
+
+        return camera_matrix, dist_matrix
+    
+    def read(self):
+        ret, frame = self.cam.read()
+        return ret, frame
+
+    def isOpened(self):
+        res, _ = self.cam.read()
+
+        return res is not None
+
+    def release(self):
+        return True
