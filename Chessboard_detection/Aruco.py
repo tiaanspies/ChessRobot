@@ -6,9 +6,23 @@ import cv2
 import cv2.aruco as aruco
 import numpy as np
 import pi_debugging
-from Camera_Manager import LaptopCamera
+import Camera_Manager
+from pathlib import Path
 
-def generate_pattern(page: np.ndarray, rows:int, cols:int, dict:aruco.Dictionary, count_start: int):
+MAJOR = 4
+MINOR = 6
+
+PIXEL_TO_MM = 25.4*8.5/816
+
+def main():
+    name = "7x5_small_3x2_large"
+    file_path_and_name = Path("Chessboard_detection", "Aruco Markers", name).resolve().__str__()
+
+    generate(file_path_and_name)
+    size_correction = 186.5/191.29374999999996
+    track(file_path_and_name, size_correction)
+
+def generate_pattern(page: np.ndarray, rows:int, cols:int, dict, count_start: int):
     page_height, page_width = page.shape
     
     # percentage of marker col to fill with marker
@@ -34,7 +48,11 @@ def generate_pattern(page: np.ndarray, rows:int, cols:int, dict:aruco.Dictionary
             
             # create array for one marker
             marker_image = np.zeros((marker_size, marker_size), dtype=np.uint8)
-            marker_image = aruco.generateImageMarker(dict, count, marker_size, 20)
+
+            if MAJOR > 4 or (MAJOR == 4 and MINOR >= 7):
+                marker_image = aruco.generateImageMarker(dict, count, marker_size, 20)
+            else:
+                marker_image = aruco.drawMarker(dict, count, marker_size, 20)
 
             # calculate whitespace between markers
             row_space = (page_height-rows*marker_size)/(rows+1)
@@ -55,19 +73,23 @@ def generate_pattern(page: np.ndarray, rows:int, cols:int, dict:aruco.Dictionary
             pos = np.vstack([pos, [col_center - w, -row_center - w, 0]])
 
             positions[count] = pos
+        
+    total_length = int(row_space+marker_size/2+(rows-1)*(marker_size+row_space)+w) - int(row_space)
 
-    return count, positions
+    return count, positions, total_length
 
-def generate():
+def generate(dest_path):    
     # Define the size and number of bits of the marker
     page = np.ones((1056, 816))*255
     count = 0
     dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 
     # generate large markers
-    count, positions_large = generate_pattern(page,3, 2, dictionary, count)
+    count, positions_large, total_length = generate_pattern(page,3, 2, dictionary, count)
+    print(f"Predicted large marker width (mm): {total_length*PIXEL_TO_MM}")
     # generate small markers
-    count, positions_small = generate_pattern(page, 7, 5, dictionary, count)
+    count, positions_small, total_length = generate_pattern(page, 7, 5, dictionary, count)
+    print(f"Predicted small marker width (mm): {total_length*PIXEL_TO_MM}")
 
     # join position dictionaries
     positions = positions_small | positions_large
@@ -75,24 +97,32 @@ def generate():
     # Display the generated marker
     # cv2.imshow("Marker Image", page)
     # cv2.waitKey(0)
-
     # # Save the marker image to a file
-    cv2.imwrite("large.png", page)
+    cv2.imwrite(dest_path+".png", page)
 
     # save position data
-    np.save("large.npy", positions)
+    np.save(dest_path+".npy", positions)
 
-def detect_and_estimate_pose(image, marker_size, camera_matrix, dist_coeffs, marker_positions):
+def detect_and_estimate_pose(image, camera_matrix, dist_coeffs, marker_positions):
     # Load the ArUco dictionary
     aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
 
-    # Create the ArUco parameters
-    aruco_params = cv2.aruco.DetectorParameters()
+   # new version of OPENCV
+    if MAJOR > 4 or (MAJOR == 4 and MINOR >= 7):
+        # Create the ArUco parameters
+        aruco_params = cv2.aruco.DetectorParameters()
 
-    #create detector
-    detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
-    # Detect markers in the image
-    corners, ids, _ = detector.detectMarkers(image)
+        #create detector
+        detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
+
+        # Detect markers in the image
+        corners, ids, _ = detector.detectMarkers(image)
+    else: #OLD version of opencv
+        # create detector
+        aruco_params = cv2.aruco.DetectorParameters_create()
+
+        # detect markers
+        corners, ids, _ = cv2.aruco.detectMarkers(image, aruco_dict, parameters=aruco_params)
 
     # create world and image point matrices
     world_points = np.zeros((0,3))
@@ -122,24 +152,26 @@ def detect_and_estimate_pose(image, marker_size, camera_matrix, dist_coeffs, mar
     cv2.drawFrameAxes(image, camera_matrix, dist_coeffs, rvecs, tvecs, 100, 3)
     return rvecs, tvecs, image
 
-def track(args=None):
-    cam = LaptopCamera()
+def track(file_name_and_path, size_correction):
+    cam = Camera_Manager.RPiCamera(loadSavedFirst=False)
 
     # scale to convert from aruco size in pixels to mm
-    scale_conv = 25.4*8.5/816
+    scale_conv = PIXEL_TO_MM*size_correction
 
     # Camera parameters (replace these with your own calibration values)
     camera_matrix, dist_coeffs = cam.readCalibMatrix()
 
     #read position data
-    marker_positions = np.load("large.npy", allow_pickle=True).flat[0]
+    marker_positions = np.load(file_name_and_path+".npy", allow_pickle=True).flat[0]
+    for pos in marker_positions:
+        marker_positions[pos] = marker_positions[pos]*scale_conv
     # *
 
     # Load the image
     _, image = cam.read()
     # image = cv2.imread("large.png")
 
-    rvecs, tvecs, image_with_axes = detect_and_estimate_pose(image, scale_conv, camera_matrix, dist_coeffs, marker_positions)
+    rvecs, tvecs, image_with_axes = detect_and_estimate_pose(image, camera_matrix, dist_coeffs, marker_positions)
 
     if rvecs is not None:
         # rvecs and tvecs contain the rotation and translation vectors for each detected marker
@@ -150,10 +182,9 @@ def track(args=None):
         print(tvecs)
 
         # Display the image with the detected markers and axes
-        cv2.imshow("Camera Pose Estimation", image_with_axes)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        # cv2.imshow("Camera Pose Estimation", image_with_axes)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    generate()
-    track()
+    main()

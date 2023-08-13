@@ -98,7 +98,7 @@ class PhoneCamera:
 
 class RPiCamera:
 
-    def __init__(self, res, absPath, storeImgHist=True, loadSavedFirst=True) -> None:
+    def __init__(self, absPath=None,res=(480, 640), storeImgHist=True, loadSavedFirst=True) -> None:
         self.imgHistDB = pi_debugging.imgDBManager()
 
         self.camera = PiCamera()
@@ -112,6 +112,9 @@ class RPiCamera:
         # Change statenum to -1 to use saved picture as first picture.
         # Change statenum to 1 to used camera for all pictures
         if loadSavedFirst:
+            if absPath is None:
+                raise ValueError("absPath must be given if loadSavedFirst is true. "\
+                                  "Set loadSavedFirst to false to not load stored image first")
             self.stateNum = -1
         else:
             self.stateNum = 1
@@ -122,7 +125,7 @@ class RPiCamera:
         """
         Return the calibration matrix that was saved to cameraProperties.out
         """
-        camera_calib_file = Path("Chessboard_detection", "cameraProperties.out")
+        camera_calib_file = Path("Chessboard_detection", "cameraProperties rpi.out")
 
         with open(str(camera_calib_file.resolve()), 'rb') as f:
             camera_calib = np.load(f, allow_pickle=True)

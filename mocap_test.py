@@ -50,9 +50,9 @@ def main():
         "close" : 120,
         "far" : 520}
 
-    path = draw_cube(vertices, 4) # generate waypoints
+    # path = draw_cube(vertices, 4) # generate waypoints
     # np.save("mocap_test/path_big_day2.npy", path) # CHANGE THIS SO YOU DON'T OVERWRITE PREVIOUS!
-    print("path generated")
+    # print("path generated")
     
     # ax = plt.axes(projection='3d')
     # ax.scatter(path[0,:], path[1,:], path[2,:])
@@ -66,21 +66,21 @@ def main():
     # cm.plot_robot(thetas, path)
 
     # np.save("mocap_test/plan_big_z.npy",plan)
-    # plan = np.load("mocap_test/plan_big_z.npy",)
+    plan = np.load("Data_analytics/plan_big_z.npy",)
     
-    # mc.run(plan)
+    mc.run(plan)
 
     # ==================Using transformation matrix============
-    print("finding transform")
-    H, T, real_mean = correction_transform.get_transform("positions_day2.npy", "path_big_day2.npy")
-    print("Updating points")
-    path_optitrack_sys = correction_transform.to_optitrack_sys(path)
-    projected_points = correction_transform.project_points(path_optitrack_sys, real_mean, T, H)
-    projected_points = correction_transform.from_optitrack_sys(projected_points)
+    # print("finding transform")
+    # H, T, real_mean = correction_transform.get_transform("positions_day2.npy", "path_big_day2.npy")
+    # print("Updating points")
+    # path_optitrack_sys = correction_transform.to_optitrack_sys(path)
+    # projected_points = correction_transform.project_points(path_optitrack_sys, real_mean, T, H)
+    # projected_points = correction_transform.from_optitrack_sys(projected_points)
     
-    ax = plt.axes(projection='3d')
-    ax.scatter(projected_points[0,:], projected_points[1,:], projected_points[2,:])
-    plt.show()
+    # ax = plt.axes(projection='3d')
+    # ax.scatter(projected_points[0,:], projected_points[1,:], projected_points[2,:])
+    # plt.show()
 
     # print("solving inverse kinematics...")
     # thetas = cm.inverse_kinematics(projected_points) # convert to joint angles
