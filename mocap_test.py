@@ -81,22 +81,52 @@ def run_and_track(tracker, cam):
         rvecs, tvecs = tracker.estimate_pose(cam)
 
         if tvecs is None:
-            tvecs = np.zeros((3,1))
+            new_pos = np.zeros((3,1))
+        else:
+            new_pos = tvecs-start_pos+home_pos
 
-        new_pos = tvecs-start_pos+home_pos
         positions = np.hstack([positions, new_pos])
         sleep(1)
 
     np.save("positions.npy", positions)
 
+def save_path():
+   
+    vertices = {
+    "top" : 340,
+    "bottom" : 120,
+    "right" : 120,
+    "left" : -120,
+    "close" : 120,
+    "far" : 520}
+
+    path = draw_cube(vertices, 4) # generate waypoints
+    # np.save("mocap_test/path_big_day2.npy", path) # CHANGE THIS SO YOU DON'T OVERWRITE PREVIOUS!
+    print("path generated")
+    
+    ax = plt.axes(projection='3d')
+    ax.scatter(path[0,:], path[1,:], path[2,:])
+    plt.show()
+
+    print("solving inverse kinematics...")
+    thetas = cm.inverse_kinematics(path) # convert to joint angles
+    grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
+    plan = mc.sort_commands(thetas, grip_commands)
+    print("solved!")
+    cm.plot_robot(thetas, path)
+
+    np.save("data_analytics/plan_big_z.npy",plan)
+
 def main():
-    # load aruco obj things
-    aruco_obj = create_tracker()
+    save_path()
 
-    # create camera object
-    cam = Camera_Manager.RPiCamera(loadSavedFirst=False)
+    # # load aruco obj things
+    # aruco_obj = create_tracker()
 
-    run_and_track(aruco_obj, cam)
+    # # create camera object
+    # cam = Camera_Manager.RPiCamera(loadSavedFirst=False)
+
+    # run_and_track(aruco_obj, cam)
 
 def old_main():
         vertices = {

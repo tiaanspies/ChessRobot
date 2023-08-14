@@ -126,21 +126,21 @@ def main():
     global pts_real_subset
     global pts_ideal_subset
 
-    name_real = "positions_day2.npy"
+    name_real = "positions_pi_cam1.npy"
 
     # Load the numpy files for current and actual positions
     try:
         prefix = "Data_analytics\\"
-        pts_real = np.load(prefix+name_real)[:-1, :]
+        pts_real = np.load(prefix+name_real).T[:, [1, 2, 0]]
         pts_ideal = (np.load(prefix+'path_big_day2.npy').T)[:, [1, 2, 0]]
     except FileNotFoundError:
         prefix = ""
-        pts_real = np.load(prefix+name_real)[:-1, :]
+        pts_real = np.load(prefix+name_real).T[:, [1, 2, 0]]
         pts_ideal = (np.load(prefix+'path_big_day2.npy').T)[:, [1, 2, 0]]
     
     
     # H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal_subset, pts_real_subset)
-    res, H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize(pts_ideal, pts_real)
+    H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize(pts_ideal, pts_real)
     # ===================================================================
     # Create a 3D scatter plot
     fig = go.Figure()
