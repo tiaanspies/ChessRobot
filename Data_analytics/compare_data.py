@@ -6,8 +6,8 @@ from mpl_toolkits.mplot3d import Axes3D
 # data = np.load('positions 4.npy')
 # data_target = np.load('path_bigXs.npy').T
 
-data = np.load('positions 5.npy')[165:, :]
-data_target = np.load('path_board.npy').T
+data = np.load('positions.npy')[165:, :]
+data_target = np.load("Data_analytics/plan_big_z.npy").T
 
 data_target[:, [0, 1, 2]] = data_target[:, [1, 2, 0]]
 data_target = data_target[data_target[:, 1] == 100]

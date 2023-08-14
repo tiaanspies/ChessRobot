@@ -3,6 +3,10 @@ from motor_commands import MotorCommands
 import numpy as np
 import matplotlib.pyplot as plt
 from Data_analytics import correction_transform
+from time import sleep
+from pathlib import Path
+from Chessboard_detection import Camera_Manager
+from Chessboard_detection import Aruco
 
 cm = ChessMoves()
 mc = MotorCommands()
@@ -39,10 +43,63 @@ def draw_cube(v, slice_num):
     path = np.hstack((path, cm.quintic_line(top_left, cm.HOME, step)))  
 
     return path
-        
-def main():
 
-    vertices = {
+def create_tracker():
+    # define aruco pattern file location.
+    name = "7x5_small_3x2_large"
+    file_path_and_name = Path("Chessboard_detection", "Aruco Markers", name).resolve().__str__()
+
+    # create aruco tracker object
+    aruco_obj = Aruco.ArucoTracker()
+
+    # generate new pattern and save
+    aruco_obj.generate_and_save_marker_pattern(file_path_and_name)
+
+    # load pattern
+    # correction = actual length from top of pattern to bottom / predicted
+    size_correction = 186.5/191.29374999999996
+    aruco_obj.load_marker_pattern(file_path_and_name, size_correction)
+
+    return aruco_obj
+
+def run_and_track(tracker, cam):
+    # load path
+    plan = np.load("Data_analytics/plan_big_z.npy",)
+    mc.load_path(plan)
+
+    # Initialize tracking variables
+    positions = np.zeros((3,0))
+
+    # read first pos
+    rvecs, start_pos = tracker.estimate_pose(cam)
+    home_pos = np.array([[0], [230], [500]]) # come pos
+
+    # step through
+    while mc.run_once():
+        sleep(2)
+        # get position
+        rvecs, tvecs = tracker.estimate_pose(cam)
+
+        if tvecs is None:
+            tvecs = np.zeros((3,1))
+
+        new_pos = tvecs-start_pos+home_pos
+        positions = np.hstack([positions, new_pos])
+        sleep(1)
+
+    np.save("positions.npy", positions)
+
+def main():
+    # load aruco obj things
+    aruco_obj = create_tracker()
+
+    # create camera object
+    cam = Camera_Manager.RPiCamera(loadSavedFirst=False)
+
+    run_and_track(aruco_obj, cam)
+
+def old_main():
+        vertices = {
         "top" : 340,
         "bottom" : 120,
         "right" : 120,
@@ -66,9 +123,9 @@ def main():
     # cm.plot_robot(thetas, path)
 
     # np.save("mocap_test/plan_big_z.npy",plan)
-    plan = np.load("Data_analytics/plan_big_z.npy",)
-    
-    mc.run(plan)
+    # plan = np.load("Data_analytics/plan_big_z.npy",)
+
+    # mc.run(plan)
 
     # ==================Using transformation matrix============
     # print("finding transform")
@@ -94,7 +151,6 @@ def main():
     # plan = np.load("mocap_test/plan_day3_2.npy")
     
     # mc.run(plan)
-
 
 if __name__ == "__main__":
     main()

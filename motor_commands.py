@@ -42,6 +42,10 @@ class MotorCommands:
         self.OPEN = np.pi/4 # TODO: replace this with the angle needed for it to be open (in radians)
         self.CLOSED = 3*np.pi/4 # TODO: replace this with the angle needed for it to be closed (in radians)
 
+        # variables for run_once function
+        self.angles = None
+        self.path_progress = 0
+
     def go_to(self, theta, angletype='rad'):
         """moves directly to provided theta configuration"""
         if angletype == 'rad':
@@ -56,8 +60,7 @@ class MotorCommands:
         self.elbow.angle = angle[2]
         self.grip.angle = angle[3]
 
-    def run(self, thetas, angletype='rad', record=False):
-        count = 0
+    def run(self, thetas, angletype='rad'):
         """runs the full set of theta commands"""
         if angletype == 'rad':
             angles = np.rad2deg(thetas)
@@ -73,11 +76,43 @@ class MotorCommands:
                 self.elbow.angle = angle[2]
                 self.grip.angle = angle[3]
                 sleep(.1) # will need to decrease eventually
-                input(f"count: {count}. move to next pos?")
-                count += 1
+
         except KeyboardInterrupt:
             self.grip.angle = np.rad2deg(self.OPEN)
             pass # TODO: make sure this means gripper is open
+
+    def load_path(self, thetas, angletype='rad'):
+        """
+        Load new set of angles into class, allows for run_once command to function.
+        """
+
+        if angletype == 'rad':
+            angles = np.rad2deg(thetas)
+        elif angletype == 'deg':
+            angles = thetas
+        else:
+            raise ValueError("angletype argument must be either 'rad' or 'deg'")
+
+        self.angles = angles
+        self.path_progress = 0
+        self.path_len = angles.shape[1]
+
+    def run_once(self):
+        """
+        Move one step in the path that is saved. Load new paths with load_path
+        """
+
+        if self.path_progress >= self.path_len:
+            return False
+        
+        self.base.angle = self.angles[0, self.path_progress]
+        self.shoulder.angle = self.angles[1, self.path_progress]
+        self.elbow.angle = self.angles[2, self.path_progress]
+        self.grip.angle = self.angles[3, self.path_progress]
+
+        self.path_progress += 1
+
+        return True
     
     def sort_commands(self, thetas, grip_commands):
         thetas[3,:] = grip_commands
