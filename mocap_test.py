@@ -118,15 +118,15 @@ def save_path():
     np.save("data_analytics/plan_big_z.npy",plan)
 
 def main():
-    save_path()
+    # save_path()
 
-    # # load aruco obj things
-    # aruco_obj = create_tracker()
+    # load aruco obj things
+    aruco_obj = create_tracker()
 
-    # # create camera object
-    # cam = Camera_Manager.RPiCamera(loadSavedFirst=False)
+    # create camera object
+    cam = Camera_Manager.RPiCamera(loadSavedFirst=False)
 
-    # run_and_track(aruco_obj, cam)
+    run_and_track(aruco_obj, cam)
 
 def old_main():
         vertices = {
