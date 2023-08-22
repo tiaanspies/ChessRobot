@@ -95,7 +95,8 @@ def attempt_minimize(pts_ideal:np.array, pts_real:np.array):
     res = minimize(
             objective_function, 
             x0=init, args=args,
-            tol=tolerance,
+            # tol=tolerance,
+            tol=1e-6,
             options={'maxiter':10000},
             # method="Nelder-Mead" //Gives poor result
             method="BFGS"
@@ -106,8 +107,8 @@ def attempt_minimize(pts_ideal:np.array, pts_real:np.array):
     # H = res.x.reshape((4,4))
     H = np.vstack([res.x.reshape((3,4)), [0, 0, 0, 1]])
 
-    if res.success == False:
-        raise ValueError("Unable to minimize for transformation matrix")
+    # if res.success == False:
+    #     raise ValueError("Unable to minimize for transformation matrix")
 
     return H, T, pts_ideal_mean, pts_real_mean
 

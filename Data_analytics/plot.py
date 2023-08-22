@@ -31,6 +31,65 @@ pts_ideal_subset = np.array([
 ])[:, [0, 2, 1]]
 # pts_ideal_subset[:, [0, 1, 2]] = pts_ideal_subset
 
+def main():
+    # declare global variables
+    global pts_real_subset
+    global pts_ideal_subset
+
+    # name_real = "positions_pi_cam2.npy"
+    name_real = "positions_day2.npy"
+
+    # Load the numpy files for current and actual positions
+    try:
+        prefix = "Data_analytics\\"
+        pts_real = np.load(prefix+name_real).T[:, [1, 2, 0]]
+        pts_ideal = (np.load(prefix+'plan_big_z.npy').T)[:, [1, 2, 0]]
+    except FileNotFoundError:
+        prefix = ""
+        pts_real = np.load(prefix+name_real).T[:, [1, 2, 0]]
+        pts_ideal = (np.load(prefix+'plan_big_z.npy').T)[:, [1, 2, 0]]
+
+    pts_real_filtered = np.zeros((0, 3))
+    pts_ideal_filtered = np.zeros((0, 3))
+    for row_ideal, row_real in zip(pts_ideal, pts_real):
+        if (row_real != 0).any():
+            pts_real_filtered = np.vstack([pts_real_filtered , row_real])
+            pts_ideal_filtered = np.vstack([pts_ideal_filtered , row_ideal])
+
+    
+    
+    # H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal_subset, pts_real_subset)
+    H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize(pts_ideal_filtered, pts_real_filtered)
+    # ===================================================================
+    # Create a 3D scatter plot
+    fig = go.Figure()
+
+    # plot target positions
+    plot_3data(pts_ideal, fig, "pts_ideal")
+    # plot_3data(pts_ideal_subset, fig, "pts_ideal_subset")
+
+    # find predictions and plot
+    # plot_3data(project_points(pts_real_subset, pts_real_mean, T, H), fig, "projected_subset")
+    plot_3data(project_points(pts_real, pts_real_mean, T, H), fig, "Projected")
+    plot_3data(pts_real, fig, "Pts_real")
+    # plot_3data(pts_real_subset, fig, "Pts_real_subset")
+
+    # Set labels and title
+    fig.update_layout(
+        scene=dict(
+            xaxis_title='X',
+            yaxis_title='Y',
+            zaxis_title='Z',
+            # xaxis_range=[-100, 500],
+            # yaxis_range=[-400, 400],
+            # zaxis_range=[0, 600],
+        ),
+        title='3D Scatter Plot'
+    )
+
+    # Show the plot
+    fig.show()
+
 def plot_3data(pts_real, fig, lab):
     # Extract x, y, and z coordinates
     x = pts_real[:, 0]
@@ -121,55 +180,7 @@ def attempt_minimize(pts_ideal:np.array, pts_real:np.array):
 
     return H, T, pts_ideal_mean, pts_real_mean
 
-def main():
-    # declare global variables
-    global pts_real_subset
-    global pts_ideal_subset
 
-    name_real = "positions_pi_cam1.npy"
-
-    # Load the numpy files for current and actual positions
-    try:
-        prefix = "Data_analytics\\"
-        pts_real = np.load(prefix+name_real).T[:, [1, 2, 0]]
-        pts_ideal = (np.load(prefix+'path_big_day2.npy').T)[:, [1, 2, 0]]
-    except FileNotFoundError:
-        prefix = ""
-        pts_real = np.load(prefix+name_real).T[:, [1, 2, 0]]
-        pts_ideal = (np.load(prefix+'path_big_day2.npy').T)[:, [1, 2, 0]]
-    
-    
-    # H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal_subset, pts_real_subset)
-    H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize(pts_ideal, pts_real)
-    # ===================================================================
-    # Create a 3D scatter plot
-    fig = go.Figure()
-
-    # plot target positions
-    plot_3data(pts_ideal, fig, "pts_ideal")
-    # plot_3data(pts_ideal_subset, fig, "pts_ideal_subset")
-
-    # find predictions and plot
-    # plot_3data(project_points(pts_real_subset, pts_real_mean, T, H), fig, "projected_subset")
-    plot_3data(project_points(pts_real, pts_real_mean, T, H), fig, "Projected")
-    plot_3data(pts_real, fig, "Pts_real")
-    # plot_3data(pts_real_subset, fig, "Pts_real_subset")
-
-    # Set labels and title
-    fig.update_layout(
-        scene=dict(
-            xaxis_title='X',
-            yaxis_title='Y',
-            zaxis_title='Z',
-            # xaxis_range=[-100, 500],
-            # yaxis_range=[-400, 400],
-            # zaxis_range=[0, 600],
-        ),
-        title='3D Scatter Plot'
-    )
-
-    # Show the plot
-    fig.show()
 
 if __name__ == "__main__":
     main()
