@@ -38,16 +38,17 @@ def main():
 
     # name_real = "positions_pi_cam2.npy"
     name_real = "positions_day2.npy"
+    name_ideal = "path_big_day2.npy"
 
     # Load the numpy files for current and actual positions
     try:
         prefix = "Data_analytics\\"
-        pts_real = np.load(prefix+name_real).T[:, [1, 2, 0]]
-        pts_ideal = (np.load(prefix+'plan_big_z.npy').T)[:, [1, 2, 0]]
+        pts_real = np.load(prefix+name_real)[:-1, [1, 2, 0]]
+        pts_ideal = (np.load(prefix+name_ideal).T)[:, [1, 2, 0]]
     except FileNotFoundError:
         prefix = ""
-        pts_real = np.load(prefix+name_real).T[:, [1, 2, 0]]
-        pts_ideal = (np.load(prefix+'plan_big_z.npy').T)[:, [1, 2, 0]]
+        pts_real = np.load(prefix+name_real)[:-1, [1, 2, 0]]
+        pts_ideal = (np.load(prefix+name_ideal).T)[:, [1, 2, 0]]
 
     pts_real_filtered = np.zeros((0, 3))
     pts_ideal_filtered = np.zeros((0, 3))
