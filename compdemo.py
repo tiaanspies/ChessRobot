@@ -17,7 +17,7 @@ def generate_path():
     drop_square = input("Drop off square:")
     goal = cm.get_coords(drop_square)
 
-    path = cm.generate_quintic_path(start, goal, None) # generate waypoints
+    path = cm.generate_quintic_path(start, goal, None, step=5) # generate waypoints
     
     print("Updating points")
     # change between coordinate systems
@@ -26,7 +26,7 @@ def generate_path():
     projected_points = correction_transform.from_optitrack_sys(projected_points)
 
     print("Inverse Kinematics")
-    thetas = cm.inverse_kinematics(path) # convert to joint angles
+    thetas = cm.inverse_kinematics(projected_points) # convert to joint angles
     grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
     return mc.sort_commands(thetas, grip_commands)
 
