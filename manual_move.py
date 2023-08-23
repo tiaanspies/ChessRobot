@@ -15,6 +15,14 @@ def string_to_array(s: str) -> np.ndarray:
     
     return int_array
 
+def get_gripper_commands_new(waypoints):
+    """3rd attempt: manually makes the last step close the gripper"""
+    commands = [np.pi/4, 3*np.pi/4] # angles needed for open and closed (in radians)
+
+    grip_commands = np.ones_like(waypoints[0,:]) * commands[0]
+    grip_commands[-1] = commands[1]
+    return grip_commands
+
 def main():
     cm = ChessMoves(lift=200)
     mc = MotorCommands()
@@ -38,7 +46,7 @@ def main():
 
         print("inverse inematics")
         thetas = cm.inverse_kinematics(projected_points) # convert to joint angles
-        grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
+        grip_commands = cm.get_gripper_commands_new(path) # remove unnecessary wrist commands, add gripper open close instead
         
         cm.plot_robot(thetas, projected_points)
         return mc.sort_commands(thetas, grip_commands)
