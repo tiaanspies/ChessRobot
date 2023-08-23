@@ -36,7 +36,7 @@ def main():
     def generate_path(start, goal):
         print("Generating quintic line.")
         path = cm.quintic_line(start, goal, 5) # generate waypoints
-        path = np.hstack((path, path[:,-1]))
+        path = np.hstack((path, path[:,-1].reshape((3,1))))
         
         print("Updating points")
         # change between coordinate systems
@@ -44,7 +44,7 @@ def main():
         projected_points = correction_transform.project_points(path_optitrack_sys, real_mean, T, H)
         projected_points = correction_transform.from_optitrack_sys(projected_points)
 
-        print("inverse inematics")
+        print("Inverse Kinematics")
         thetas = cm.inverse_kinematics(projected_points) # convert to joint angles
         grip_commands = cm.get_gripper_commands_new(path) # remove unnecessary wrist commands, add gripper open close instead
         
@@ -59,8 +59,13 @@ def main():
             next_pos = cm.get_coords(value)
 
         print(f"next_pos: {next_pos}")
-        
+        path_optitrack_sys = correction_transform.to_optitrack_sys(np.array(next_pos).reshape((3,1)))
+        projected_points = correction_transform.project_points(path_optitrack_sys, real_mean, T, H)
+        projected_points = correction_transform.from_optitrack_sys(projected_points)
+        print(f"Corrected Pos: {projected_points.reshape((1,3))}")
+                
         path = generate_path(cur_pos, next_pos)
+        print(path[:, -5:])
 
         mc.run(path)
 
