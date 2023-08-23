@@ -46,7 +46,7 @@ def main():
 
         print("Inverse Kinematics")
         thetas = cm.inverse_kinematics(projected_points) # convert to joint angles
-        grip_commands = cm.get_gripper_commands_new(path) # remove unnecessary wrist commands, add gripper open close instead
+        grip_commands = get_gripper_commands_new(path) # remove unnecessary wrist commands, add gripper open close instead
         
         cm.plot_robot(thetas, projected_points)
         return mc.sort_commands(thetas, grip_commands)
@@ -67,6 +67,7 @@ def main():
         path = generate_path(cur_pos, next_pos)
         print(path[:, -5:])
 
+        input("Are you ready.")
         mc.run(path)
 
         cur_pos = next_pos
