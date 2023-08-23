@@ -45,7 +45,11 @@ def main():
 
     while 1:
         value = input("Enter new target:")
-        next_pos = cm.get_coords(value)
+        if value == "HOME":
+            next_pos = cm.HOME
+        else:
+            next_pos = cm.get_coords(value)
+            
         print(f"next_pos: {next_pos}")
         
         path = generate_path(cur_pos, next_pos)
