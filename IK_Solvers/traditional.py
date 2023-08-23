@@ -9,7 +9,7 @@ from IK_Solvers.quintic_polynomials_planner import QuinticPolynomial
 
 class ChessMoves():
     
-    def __init__(self, lift=50, square_width=30, base_dist=230, board_height=20, grip_height=20, L1=296, L2=284.76):
+    def __init__(self, lift=50, square_width=40, base_dist=150, board_height=25, grip_height=20, L1=296, L2=284.76):
         self.LIFT = lift # distance to clear the other pieces in mm
         self.SQUARE_WIDTH = square_width # width of one board square in mm
         self.BASE_DIST = base_dist # distance from edge of the board to the robot base in mm
