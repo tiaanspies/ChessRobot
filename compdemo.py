@@ -6,8 +6,11 @@ cm = ChessMoves(lift=200)
 mc = MotorCommands()
 
 def generate_path():
-    start = np.array([-200,300,60])
-    goal = np.array([200,300,60])
+    pickup_square = input("Pick up square:")
+    start = cm.get_coords(pickup_square)
+    drop_square = input("Drop off square:")
+    goal = cm.get_coords(drop_square)
+
     path = cm.generate_quintic_path(start, goal, None) # generate waypoints
     thetas = cm.inverse_kinematics(path) # convert to joint angles
     grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
@@ -18,8 +21,8 @@ def show_feed():
     return None
 
 def main():
-    #path = generate_path()
-    #np.save("path.npy",path)
+    path = generate_path()
+    np.save("path.npy",path)
     forw_path = np.load("path.npy")
     rev_path = np.flip(forw_path,axis=1)
     forward = True
