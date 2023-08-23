@@ -28,6 +28,7 @@ def main():
     def generate_path(start, goal):
         print("Generating quintic line.")
         path = cm.quintic_line(start, goal, 5) # generate waypoints
+        path = np.hstack((path, path[:,-1]))
         
         print("Updating points")
         # change between coordinate systems
@@ -38,7 +39,6 @@ def main():
         print("inverse inematics")
         thetas = cm.inverse_kinematics(projected_points) # convert to joint angles
         grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
-
         
         cm.plot_robot(thetas, projected_points)
         return mc.sort_commands(thetas, grip_commands)
@@ -49,7 +49,7 @@ def main():
             next_pos = cm.HOME
         else:
             next_pos = cm.get_coords(value)
-            
+
         print(f"next_pos: {next_pos}")
         
         path = generate_path(cur_pos, next_pos)
