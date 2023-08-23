@@ -1,6 +1,7 @@
 import numpy as np
 from IK_Solvers.traditional import ChessMoves
 from motor_commands import MotorCommands
+from Data_analytics import correction_transform
 
 def string_to_array(s: str) -> np.ndarray:
     # Split the string into a list of strings
@@ -27,10 +28,22 @@ def main():
 
     while 1:
         value = input("Enter new target:")
-        next_pos = string_to_array(value)
-
+        next_pos = cm.get_coords(value)
+        
         path = generate_path(cur_pos, next_pos)
-        mc.run(path)
+
+        # ==================Using transformation matrix============
+        # load transformation matrix
+        print("finding transform")
+        H, T, real_mean = correction_transform.get_transform("positions_day2.npy", "path_big_day2.npy")
+        print("Updating points")
+
+        # change between coordinate systems
+        path_optitrack_sys = correction_transform.to_optitrack_sys(path)
+        projected_points = correction_transform.project_points(path_optitrack_sys, real_mean, T, H)
+        projected_points = correction_transform.from_optitrack_sys(projected_points)
+
+        mc.run(projected_points)
 
         cur_pos = next_pos
         
