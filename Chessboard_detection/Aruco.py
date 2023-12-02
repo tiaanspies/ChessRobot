@@ -5,8 +5,14 @@ My aruco file
 import cv2
 import cv2.aruco as aruco
 import numpy as np
-from Chessboard_detection import pi_debugging
-from Chessboard_detection import Camera_Manager
+
+try:
+    from Chessboard_detection import pi_debugging
+    from Chessboard_detection import Camera_Manager
+except ModuleNotFoundError:
+    import pi_debugging
+    import Camera_Manager
+
 import json
 from pathlib import Path
 
@@ -19,59 +25,71 @@ class ArucoTracker:
     """
     A tracking object for the custom aruco boards
     """
-    def __init__(self) -> None:
-        self.marker_path = None
+    def __init__(self, aruco_position_path_dir) -> None:
+        self.marker_path_dir = aruco_position_path_dir
         self.marker_positions = None
         self.aruco_dict_name = None
 
-    def generate_and_save_marker_pattern(self, dest_path, aruco_dict_name=aruco.DICT_4X4_50):    
-        #save path for tracking
-        self.marker_path = dest_path
-        self.aruco_dict_name = aruco_dict_name
+        if Path(self.marker_path_dir).is_dir() == False:
+            raise ValueError("Marker path directory does not exist")
 
-        # Define the size and number of bits of the marker
-        page = np.ones((1056, 816))*255
-        count = 0
-        dictionary = aruco.getPredefinedDictionary(self.aruco_dict_name)
+    def generate_calibio_pattern_positions(self, rows, cols, checker_size, marker_size):   
+        """
+        Creates a list of marker positions for the calibration pattern
+        """   
+        edge_size = (checker_size-marker_size)/2
+        cols_d2 = int(cols/2)
+        # create a list with 4x2 list for each marker
+        # each marker will store the x and y position for its 4 corners
+        positions = [[[0,0], [0,0], [0,0], [0,0]] for i in range(int(rows*cols/2))]
+        
+        for x in range(int(rows)):
+            for y in range(int(cols/2)):
+                if x % 2 == 0:
+                    marker_pos = [edge_size+x*checker_size, edge_size+y*checker_size*2]
+                else:
+                    marker_pos = [edge_size+x*checker_size, edge_size+(y+0.5)*checker_size*2]
 
-        # generate large markers
-        count, positions_large, total_length = generate_pattern(page,3, 2, dictionary, count)
-        print(f"Predicted large marker width (mm): {total_length*PIXEL_TO_MM}")
-        # generate small markers
-        count, positions_small, total_length = generate_pattern(page, 7, 5, dictionary, count)
-        print(f"Predicted small marker width (mm): {total_length*PIXEL_TO_MM}")
-
-        # join position dictionaries
-        positions = positions_small | positions_large
-
-        # Display the generated marker
-        # cv2.imshow("Marker Image", page)
-        # cv2.waitKey(0)
-        # # Save the marker image to a file
-        cv2.imwrite(dest_path+".png", page)
+                positions[x*(cols_d2) + y][0] = marker_pos
+                positions[x*(cols_d2) + y][1] = [marker_pos[0], marker_pos[1]+marker_size]
+                positions[x*(cols_d2) + y][2] = [marker_pos[0]+marker_size, marker_pos[1]+marker_size]
+                positions[x*(cols_d2) + y][3] = [marker_pos[0]+marker_size, marker_pos[1]]
 
         # save position data
-        aruco_data = [self.aruco_dict_name, positions]
-        with open(dest_path+".json", "w") as json_file:
+        properties = [rows, cols, checker_size, marker_size]
+        properties_name = properties.join("_")
+        aruco_data = [properties, positions]
+
+        with open(self.marker_path_dir+properties_name+".json", "w") as json_file:
             json.dump(aruco_data, json_file, indent=4)
 
-        print(f"Wrote marker properties to {dest_path}.json")
+        print(f"Wrote marker properties to {self.marker_path_dir}\\{properties_name}.json")
 
-    def load_marker_pattern(self, dest_path, size_correction):
-        # save path for tracking
-        self.marker_path = dest_path
+        return positions
 
-        # scale to convert from aruco size in pixels to mm
-        scale_conv = PIXEL_TO_MM*size_correction
+    def load_marker_pattern_positions(self, rows, cols, checker_size, marker_size):
+        """
+        Checks whether the marker pattern exists and creates it if it does not.
+        """
+        properties = [rows, cols, checker_size, marker_size]
+        properties_name = properties.join("_")
 
-        #read position data
-        with open(dest_path+".json", "r") as json_file:
-            data = json.load(json_file)
-            self.aruco_dict_name = data[0]
-            self.marker_positions = data[1]
+        # check if marker pattern exists
+        if Path(self.marker_path_dir+properties_name+".json").is_file() == False:
+            # generate marker pattern
+            self.marker_positions = self.generate_calibio_pattern_positions(rows, cols, checker_size, marker_size)
+        else:
+            # load marker pattern
+            with open(self.marker_path_dir+properties_name+".json", "r") as json_file:
+                data = json.load(json_file)
+                self.marker_positions = data[1]
 
+            if properties != data[0]:
+                raise ValueError("Marker properties do not match")
+
+        # convert to numpy array
         for pos in self.marker_positions:
-            self.marker_positions[pos] = np.array(self.marker_positions[pos])*scale_conv
+            self.marker_positions[pos] = np.array(self.marker_positions[pos])
 
     def estimate_pose(self, cam):
         # Camera parameters
@@ -91,10 +109,6 @@ class ArucoTracker:
             print("Translation vectors:")
             print(tvecs)
 
-            # Display the image with the detected markers and axes
-            # cv2.imshow("Camera Pose Estimation", image_with_axes)
-            # cv2.waitKey(0)
-            # cv2.destroyAllWindows()
             # pi_debugging.saveTempImg(image_with_axes, "Aruco_markers_w_axes.png")
 
         return rvecs, tvecs
@@ -102,28 +116,27 @@ class ArucoTracker:
 
 def main():
     # define aruco pattern file location.
-    name = "7x5_small_3x2_large"
-    file_path_and_name = Path("Chessboard_detection", "Aruco Markers", name).resolve().__str__()
+    # name = "7x5_small_3x2_large_4x4_50_marker"
+    dir_path = Path("Chessboard_detection", "Aruco Markers").resolve().__str__()
 
-    # create camera object
+    aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_5X5_250)
+
+    # # create camera object
     cam = Camera_Manager.RPiCamera(loadSavedFirst=False)
 
-    # create aruco tracker object
-    aruco_obj = ArucoTracker()
+    # # create aruco tracker object
+    aruco_obj = ArucoTracker(dir_path)
 
-    # generate new pattern and save
-    aruco_obj.generate_and_save_marker_pattern(file_path_and_name)
-
-    # load pattern
-    # correction = actual length from top of pattern to bottom / predicted
-    size_correction = 186.5/191.29374999999996
-    aruco_obj.load_marker_pattern(file_path_and_name, size_correction)
+    aruco_obj.load_marker_pattern_positions(14, 20, 30, 22)
 
     # get camera position
     aruco_obj.estimate_pose(cam)
-    # generate(file_path_and_name)
     
     # track(file_path_and_name, size_correction)
+    
+    ids, corners = detect_markers(aruco_dict)
+
+    # label_markers(image, ids, corners)
 
 def generate_pattern(page: np.ndarray, rows:int, cols:int, dict, count_start: int):
     page_height, page_width = page.shape
@@ -132,8 +145,10 @@ def generate_pattern(page: np.ndarray, rows:int, cols:int, dict, count_start: in
     marker_size_ratio = 0.8
 
     # create marker size based on width of page dimension
-    marker_size = int(marker_size_ratio * page_width / (2*cols+1))
+    marker_size_width = int(marker_size_ratio * page_width / (2*cols+1))
+    marker_size_height = int(marker_size_ratio * page_height / (2*rows+1))
 
+    marker_size = min(marker_size_width, marker_size_height)
     if marker_size % 2 == 1:
         marker_size -= 1
 
@@ -146,7 +161,7 @@ def generate_pattern(page: np.ndarray, rows:int, cols:int, dict, count_start: in
     for row in range(rows):
         for col in range(cols):
             count += 1
-            if count >= 50:
+            if count >= 250:
                 break
             
             # create array for one marker
@@ -181,6 +196,38 @@ def generate_pattern(page: np.ndarray, rows:int, cols:int, dict, count_start: in
 
     return count, positions, total_length
 
+def label_markers(image, ids, corners):
+    if ids is not None:
+        for i in range(len(ids)):
+            # Draw the bounding box around the marker
+            aruco.drawDetectedMarkers(image, corners)
+
+            # Draw the marker ID
+            c = corners[i][0]
+            x, y = int(c[:, 0].mean()), int(c[:, 1].mean())
+            cv2.putText(image, str(ids[i][0]), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2, cv2.LINE_AA)
+
+def detect_markers(aruco_dict):
+
+   # new version of OPENCV
+    if MAJOR > 4 or (MAJOR == 4 and MINOR >= 7):
+        # Create the ArUco parameters
+        aruco_params = cv2.aruco.DetectorParameters()
+
+        #create detector
+        detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
+
+        # Detect markers in the image
+        corners, ids, _ = detector.detectMarkers(image)
+    else: #OLD version of opencv
+        # create detector
+        aruco_params = cv2.aruco.DetectorParameters_create()
+
+        # detect markers
+        corners, ids, _ = cv2.aruco.detectMarkers(image, aruco_dict, parameters=aruco_params)
+
+    return ids, corners
+    
 def detect_and_estimate_pose(image, camera_matrix, dist_coeffs, marker_positions):
     # Load the ArUco dictionary
     aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
