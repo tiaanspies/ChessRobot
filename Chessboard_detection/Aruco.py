@@ -19,8 +19,6 @@ from pathlib import Path
 MAJOR = 4
 MINOR = 6
 
-PIXEL_TO_MM = 25.4*8.5/816
-
 class ArucoTracker:
     """
     A tracking object for the custom aruco boards
@@ -112,6 +110,11 @@ class ArucoTracker:
         _, image = cam.read()
 
         ids, corners = detect_markers(self.aruco_dict, image)
+
+        if ids is None:
+            print("No markers found")
+            return None, None
+        
         rvecs, tvecs = estimate_pose(corners, ids, camera_matrix, dist_coeffs, self.marker_positions)
         
         if rvecs is not None:
@@ -276,6 +279,10 @@ def estimate_pose(corners, ids, camera_matrix, dist_coeffs, marker_positions
     world_points = np.zeros((0,2))
     image_points = np.zeros((0,2))
     for id, corner_set in zip(ids.flatten(), corners):
+        if id >= 102:
+            print("fix this line")
+            continue
+
         image_points = np.vstack([image_points, corner_set[0]])
         world_points = np.vstack([world_points, marker_positions[id]])
 

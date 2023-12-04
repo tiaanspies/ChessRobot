@@ -7,11 +7,10 @@ from time import sleep
 from pathlib import Path
 from Chessboard_detection import Camera_Manager
 from Chessboard_detection import Aruco
+import cv2.aruco as aruco
 
 cm = ChessMoves()
 mc = MotorCommands()
-
-
 
 def fake_inverse_kinematics(path):
     return np.vstack((path,np.zeros_like(path[0,:])))
@@ -46,39 +45,34 @@ def draw_cube(v, slice_num):
 
 def create_tracker():
     # define aruco pattern file location.
-    name = "7x5_small_3x2_large"
-    file_path_and_name = Path("Chessboard_detection", "Aruco Markers", name).resolve().__str__()
+    dir_path = Path("Chessboard_detection", "Aruco Markers").resolve().__str__()
+    aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_250)
 
     # create aruco tracker object
-    aruco_obj = Aruco.ArucoTracker()
+    aruco_obj = Aruco.ArucoTracker(dir_path, aruco_dict)
 
     # generate new pattern and save
-    aruco_obj.generate_and_save_marker_pattern(file_path_and_name)
-
-    # load pattern
-    # correction = actual length from top of pattern to bottom / predicted
-    size_correction = 186.5/191.29374999999996
-    aruco_obj.load_marker_pattern(file_path_and_name, size_correction)
+    aruco_obj.load_marker_pattern_positions(12, 17, 35, 26)
 
     return aruco_obj
 
-def run_and_track(tracker, cam):
+def run_and_track(tracker: Aruco.ArucoTracker, cam):
     # load path
-    plan = np.load("Data_analytics/plan_big_z.npy",)
+    plan = np.load("Data_analytics/plan_big_z2.npy",)
     mc.load_path(plan)
 
     # Initialize tracking variables
     positions = np.zeros((3,0))
 
     # read first pos
-    rvecs, start_pos = tracker.estimate_pose(cam)
+    rvecs, start_pos = tracker.take_photo_and_estimate_pose(cam)
     home_pos = np.array([[0], [230], [500]]) # come pos
 
     # step through
     while mc.run_once():
         sleep(2)
         # get position
-        rvecs, tvecs = tracker.estimate_pose(cam)
+        rvecs, tvecs = tracker.take_photo_and_estimate_pose(cam)
 
         if tvecs is None:
             new_pos = np.zeros((3,1))
@@ -98,35 +92,35 @@ def save_path():
     "right" : 120,
     "left" : -120,
     "close" : 120,
-    "far" : 520}
+    "far" : 400}
 
     path = draw_cube(vertices, 4) # generate waypoints
-    np.save("data_analytics/plan_big_z_250pts.npy", path) # CHANGE THIS SO YOU DON'T OVERWRITE PREVIOUS!
+    np.save("Data_analytics/plan_big_z_250pts.npy", path) # CHANGE THIS SO YOU DON'T OVERWRITE PREVIOUS!
     print("path generated")
     
     # ax = plt.axes(projection='3d')
     # ax.scatter(path[0,:], path[1,:], path[2,:])
     # plt.show()
 
-    # print("solving inverse kinematics...")
-    # thetas = cm.inverse_kinematics(path) # convert to joint angles
-    # grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
-    # plan = mc.sort_commands(thetas, grip_commands)
-    # print("solved!")
+    print("solving inverse kinematics...")
+    thetas = cm.inverse_kinematics(path) # convert to joint angles
+    grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
+    plan = mc.sort_commands(thetas, grip_commands)
+    print("solved!")
     # cm.plot_robot(thetas, path)
 
-    # np.save("data_analytics/plan_big_z.npy",plan)
+    np.save("Data_analytics/plan_big_z2.npy",plan)
 
 def main():
-    save_path()
+    # save_path()
 
     # load aruco obj things
-    # aruco_obj = create_tracker()
+    aruco_obj = create_tracker()
 
     # # create camera object
-    # cam = Camera_Manager.RPiCamera(loadSavedFirst=False)
+    cam = Camera_Manager.RPiCamera(loadSavedFirst=False)
 
-    # run_and_track(aruco_obj, cam)
+    run_and_track(aruco_obj, cam)
 
 def old_main():
     vertices = {
@@ -188,5 +182,5 @@ def old_main():
     mc.run(plan)
 
 if __name__ == "__main__":
-    # main()
-    old_main()
+    main()
+    # old_main()
