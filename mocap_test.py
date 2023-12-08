@@ -94,7 +94,7 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     prefix = date.today().strftime("%Y_%m_%d")
 
     np.save(Path(cal_path, prefix + "_measured.npy"), measured)
-    np.save(Path(cal_path, prefix + "planned_path.npy"), planned_path_actual)
+    np.save(Path(cal_path, prefix + "_planned_path.npy"), planned_path_actual)
 
 def save_path():
    
