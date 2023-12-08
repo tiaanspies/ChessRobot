@@ -115,7 +115,7 @@ class MotorCommands:
         self.elbow.angle = self.angles[2, self.path_progress]
         self.grip.angle = self.angles[3, self.path_progress]
         
-        plan_points = self.plan_points[:, self.path_progress]
+        plan_points = self.plan_points[:, self.path_progress].reshape(3,1)
         
         self.path_progress += 1
 

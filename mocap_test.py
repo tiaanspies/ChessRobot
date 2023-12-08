@@ -47,20 +47,24 @@ def draw_cube(v, slice_num):
 def create_tracker():
     # define aruco pattern file location.
     dir_path = Path("Chessboard_detection", "Aruco Markers").resolve().__str__()
-    aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_250)
+    # aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_250)
+    aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_5X5_1000)
+
 
     # create aruco tracker object
     aruco_obj = Aruco.ArucoTracker(dir_path, aruco_dict)
 
     # generate new pattern and save
-    aruco_obj.load_marker_pattern_positions(12, 17, 35, 26)
+    # aruco_obj.load_marker_pattern_positions(12, 17, 35, 26)
+    aruco_obj.load_marker_pattern_positions(22, 30, 20, 15)
 
     return aruco_obj
 
 def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     # load path
-    angles = np.load("Data_analytics/plan_big_z2.npy",)
-    mc.load_path(angles)
+    angles = np.load("Data_analytics/plan_big_z2.npy")
+    plan = np.load("Data_analytics/plan_big_z_250pts.npy")
+    mc.load_path(angles, plan)
 
     # Initialize tracking variables
     measured = np.zeros((3,0))
@@ -79,7 +83,7 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
         # get position
         rvecs, tvecs = tracker.take_photo_and_estimate_pose(cam)
 
-        if tvecs is not None:
+        if tvecs is not None and plan_points is not None:
             new_pos = tvecs-start_pos+home_pos
 
             measured = np.hstack([measured, new_pos])
@@ -87,7 +91,8 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
         sleep(1)
 
     # save data
-    prefix = date.today().strftime("%d_%m_%Y")
+    prefix = date.today().strftime("%Y_%m_%d")
+
     np.save(Path(cal_path, prefix + "_measured.npy"), measured)
     np.save(Path(cal_path, prefix + "planned_path.npy"), planned_path_actual)
 
@@ -109,14 +114,14 @@ def save_path():
     # ax.scatter(path[0,:], path[1,:], path[2,:])
     # plt.show()
 
-    print("solving inverse kinematics...")
-    thetas = cm.inverse_kinematics(path) # convert to joint angles
-    grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
-    plan = mc.sort_commands(thetas, grip_commands)
-    print("solved!")
-    # cm.plot_robot(thetas, path)
+    # print("solving inverse kinematics...")
+    # thetas = cm.inverse_kinematics(path) # convert to joint angles
+    # grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
+    # plan = mc.sort_commands(thetas, grip_commands)
+    # print("solved!")
+    # # cm.plot_robot(thetas, path)
 
-    np.save("Data_analytics/plan_big_z2.npy",plan)
+    # np.save("Data_analytics/plan_big_z2.npy",plan)
 
 def main():
     # save_path()
@@ -128,7 +133,7 @@ def main():
     cam = Camera_Manager.RPiCamera(loadSavedFirst=False)
 
     # calibration path
-    cal_path = Path("Chessboard_detection", "Data_analytics", "Arm Cal Data")
+    cal_path = Path("Data_analytics", "Arm Cal Data")
 
     run_and_track(aruco_obj, cam, cal_path)
 

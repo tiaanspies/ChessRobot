@@ -28,6 +28,8 @@ class ArucoTracker:
         self.marker_positions = None
         self.aruco_dict = aruco_dict
 
+        self.max_id = 0
+
         if Path(self.marker_path_dir).is_dir() == False:
             raise ValueError("Marker path directory does not exist")
 
@@ -76,6 +78,8 @@ class ArucoTracker:
         properties_name = "_".join([str(i) for i in properties])
         properties_path = Path(self.marker_path_dir, properties_name+".json")
 
+        self.max_id = rows*cols/2
+
         # check if marker pattern exists
         if properties_path.is_file() == False:
             # generate marker pattern
@@ -122,7 +126,7 @@ class ArucoTracker:
             print("No markers found")
             return None, None
         
-        rvecs, tvecs = estimate_pose(corners, ids, camera_matrix, dist_coeffs, self.marker_positions)
+        rvecs, tvecs = estimate_pose(corners, ids, camera_matrix, dist_coeffs, self.marker_positions, self.max_id)
         
         if rvecs is not None:
             # Draw the detected markers and axes on the image
@@ -269,7 +273,7 @@ def detect_markers(aruco_dict: cv2.aruco_Dictionary, image: np.ndarray)-> tuple[
 
     return ids, corners
 
-def estimate_pose(corners, ids, camera_matrix, dist_coeffs, marker_positions
+def estimate_pose(corners, ids, camera_matrix, dist_coeffs, marker_positions, max_id: int
                   ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     
     if ids is None:
@@ -279,8 +283,7 @@ def estimate_pose(corners, ids, camera_matrix, dist_coeffs, marker_positions
     world_points = np.zeros((0,2))
     image_points = np.zeros((0,2))
     for id, corner_set in zip(ids.flatten(), corners):
-        if id >= 102:
-            print("fix this line")
+        if id >= max_id:
             continue
 
         image_points = np.vstack([image_points, corner_set[0]])
