@@ -103,6 +103,13 @@ class ArucoTracker:
             self.marker_positions[pos] = np.array(self.marker_positions[pos])
 
     def take_photo_and_estimate_pose(self, cam: Camera_Manager.RPiCamera)-> tuple[np.ndarray, np.ndarray]:
+        """
+        Gets image from camera and estimates the pose of the camera.
+
+        Returns None if no markers are found.
+        Returns the translation and rotation vectors if markers can be found
+        """
+        
         # Camera parameters
         camera_matrix, dist_coeffs = cam.readCalibMatrix()
 
@@ -118,13 +125,6 @@ class ArucoTracker:
         rvecs, tvecs = estimate_pose(corners, ids, camera_matrix, dist_coeffs, self.marker_positions)
         
         if rvecs is not None:
-            # rvecs and tvecs contain the rotation and translation vectors for each detected marker
-            print("Rotation vectors:")
-            print(rvecs)
-
-            print("Translation vectors:")
-            print(tvecs)  
-            
             # Draw the detected markers and axes on the image
             # for id in ids:
             #     cv2.aruco.drawDetectedMarkers(image, corners)

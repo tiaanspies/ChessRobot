@@ -7,6 +7,7 @@ from time import sleep
 from pathlib import Path
 from Chessboard_detection import Camera_Manager
 from Chessboard_detection import Aruco
+from datetime import date
 import cv2.aruco as aruco
 
 cm = ChessMoves()
@@ -56,33 +57,39 @@ def create_tracker():
 
     return aruco_obj
 
-def run_and_track(tracker: Aruco.ArucoTracker, cam):
+def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     # load path
-    plan = np.load("Data_analytics/plan_big_z2.npy",)
-    mc.load_path(plan)
+    angles = np.load("Data_analytics/plan_big_z2.npy",)
+    mc.load_path(angles)
 
     # Initialize tracking variables
-    positions = np.zeros((3,0))
+    measured = np.zeros((3,0))
+    planned_path_actual = np.zeros((3,0))
 
     # read first pos
     rvecs, start_pos = tracker.take_photo_and_estimate_pose(cam)
-    home_pos = np.array([[0], [230], [500]]) # come pos
+    home_pos = np.array([[0], [230], [500]]) # home pos
 
     # step through
-    while mc.run_once():
+    run_cal = True 
+    while run_cal:
+        run_cal, plan_points = mc.run_once()
+
         sleep(2)
         # get position
         rvecs, tvecs = tracker.take_photo_and_estimate_pose(cam)
 
-        if tvecs is None:
-            new_pos = np.zeros((3,1))
-        else:
+        if tvecs is not None:
             new_pos = tvecs-start_pos+home_pos
 
-        positions = np.hstack([positions, new_pos])
+            measured = np.hstack([measured, new_pos])
+            planned_path_actual = np.hstack([planned_path_actual, plan_points])
         sleep(1)
 
-    np.save("positions.npy", positions)
+    # save data
+    prefix = date.today().strftime("%d_%m_%Y")
+    np.save(Path(cal_path, prefix + "_measured.npy"), measured)
+    np.save(Path(cal_path, prefix + "planned_path.npy"), planned_path_actual)
 
 def save_path():
    
@@ -120,7 +127,10 @@ def main():
     # # create camera object
     cam = Camera_Manager.RPiCamera(loadSavedFirst=False)
 
-    run_and_track(aruco_obj, cam)
+    # calibration path
+    cal_path = Path("Chessboard_detection", "Data_analytics", "Arm Cal Data")
+
+    run_and_track(aruco_obj, cam, cal_path)
 
 def old_main():
     vertices = {

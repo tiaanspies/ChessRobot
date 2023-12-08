@@ -45,6 +45,7 @@ class MotorCommands:
         # variables for run_once function
         self.angles = None
         self.path_progress = 0
+        self.plan_points = None
 
     def go_to(self, theta, angletype='rad'):
         """moves directly to provided theta configuration"""
@@ -81,18 +82,22 @@ class MotorCommands:
             self.grip.angle = np.rad2deg(self.OPEN)
             pass # TODO: make sure this means gripper is open
 
-    def load_path(self, thetas, angletype='rad'):
+    def load_path(self, thetas, plan_points = None, angletype='rad'):
         """
         Load new set of angles into class, allows for run_once command to function.
         """
 
+        # convert angles to degrees if necessary
         if angletype == 'rad':
             angles = np.rad2deg(thetas)
         elif angletype == 'deg':
             angles = thetas
         else:
             raise ValueError("angletype argument must be either 'rad' or 'deg'")
-
+        
+        # Load the plan if it is provided
+        self.plan_points = plan_points
+        
         self.angles = angles
         self.path_progress = 0
         self.path_len = angles.shape[1]
@@ -103,16 +108,18 @@ class MotorCommands:
         """
 
         if self.path_progress >= self.path_len:
-            return False
+            return False, None
         
         self.base.angle = self.angles[0, self.path_progress]
         self.shoulder.angle = self.angles[1, self.path_progress]
         self.elbow.angle = self.angles[2, self.path_progress]
         self.grip.angle = self.angles[3, self.path_progress]
-
+        
+        plan_points = self.plan_points[:, self.path_progress]
+        
         self.path_progress += 1
 
-        return True
+        return True, plan_points
     
     def sort_commands(self, thetas, grip_commands):
         thetas[3,:] = grip_commands
