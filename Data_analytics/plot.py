@@ -37,17 +37,19 @@ def main():
     global pts_ideal_subset
 
     # name_real = "positions_pi_cam2.npy"
-    name_real = "positions_day2.npy"
-    name_ideal = "path_big_day2.npy"
+    # name_real = "positions_day2.npy"
+    # name_ideal = "path_big_day2.npy"
+    name_real = "2023_12_08_measured.npy"
+    name_ideal = "2023_12_08planned_path.npy"
 
     # Load the numpy files for current and actual positions
     try:
-        prefix = "Data_analytics\\"
-        pts_real = np.load(prefix+name_real)[:-1, [1, 2, 0]]
+        prefix = "Data_analytics\\Arm Cal Data\\"
+        pts_real = np.load(prefix+name_real).T[:, [1, 2, 0]]
         pts_ideal = (np.load(prefix+name_ideal).T)[:, [1, 2, 0]]
     except FileNotFoundError:
-        prefix = ""
-        pts_real = np.load(prefix+name_real)[:-1, [1, 2, 0]]
+        prefix = "Arm Cal Data\\"
+        pts_real = np.load(prefix+name_real).T[:, [1, 2, 0]]
         pts_ideal = (np.load(prefix+name_ideal).T)[:, [1, 2, 0]]
 
     pts_real_filtered = np.zeros((0, 3))
@@ -57,8 +59,6 @@ def main():
             pts_real_filtered = np.vstack([pts_real_filtered , row_real])
             pts_ideal_filtered = np.vstack([pts_ideal_filtered , row_ideal])
 
-    
-    
     # H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal_subset, pts_real_subset)
     H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize(pts_ideal_filtered, pts_real_filtered)
     # ===================================================================
@@ -72,7 +72,7 @@ def main():
     # find predictions and plot
     # plot_3data(project_points(pts_real_subset, pts_real_mean, T, H), fig, "projected_subset")
     plot_3data(project_points(pts_real, pts_real_mean, T, H), fig, "Projected")
-    plot_3data(pts_real, fig, "Pts_real")
+    plot_3data(pts_real-pts_real_mean+pts_ideal_mean, fig, "Pts_real")
     # plot_3data(pts_real_subset, fig, "Pts_real_subset")
 
     # Set labels and title
