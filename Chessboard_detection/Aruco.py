@@ -147,7 +147,7 @@ def main():
     # name = "7x5_small_3x2_large_4x4_50_marker"
     dir_path = Path("Chessboard_detection", "Aruco Markers").resolve().__str__()
 
-    aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_250)
+    aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_5X5_1000)
 
     # # create camera object
     cam = Camera_Manager.RPiCamera(loadSavedFirst=False)
@@ -156,7 +156,8 @@ def main():
     aruco_obj = ArucoTracker(dir_path, aruco_dict)
 
     # aruco_obj.load_marker_pattern_positions(14, 20, 30, 22)
-    aruco_obj.load_marker_pattern_positions(12, 17, 35, 26)
+    # aruco_obj.load_marker_pattern_positions(12, 17, 35, 26)
+    aruco_obj.load_marker_pattern_positions(22, 30, 20, 15)
 
     # get camera position
     aruco_obj.take_photo_and_estimate_pose(cam)

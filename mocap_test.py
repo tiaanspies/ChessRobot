@@ -7,7 +7,7 @@ from time import sleep
 from pathlib import Path
 from Chessboard_detection import Camera_Manager
 from Chessboard_detection import Aruco
-from datetime import date
+import datetime
 import cv2.aruco as aruco
 
 cm = ChessMoves()
@@ -91,7 +91,7 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
         sleep(1)
 
     # save data
-    prefix = date.today().strftime("%Y_%m_%d")
+    prefix = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     np.save(Path(cal_path, prefix + "_measured.npy"), measured)
     np.save(Path(cal_path, prefix + "_planned_path.npy"), planned_path_actual)
@@ -130,7 +130,7 @@ def main():
     aruco_obj = create_tracker()
 
     # # create camera object
-    cam = Camera_Manager.RPiCamera(loadSavedFirst=False)
+    cam = Camera_Manager.RPiCamera(loadSavedFirst=False, storeImgHist=False)
 
     # calibration path
     cal_path = Path("Data_analytics", "Arm Cal Data")
