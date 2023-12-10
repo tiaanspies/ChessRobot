@@ -1,35 +1,7 @@
 import numpy as np
 import plotly.graph_objects as go
 from scipy.optimize import minimize
-from scipy.linalg import orthogonal_procrustes
 import correction_transform
-
-# ==========================
-# order is bot right, bot left, top left, top right
-pts_real_subset = np.array([
-    [320, 120, 16],
-    [344, -105, 13],
-    [445, -90, 256],
-    [403, 160, 273],
-    [-12, 45, 48],
-    [4.8, -104, 51],
-    [44, -129, 283],
-    [26, 100, 296]
-])[:, [0, 2, 1]]
-
-# pts_real_subset[:, [0, 1, 2]] = pts_real_subset
-
-pts_ideal_subset = np.array([
-    [445, 120, 100],
-    [445, -120, 100],
-    [445, -120, 340],
-    [445, 120, 340],
-    [220, 120, 100],
-    [220, -120, 100],
-    [220, -120, 340],
-    [220, 120, 340]
-])[:, [0, 2, 1]]
-# pts_ideal_subset[:, [0, 1, 2]] = pts_ideal_subset
 
 def main():
     # declare global variables
@@ -39,7 +11,7 @@ def main():
     # name_real = "positions_pi_cam2.npy"
     # name_real = "positions_day2.npy"
     # name_ideal = "path_big_day2.npy"
-    date = "20231208_201339"
+    date = "20231210_132909"
     name_real = date+"_measured.npy"
     name_ideal = date+"_planned_path.npy"
 
@@ -53,25 +25,18 @@ def main():
         pts_real = np.load(prefix+name_real).T[:, [1, 2, 0]]
         pts_ideal = (np.load(prefix+name_ideal).T)[:, [1, 2, 0]]
 
-    pts_real_filtered = np.zeros((0, 3))
-    pts_ideal_filtered = np.zeros((0, 3))
-    for row_ideal, row_real in zip(pts_ideal, pts_real):
-        if (row_real != 0).any():
-            pts_real_filtered = np.vstack([pts_real_filtered , row_real])
-            pts_ideal_filtered = np.vstack([pts_ideal_filtered , row_ideal])
-
-    # H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal_subset, pts_real_subset)
-    H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize(pts_ideal_filtered, pts_real_filtered)
+    H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize(pts_ideal, pts_real)
+    
     # ===================================================================
     # Create a 3D scatter plot
     fig = go.Figure()
 
-    # # plot target positions
-    # plot_3data(pts_ideal, fig, "pts_ideal")
+    # plot target positions
+    plot_3data(pts_ideal, fig, "pts_ideal")
 
-    # # find predictions and plot
-    # plot_3data(project_points(pts_real, pts_real_mean, T, H), fig, "Projected")
-    plot_3data(pts_real, fig, "Pts_real")
+    # find predictions and plot
+    plot_3data(project_points(pts_real, pts_real_mean, T, H), fig, "Projected")
+    # plot_3data(pts_real, fig, "Pts_real")
 
     # Set labels and title
     fig.update_layout(
@@ -79,9 +44,9 @@ def main():
             xaxis_title='X',
             yaxis_title='Y',
             zaxis_title='Z',
-            # xaxis_range=[-100, 500],
-            # yaxis_range=[-400, 400],
-            # zaxis_range=[0, 600],
+            xaxis_range=[50, 350],
+            yaxis_range=[-150, 150],
+            zaxis_range=[0, 600],
         ),
         title='3D Scatter Plot'
     )
