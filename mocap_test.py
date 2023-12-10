@@ -71,8 +71,10 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     planned_path_actual = np.zeros((3,0))
 
     # read first pos
-    rvecs, start_pos = tracker.take_photo_and_estimate_pose(cam)
+    start_pos = tracker.take_photo_and_estimate_pose(cam)
     home_pos = np.array([[0], [230], [500]]) # home pos
+    
+    print(f"Start_pos: {start_pos}")
 
     # step through
     run_cal = True 
@@ -81,13 +83,15 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
 
         sleep(2)
         # get position
-        rvecs, tvecs = tracker.take_photo_and_estimate_pose(cam)
+        tvecs = tracker.take_photo_and_estimate_pose(cam)
 
         if tvecs is not None and plan_points is not None:
             new_pos = tvecs-start_pos+home_pos
 
             measured = np.hstack([measured, new_pos])
             planned_path_actual = np.hstack([planned_path_actual, plan_points])
+
+            print(f"Position: {new_pos.reshape(1,3)}")
         sleep(1)
 
     # save data
@@ -197,5 +201,7 @@ def old_main():
     mc.run(plan)
 
 if __name__ == "__main__":
+    np.set_printoptions(suppress=True, precision=2)
+
     main()
     # old_main()

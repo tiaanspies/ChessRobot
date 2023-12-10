@@ -111,7 +111,7 @@ class ArucoTracker:
         Gets image from camera and estimates the pose of the camera.
 
         Returns None if no markers are found.
-        Returns the translation and rotation vectors if markers can be found
+        Returns the camera position
         """
         
         # Camera parameters
@@ -120,13 +120,13 @@ class ArucoTracker:
         # Load the image
         _, image = cam.read()
 
-        ids, corners = detect_markers(self.aruco_dict, image)
+        corners, ids = detect_markers(self.aruco_dict, image)
 
         if ids is None:
             print("No markers found")
-            return None, None
+            return None
         
-        rvecs, tvecs = estimate_pose(corners, ids, camera_matrix, dist_coeffs, self.marker_positions, self.max_id)
+        rvecs, tvec = estimate_pose(corners, ids, camera_matrix, dist_coeffs, self.marker_positions, self.max_id)
         
         if rvecs is not None:
             # Draw the detected markers and axes on the image
@@ -135,12 +135,16 @@ class ArucoTracker:
                 # cv2.aruco.drawAxis(image, camera_matrix, dist_coeffs, rvecs[i], tvecs[i], marker_size * 0.5)
 
             # Draw the origin on the board
-            cv2.drawFrameAxes(image, camera_matrix, dist_coeffs, rvecs, tvecs, 100, 3)
+            cv2.drawFrameAxes(image, camera_matrix, dist_coeffs, rvecs, tvec, 100, 1)
             label_markers(image, ids, corners)
             pi_debugging.saveTempImg(image, "Aruco_markers_w_axes.png")
 
-        return rvecs, tvecs
+        r_mat = cv2.Rodrigues(rvecs)[0]
 
+        big_mat = np.block([[r_mat, tvec], [0,0,0,1]])
+        big_mat = np.linalg.inv(big_mat)
+
+        return big_mat[:3, 3].reshape(3,1)
 
 def main():
     # define aruco pattern file location.
@@ -164,7 +168,7 @@ def main():
     
     # track(file_path_and_name, size_correction)
     
-    # ids, corners = detect_markers(aruco_dict)
+    # corners, ids = detect_markers(aruco_dict)
 
     # label_markers(image, ids, corners)
 
@@ -243,10 +247,11 @@ def label_markers(image, ids:list, corners:list) -> np.ndarray:
             # Draw the bounding box around the marker
             aruco.drawDetectedMarkers(image, corners)
 
+        for i in range(len(ids)):
             # Draw the marker ID
             c = corners[i][0]
             x, y = int(c[:, 0].mean()), int(c[:, 1].mean())
-            cv2.putText(image, str(ids[i][0]), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2, cv2.LINE_AA)
+            cv2.putText(image, str(ids[i][0]), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1, cv2.LINE_AA)
 
     return image
 
@@ -272,7 +277,7 @@ def detect_markers(aruco_dict: cv2.aruco_Dictionary, image: np.ndarray)-> tuple[
         # detect markers
         corners, ids, _ = cv2.aruco.detectMarkers(image, aruco_dict, parameters=aruco_params)
 
-    return ids, corners
+    return corners, ids
 
 def estimate_pose(corners, ids, camera_matrix, dist_coeffs, marker_positions, max_id: int
                   ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -284,6 +289,8 @@ def estimate_pose(corners, ids, camera_matrix, dist_coeffs, marker_positions, ma
     world_points = np.zeros((0,2))
     image_points = np.zeros((0,2))
     for id, corner_set in zip(ids.flatten(), corners):
+
+        # skip any ids that are above max
         if id >= max_id:
             continue
 
@@ -300,6 +307,8 @@ def estimate_pose(corners, ids, camera_matrix, dist_coeffs, marker_positions, ma
     
     # Estimate pose for each detected marker
     res, rvecs, tvecs= cv2.solvePnP(world_points, image_points, camera_matrix, dist_coeffs)
+    # res, rvecs, tvecs, inliers= cv2.solvePnPRansac(world_points, image_points, camera_matrix, dist_coeffs)
+    # print(f"Inliers: {inliers.__len__()}")
 
     # check that localization succeeded
     if res == False:
