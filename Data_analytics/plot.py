@@ -39,8 +39,9 @@ def main():
     # name_real = "positions_pi_cam2.npy"
     # name_real = "positions_day2.npy"
     # name_ideal = "path_big_day2.npy"
-    name_real = "2023_12_08_measured.npy"
-    name_ideal = "2023_12_08planned_path.npy"
+    date = "20231208_201339"
+    name_real = date+"_measured.npy"
+    name_ideal = date+"_planned_path.npy"
 
     # Load the numpy files for current and actual positions
     try:
@@ -65,15 +66,12 @@ def main():
     # Create a 3D scatter plot
     fig = go.Figure()
 
-    # plot target positions
-    plot_3data(pts_ideal, fig, "pts_ideal")
-    # plot_3data(pts_ideal_subset, fig, "pts_ideal_subset")
+    # # plot target positions
+    # plot_3data(pts_ideal, fig, "pts_ideal")
 
-    # find predictions and plot
-    # plot_3data(project_points(pts_real_subset, pts_real_mean, T, H), fig, "projected_subset")
-    plot_3data(project_points(pts_real, pts_real_mean, T, H), fig, "Projected")
-    plot_3data(pts_real-pts_real_mean+pts_ideal_mean, fig, "Pts_real")
-    # plot_3data(pts_real_subset, fig, "Pts_real_subset")
+    # # find predictions and plot
+    # plot_3data(project_points(pts_real, pts_real_mean, T, H), fig, "Projected")
+    plot_3data(pts_real, fig, "Pts_real")
 
     # Set labels and title
     fig.update_layout(
