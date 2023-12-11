@@ -53,22 +53,23 @@ def project_points(pts:np.array, pts_mean:np.array, T:np.array, transformation_m
         (Is usually difference between target and starting point means)
     transformation_matrix: Used to project the zero mean points onto the zero mean target points.
     """
-    assert pts.shape[1] == 3, "Points must be in shape (n, 3)"
+    assert pts.shape[0] == 3, "Points must be in shape (3, n)"
+    assert pts_mean.shape[0] == 3, "Points must be in shape (3, n)"
     # Homogeneous coordinates
-    pts_zero_0_mean = pts-pts_mean.reshape((1,3))
-    ones_col = np.ones((pts.shape[0], 1))
+    pts_zero_0_mean = pts-pts_mean
+    ones_row = np.ones((1, pts.shape[1]))
 
-    pts_general_0_mean = np.hstack((pts_zero_0_mean, ones_col))
+    pts_general_0_mean = np.vstack((pts_zero_0_mean, ones_row))
     
     # # Apply transformation
-    projected_points_general_0_mean = np.dot(transformation_matrix ,pts_general_0_mean.T)
+    projected_points_general_0_mean = transformation_matrix @ pts_general_0_mean
     
     # Convert back to Cartesian coordinates by dividing by last col which should be ones.
     projected_points_0_mean = projected_points_general_0_mean[:3, :] / projected_points_general_0_mean[3:, :]
     
     # translate points.
     # TODO: Simplify by translating directly to target instead of first to original then to target.
-    translated_points = projected_points_0_mean.T + pts_mean + T
+    translated_points = projected_points_0_mean + pts_mean + T
     return translated_points
 
 def attempt_minimize(pts_ideal:np.array, pts_real:np.array):
@@ -76,22 +77,22 @@ def attempt_minimize(pts_ideal:np.array, pts_real:np.array):
     Make points zero mean and save mean to return functions later.  
     
     """
-    assert pts_ideal.shape[1] == 3, "Points must be in shape (n, 3)"
-    assert pts_real.shape[1] == 3, "Points must be in shape (n, 3)"
-    pts_ideal_mean = pts_ideal.mean(axis=0)
-    pts_real_mean = pts_real.mean(axis=0)
+    assert pts_ideal.shape[0] == 3, "Points must be in shape (3, n)"
+    assert pts_real.shape[0] == 3, "Points must be in shape (3, n)"
+    pts_ideal_mean = pts_ideal.mean(axis=1, keepdims=True)
+    pts_real_mean = pts_real.mean(axis=1, keepdims=True)
 
     T = pts_ideal_mean-pts_real_mean
 
     # change points into generalized form
-    pt_count = pts_real.shape[0]
-    ones_col = np.ones((pt_count, 1))
+    pt_count = pts_real.shape[1]
+    ones_row = np.ones((1, pt_count))
 
-    pts_real_zero_mean = np.hstack([pts_real-pts_real_mean, ones_col])
-    pts_ideal_zero_mean = np.hstack([pts_ideal-pts_ideal_mean, ones_col])
+    pts_real_zero_mean = np.vstack([pts_real-pts_real_mean, ones_row])
+    pts_ideal_zero_mean = np.vstack([pts_ideal-pts_ideal_mean, ones_row])
 
     # set points as args
-    args = (pts_ideal_zero_mean.T, pts_real_zero_mean.T)
+    args = (pts_ideal_zero_mean, pts_real_zero_mean)
 
     # initialize matrix
     init = np.eye(4)[:3,:].reshape((-1))
@@ -136,8 +137,8 @@ def get_transform(filename_real, filename_ideal):
     """
     # Load the numpy files for current and actual positions
 
-    pts_real = np.load(Path(dirs.CAL_TRACKING_DATA_PATH, filename_real)).T[:, [1, 2, 0]]
-    pts_ideal = np.load(Path(dirs.CAL_TRACKING_DATA_PATH,filename_ideal)).T[:, [1, 2, 0]]
+    pts_real = np.load(Path(dirs.CAL_TRACKING_DATA_PATH, filename_real))
+    pts_ideal = np.load(Path(dirs.CAL_TRACKING_DATA_PATH,filename_ideal))
 
     # H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal_subset, pts_real_subset)
     H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal, pts_real)

@@ -210,32 +210,16 @@ def generate_transformed_pattern():
     print("Updating points")
 
     # change between coordinate systems
-    pts_ideal = np.load(Path(dirs.PLANNED_PATHS, "250_120_120_-120_120_350_ja_ideal.npy"))
-    path_optitrack_sys = correction_transform.to_optitrack_sys(pts_ideal)
-    projected_points = correction_transform.project_points(path_optitrack_sys, real_mean, T, H)
-    projected_points = correction_transform.from_optitrack_sys(projected_points)
+    pts_ideal = np.load(Path(dirs.PLANNED_PATHS, "250_120_120_-120_120_350_path_ideal.npy"))
+    projected_points = correction_transform.project_points(pts_ideal, real_mean, T, H)
 
     # print to check they match
     if platform.system() == "Windows":
         fig = go.Figure()
-        analyze_transform.plot_3data(projected_points.T[:, [0, 2, 1]], fig, "projected")
+        analyze_transform.plot_3data(projected_points, fig, "projected")
 
-        # Set labels and title
-    # Set labels and title
-    fig.update_layout(
-        scene=dict(
-            xaxis_title='X',
-            yaxis_title='Y',
-            zaxis_title='Z',
-            xaxis_range=[-150, 150],
-            yaxis_range=[50, 350],
-            zaxis_range=[0, 600],
-        ),
-        title='3D Scatter Plot'
-    )
-
-    # Show the plot
-    fig.show()
+        # Show the plot
+        fig.show()
 
     # solve inverse kinematics
     print("solving inverse kinematics...")

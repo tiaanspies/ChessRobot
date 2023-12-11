@@ -91,8 +91,8 @@ def get_filename():
 def plot_3data(pts_real, fig, lab):
     # Extract x, y, and z coordinates
     x = pts_real[:, 0]
-    y = pts_real[:, 2]
-    z = pts_real[:, 1]
+    y = pts_real[:, 1]
+    z = pts_real[:, 2]
 
     # shapes = ['circle', 'cross', 'diamond', 'square', 'x']
     shapes = ['circle']
@@ -111,6 +111,18 @@ def plot_3data(pts_real, fig, lab):
         ),
         name=lab
     ))
+
+    fig.update_layout(
+    scene=dict(
+        xaxis_title='X',
+        yaxis_title='Y',
+        zaxis_title='Z',
+        xaxis_range=[-150, 150],
+        yaxis_range=[50, 350],
+        zaxis_range=[0, 600],
+    ),
+    title='3D Scatter Plot'
+    )
 
 def objective_function(X:np.array, pts_ideal:np.array, pts_real:np.array):
     # coef = np.vstack([X.reshape((3,4)), [0, 0, 0, 1]])
