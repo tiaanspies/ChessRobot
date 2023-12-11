@@ -1,11 +1,20 @@
 import numpy as np
-import plotly.graph_objects as go
+
+try:
+    import plotly.graph_objects as go
+except ModuleNotFoundError:
+    print("analyze_transform: Did not load plotly, will not plot")
 from scipy.optimize import minimize
-import correction_transform
+from Data_analytics import correction_transform
 from pathlib import Path
 import path_directories as dirs
+import sys
 
 def main():
+    if sys.platform == "linux":
+        print("This function is not supported on linux as it requires plotly")
+        sys.exit()
+
     # declare global variables
     global pts_real_subset
     global pts_ideal_subset
@@ -22,6 +31,7 @@ def main():
     file_ideal = Path(dirs.CAL_TRACKING_DATA_PATH, name_ideal)
 
     # Load the numpy files for current and actual positions
+    # rearrange to print nicely
     pts_real = np.load(file_real).T[:, [1, 2, 0]]
     pts_ideal = (np.load(file_ideal).T)[:, [1, 2, 0]]
 

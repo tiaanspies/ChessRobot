@@ -10,7 +10,7 @@
         "type": "python",
         "request": "launch",
         "console": "integratedTerminal",
-        "module": "Chessboard_detection.${fileBasenameNoExtension}",
+        "module": "${fileBasenameNoExtension}",
       }
     ]
   }

@@ -10,13 +10,13 @@ from Chessboard_detection import Aruco
 import datetime
 import cv2.aruco as aruco
 import path_directories as dirs
+from Data_analytics import analyze_transform
+import platform
 
 cm = ChessMoves()
 mc = MotorCommands()
 
 def main():
-    save_path()
-
     # load aruco obj things
     aruco_obj = create_tracker()
 
@@ -107,33 +107,6 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     np.save(Path(cal_path, prefix + "_measured.npy"), measured)
     np.save(Path(cal_path, prefix + "_planned_path.npy"), planned_path_actual)
 
-def save_path():
-   
-    vertices = {
-    "top" : 340,
-    "bottom" : 120,
-    "right" : 120,
-    "left" : -120,
-    "close" : 120,
-    "far" : 400}
-
-    path = draw_cube(vertices, 4) # generate waypoints
-    np.save("Data_analytics/plan_big_z_250pts.npy", path) # CHANGE THIS SO YOU DON'T OVERWRITE PREVIOUS!
-    print("path generated")
-    
-    # ax = plt.axes(projection='3d')
-    # ax.scatter(path[0,:], path[1,:], path[2,:])
-    # plt.show()
-
-    # print("solving inverse kinematics...")
-    # thetas = cm.inverse_kinematics(path) # convert to joint angles
-    # grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
-    # plan = mc.sort_commands(thetas, grip_commands)
-    # print("solved!")
-    # # cm.plot_robot(thetas, path)
-
-    # np.save("Data_analytics/plan_big_z2.npy",plan)
-
 def run_calibration():
     """
     Run the calibration process
@@ -159,45 +132,69 @@ def generate_ideal_pattern(plot_pattern=False):
     "close" : 120,
     "far" : 400}
 
-    path = draw_cube(vertices, 4) # generate waypoints
+    # generate waypoints
+    path = draw_cube(vertices, 4) 
+
+    # create name
     name = "_".join([str(v) for v in vertices.values()])
-    np.save(Path(dirs.PLANNED_PATHS, name), path)
-    print("path generated")
+    name_path = name+"_path_ideal"
+    name_joint_angles = name+"_ja_ideal"
+
+    np.save(Path(dirs.PLANNED_PATHS, name_path), path)
+    print("path saved")
 
     if plot_pattern:
         ax = plt.axes(projection='3d')
         ax.scatter(path[0,:], path[1,:], path[2,:])
         plt.show()    
 
+    print("solving inverse kinematics...")
+    thetas = cm.inverse_kinematics(path) # convert to joint angles
+    grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
+    joint_angles = mc.sort_commands(thetas, grip_commands)
+    print("solved!")
+    # cm.plot_robot(thetas, path)
+
+    np.save(Path(dirs.PLANNED_PATHS, name_joint_angles), joint_angles)
+
 def generate_transformed_pattern():
     """
     Generate a transformed calibration pattern
     """
+
+    file_prefix = analyze_transform.get_filename()
+    name_real = file_prefix+"_measured.npy"
+    name_ideal = file_prefix+"_planned_path.npy"
+
+    name_joint_angles_transformed = file_prefix+"_ja_transformed"
+    name_path_transformed = file_prefix+"_path_transformed"
+
     # load transformation matrix
-    print("finding transform")
-    H, T, real_mean = correction_transform.get_transform("positions_day2.npy", "path_big_day2.npy")
+    print("Finding transform")
+    H, T, real_mean = correction_transform.get_transform(name_real, name_ideal)
     print("Updating points")
 
     # change between coordinate systems
-    path_optitrack_sys = correction_transform.to_optitrack_sys(path)
-    projected_points = correction_transform.project_points(path_optitrack_sys, real_mean, T, H)
-    projected_points = correction_transform.from_optitrack_sys(projected_points)
+    pts_ideal = np.load(Path(dirs.CAL_TRACKING_DATA_PATH, name_ideal)).T
+    projected_points = correction_transform.project_points(pts_ideal, real_mean, T, H)
 
-    # print to check they match    
-    ax = plt.axes(projection='3d')
-    ax.scatter(projected_points[0,:], projected_points[1,:], projected_points[2,:])
-    plt.show()
+    # print to check they match
+    if platform.system() == "Windows":
+        ax = plt.axes(projection='3d')
+        ax.scatter(projected_points[0,:], projected_points[1,:], projected_points[2,:])
+        plt.show()
 
     # solve inverse kinematics
     print("solving inverse kinematics...")
     thetas = cm.inverse_kinematics(projected_points) # convert to joint angles
     grip_commands = cm.get_gripper_commands2(projected_points) # remove unnecessary wrist commands, add gripper open close instead
-    plan = mc.sort_commands(thetas, grip_commands)
+    joint_angles = mc.sort_commands(thetas, grip_commands)
     print("solved!")
 
     cm.plot_robot(thetas, projected_points)
 
-    np.save("Data_analytics/plan_day3_2.npy",plan)
+    np.save(Path(dirs.PLANNED_PATHS, name_path_transformed), projected_points)
+    np.save(Path(dirs.PLANNED_PATHS, name_joint_angles_transformed), joint_angles)
 
 def user_menu():
     """
@@ -207,7 +204,7 @@ def user_menu():
     3. generate transformed calibration pattern
     """
 
-    print("1. Run calibration")
+    print("\n1. Run calibration")
     print("2. Generate ideal calibration pattern")
     print("3. Generate transformed calibration pattern")
     print("4. Exit")
@@ -215,13 +212,13 @@ def user_menu():
     choice = input("Select an option: ")
 
     if choice == "1":
-        print("Running calibration")
+        print("\nRunning calibration\n")
         run_calibration()
     elif choice == "2":
-        print("Generating ideal calibration pattern")
+        print("\nGenerating ideal calibration pattern\n")
         generate_ideal_pattern()
     elif choice == "3":
-        print("Generating transformed calibration pattern")
+        print("\nGenerating transformed calibration pattern\n")
         generate_transformed_pattern()
     elif choice == "4":
         print("Exiting")

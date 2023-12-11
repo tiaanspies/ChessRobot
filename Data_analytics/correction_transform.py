@@ -1,5 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize
+import path_directories as dirs
+from pathlib import Path
 
 def objective_function(X:np.array, pts_ideal:np.array, pts_real:np.array):
     """
@@ -51,8 +53,9 @@ def project_points(pts:np.array, pts_mean:np.array, T:np.array, transformation_m
         (Is usually difference between target and starting point means)
     transformation_matrix: Used to project the zero mean points onto the zero mean target points.
     """
+    assert pts.shape[1] == 3, "Points must be in shape (n, 3)"
     # Homogeneous coordinates
-    pts_zero_0_mean = pts-pts_mean
+    pts_zero_0_mean = pts-pts_mean.reshape((1,3))
     ones_col = np.ones((pts.shape[0], 1))
 
     pts_general_0_mean = np.hstack((pts_zero_0_mean, ones_col))
@@ -73,6 +76,8 @@ def attempt_minimize(pts_ideal:np.array, pts_real:np.array):
     Make points zero mean and save mean to return functions later.  
     
     """
+    assert pts_ideal.shape[1] == 3, "Points must be in shape (n, 3)"
+    assert pts_real.shape[1] == 3, "Points must be in shape (n, 3)"
     pts_ideal_mean = pts_ideal.mean(axis=0)
     pts_real_mean = pts_real.mean(axis=0)
 
@@ -130,23 +135,14 @@ def get_transform(filename_real, filename_ideal):
     Reads file and computes transformation matrix.
     """
     # Load the numpy files for current and actual positions
-    try:
-        prefix = "Data_analytics/"
-        pts_real = np.load(prefix+filename_real)[:-1, :]
-        pts_ideal = to_optitrack_sys(np.load(prefix+filename_ideal))
-    except FileNotFoundError:
-        prefix = ""
-        pts_real = np.load(prefix+filename_real)[:-1, :]
-        pts_ideal = to_optitrack_sys(np.load(prefix+filename_ideal))
-    
-    
+
+    pts_real = np.load(Path(dirs.CAL_TRACKING_DATA_PATH, filename_real)).T
+    pts_ideal = np.load(Path(dirs.CAL_TRACKING_DATA_PATH,filename_ideal)).T
+
     # H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal_subset, pts_real_subset)
     H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal, pts_real)
 
     return H, T, pts_real_mean
-    # ===================================================================
-    # projected_points = project_points(pts_real, pts_real_mean, T, H)
-
 
 if __name__ == "__main__":
     # main()
