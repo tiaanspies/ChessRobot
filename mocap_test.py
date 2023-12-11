@@ -204,7 +204,7 @@ def generate_transformed_pattern():
     print("Updating points")
 
     # change between coordinate systems
-    pts_ideal = np.load(Path(dirs.CAL_TRACKING_DATA_PATH, name_ideal))
+    pts_ideal = np.load(Path(dirs.PLANNED_PATHS, "250_120_120_-120_120_350_ja_ideal.npy"))
     path_optitrack_sys = correction_transform.to_optitrack_sys(pts_ideal)
     projected_points = correction_transform.project_points(path_optitrack_sys, real_mean, T, H)
     projected_points = correction_transform.from_optitrack_sys(projected_points)
