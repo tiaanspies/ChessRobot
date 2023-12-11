@@ -136,8 +136,8 @@ def get_transform(filename_real, filename_ideal):
     """
     # Load the numpy files for current and actual positions
 
-    pts_real = np.load(Path(dirs.CAL_TRACKING_DATA_PATH, filename_real)).T
-    pts_ideal = np.load(Path(dirs.CAL_TRACKING_DATA_PATH,filename_ideal)).T
+    pts_real = np.load(Path(dirs.CAL_TRACKING_DATA_PATH, filename_real)).T[:, [1, 2, 0]]
+    pts_ideal = np.load(Path(dirs.CAL_TRACKING_DATA_PATH,filename_ideal)).T[:, [1, 2, 0]]
 
     # H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal_subset, pts_real_subset)
     H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal, pts_real)

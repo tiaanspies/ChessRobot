@@ -10,7 +10,8 @@
         "type": "python",
         "request": "launch",
         "console": "integratedTerminal",
-        "module": "${fileBasenameNoExtension}",
+        // "module": "Data_analytics.${fileBasenameNoExtension}",
+        "module": "Data_analytics.analyze_transform",
       }
     ]
   }

@@ -32,8 +32,8 @@ def main():
 
     # Load the numpy files for current and actual positions
     # rearrange to print nicely
-    pts_real = np.load(file_real).T[:, [1, 2, 0]]
-    pts_ideal = (np.load(file_ideal).T)[:, [1, 2, 0]]
+    pts_real = np.load(file_real).T[:, [0, 2, 1]]
+    pts_ideal = (np.load(file_ideal).T)[:, [0, 2, 1]]
 
     H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize(pts_ideal, pts_real)
     
@@ -54,8 +54,8 @@ def main():
             xaxis_title='X',
             yaxis_title='Y',
             zaxis_title='Z',
-            xaxis_range=[50, 350],
-            yaxis_range=[-150, 150],
+            xaxis_range=[-150, 150],
+            yaxis_range=[50, 350],
             zaxis_range=[0, 600],
         ),
         title='3D Scatter Plot'

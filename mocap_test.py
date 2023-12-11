@@ -12,6 +12,10 @@ import cv2.aruco as aruco
 import path_directories as dirs
 from Data_analytics import analyze_transform
 import platform
+try:
+    import plotly.graph_objects as go
+except ModuleNotFoundError:
+    print("analyze_transform: Did not load plotly, will not plot")
 
 cm = ChessMoves()
 mc = MotorCommands()
@@ -67,10 +71,35 @@ def create_tracker():
 
     return aruco_obj
 
+def get_filename_planned():
+    """
+    USES PATH SPECIFIED BY "CAL_DATA_PATH"
+    A function that checks the contents of the "Arm Cal Data" file, 
+    prints a list to the user and lets them select a file. Then returns the 
+    selected file name
+    """
+    file_name_generator = dirs.PLANNED_PATHS.glob("*_path_ideal.npy")
+    file_name_list = [file_name for file_name in file_name_generator]
+
+    # print the list of files
+    print("Select a file:")
+    for i, file_name in enumerate(file_name_list):
+        print(f"{i}: {file_name.name}")
+
+    # get user input
+    user_input = input("Enter a number: ")
+    user_input = int(user_input)
+
+    # return the selected file name
+    name = file_name_list[user_input].stem
+    
+    return name[:-len("_path_ideal")] # remove "_measured" from the end
+
 def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     # load path
-    angles = np.load("Data_analytics/plan_big_z2.npy")
-    plan = np.load("Data_analytics/plan_big_z_250pts.npy")
+    selected_name = get_filename_planned()
+    plan = np.load(Path(dirs.PLANNED_PATHS, selected_name+"_path_ideal.npy"))
+    angles = np.load(Path(dirs.PLANNED_PATHS, selected_name+"_ja_ideal.npy"))
     mc.load_path(angles, plan)
 
     # Initialize tracking variables
@@ -125,12 +154,12 @@ def generate_ideal_pattern(plot_pattern=False):
     Generate an ideal calibration pattern
     """
     vertices = {
-    "top" : 340,
+    "top" : 250,
     "bottom" : 120,
     "right" : 120,
     "left" : -120,
     "close" : 120,
-    "far" : 400}
+    "far" : 350}
 
     # generate waypoints
     path = draw_cube(vertices, 4) 
@@ -175,14 +204,32 @@ def generate_transformed_pattern():
     print("Updating points")
 
     # change between coordinate systems
-    pts_ideal = np.load(Path(dirs.CAL_TRACKING_DATA_PATH, name_ideal)).T
-    projected_points = correction_transform.project_points(pts_ideal, real_mean, T, H)
+    pts_ideal = np.load(Path(dirs.CAL_TRACKING_DATA_PATH, name_ideal))
+    path_optitrack_sys = correction_transform.to_optitrack_sys(pts_ideal)
+    projected_points = correction_transform.project_points(path_optitrack_sys, real_mean, T, H)
+    projected_points = correction_transform.from_optitrack_sys(projected_points)
 
     # print to check they match
     if platform.system() == "Windows":
-        ax = plt.axes(projection='3d')
-        ax.scatter(projected_points[0,:], projected_points[1,:], projected_points[2,:])
-        plt.show()
+        fig = go.Figure()
+        analyze_transform.plot_3data(projected_points.T[:, [0, 2, 1]], fig, "projected")
+
+        # Set labels and title
+    # Set labels and title
+    fig.update_layout(
+        scene=dict(
+            xaxis_title='X',
+            yaxis_title='Y',
+            zaxis_title='Z',
+            xaxis_range=[-150, 150],
+            yaxis_range=[50, 350],
+            zaxis_range=[0, 600],
+        ),
+        title='3D Scatter Plot'
+    )
+
+    # Show the plot
+    fig.show()
 
     # solve inverse kinematics
     print("solving inverse kinematics...")
