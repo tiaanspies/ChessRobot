@@ -6,15 +6,13 @@ import cv2
 import cv2.aruco as aruco
 import numpy as np
 
-try:
-    from Chessboard_detection import pi_debugging
-    from Chessboard_detection import Camera_Manager
-except ModuleNotFoundError:
-    import pi_debugging
-    import Camera_Manager
+from Chessboard_detection import pi_debugging 
+from Chessboard_detection import Camera_Manager
 
 import json
 from pathlib import Path
+# import path_directories as dirs
+import path_directories as dirs
 
 MAJOR = 4
 MINOR = 6
@@ -23,7 +21,8 @@ class ArucoTracker:
     """
     A tracking object for the custom aruco boards
     """
-    def __init__(self, aruco_position_path_dir: str, aruco_dict) -> None:
+    def __init__(self, aruco_position_path_dir = dirs.ARUCO_PATTERN_PARAMS_PATH,
+                 aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_5X5_1000)) -> None:
         self.marker_path_dir = aruco_position_path_dir
         self.marker_positions = None
         self.aruco_dict = aruco_dict
@@ -149,8 +148,9 @@ class ArucoTracker:
 def main():
     # define aruco pattern file location.
     # name = "7x5_small_3x2_large_4x4_50_marker"
-    dir_path = Path("Chessboard_detection", "Aruco Markers").resolve().__str__()
 
+    dir_path = Path("Chessboard_detection", "Aruco Markers")
+    # aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_250)
     aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_5X5_1000)
 
     # # create camera object

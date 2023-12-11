@@ -2,6 +2,8 @@ import numpy as np
 import plotly.graph_objects as go
 from scipy.optimize import minimize
 import correction_transform
+from pathlib import Path
+import path_directories as dirs
 
 def main():
     # declare global variables
@@ -11,19 +13,17 @@ def main():
     # name_real = "positions_pi_cam2.npy"
     # name_real = "positions_day2.npy"
     # name_ideal = "path_big_day2.npy"
-    date = "20231210_132909"
+    date = get_filename()
+
     name_real = date+"_measured.npy"
     name_ideal = date+"_planned_path.npy"
 
+    file_real = Path(dirs.CAL_TRACKING_DATA_PATH, name_real)
+    file_ideal = Path(dirs.CAL_TRACKING_DATA_PATH, name_ideal)
+
     # Load the numpy files for current and actual positions
-    try:
-        prefix = "Data_analytics\\Arm Cal Data\\"
-        pts_real = np.load(prefix+name_real).T[:, [1, 2, 0]]
-        pts_ideal = (np.load(prefix+name_ideal).T)[:, [1, 2, 0]]
-    except FileNotFoundError:
-        prefix = "Arm Cal Data\\"
-        pts_real = np.load(prefix+name_real).T[:, [1, 2, 0]]
-        pts_ideal = (np.load(prefix+name_ideal).T)[:, [1, 2, 0]]
+    pts_real = np.load(file_real).T[:, [1, 2, 0]]
+    pts_ideal = (np.load(file_ideal).T)[:, [1, 2, 0]]
 
     H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize(pts_ideal, pts_real)
     
@@ -53,6 +53,30 @@ def main():
 
     # Show the plot
     fig.show()
+
+def get_filename():
+    """
+    USES PATH SPECIFIED BY "CAL_DATA_PATH"
+    A function that checks the contents of the "Arm Cal Data" file, 
+    prints a list to the user and lets them select a file. Then returns the 
+    selected file name
+    """
+    file_name_generator = dirs.CAL_TRACKING_DATA_PATH.glob("*_measured.npy")
+    file_name_list = [file_name for file_name in file_name_generator]
+
+    # print the list of files
+    print("Select a file:")
+    for i, file_name in enumerate(file_name_list):
+        print(f"{i}: {file_name.name}")
+
+    # get user input
+    user_input = input("Enter a number: ")
+    user_input = int(user_input)
+
+    # return the selected file name
+    name = file_name_list[user_input].stem
+    
+    return name[:-len("_measured")] # remove "_measured" from the end
 
 def plot_3data(pts_real, fig, lab):
     # Extract x, y, and z coordinates
@@ -143,8 +167,6 @@ def attempt_minimize(pts_ideal:np.array, pts_real:np.array):
     H = res.x.reshape((4,4))
 
     return H, T, pts_ideal_mean, pts_real_mean
-
-
 
 if __name__ == "__main__":
     main()

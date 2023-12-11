@@ -9,9 +9,21 @@ from Chessboard_detection import Camera_Manager
 from Chessboard_detection import Aruco
 import datetime
 import cv2.aruco as aruco
+import path_directories as dirs
 
 cm = ChessMoves()
 mc = MotorCommands()
+
+def main():
+    save_path()
+
+    # load aruco obj things
+    aruco_obj = create_tracker()
+
+    # # create camera object
+    cam = Camera_Manager.RPiCamera(loadSavedFirst=False, storeImgHist=False)
+
+    run_and_track(aruco_obj, cam, dirs.CAL_TRACKING_DATA_PATH)
 
 def fake_inverse_kinematics(path):
     return np.vstack((path,np.zeros_like(path[0,:])))
@@ -45,14 +57,9 @@ def draw_cube(v, slice_num):
     return path
 
 def create_tracker():
-    # define aruco pattern file location.
-    dir_path = Path("Chessboard_detection", "Aruco Markers").resolve().__str__()
-    # aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_250)
-    aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_5X5_1000)
-
-
     # create aruco tracker object
-    aruco_obj = Aruco.ArucoTracker(dir_path, aruco_dict)
+    # use aruco_tracker to change default parameters
+    aruco_obj = Aruco.ArucoTracker()
 
     # generate new pattern and save
     # aruco_obj.load_marker_pattern_positions(12, 17, 35, 26)
@@ -127,9 +134,10 @@ def save_path():
 
     # np.save("Data_analytics/plan_big_z2.npy",plan)
 
-def main():
-    # save_path()
-
+def run_calibration():
+    """
+    Run the calibration process
+    """
     # load aruco obj things
     aruco_obj = create_tracker()
 
@@ -137,9 +145,89 @@ def main():
     cam = Camera_Manager.RPiCamera(loadSavedFirst=False, storeImgHist=False)
 
     # calibration path
-    cal_path = Path("Data_analytics", "Arm Cal Data")
+    run_and_track(aruco_obj, cam, dirs.CAL_TRACKING_DATA_PATH)
 
-    run_and_track(aruco_obj, cam, cal_path)
+def generate_ideal_pattern(plot_pattern=False):
+    """
+    Generate an ideal calibration pattern
+    """
+    vertices = {
+    "top" : 340,
+    "bottom" : 120,
+    "right" : 120,
+    "left" : -120,
+    "close" : 120,
+    "far" : 400}
+
+    path = draw_cube(vertices, 4) # generate waypoints
+    name = "_".join([str(v) for v in vertices.values()])
+    np.save(Path(dirs.PLANNED_PATHS, name), path)
+    print("path generated")
+
+    if plot_pattern:
+        ax = plt.axes(projection='3d')
+        ax.scatter(path[0,:], path[1,:], path[2,:])
+        plt.show()    
+
+def generate_transformed_pattern():
+    """
+    Generate a transformed calibration pattern
+    """
+    # load transformation matrix
+    print("finding transform")
+    H, T, real_mean = correction_transform.get_transform("positions_day2.npy", "path_big_day2.npy")
+    print("Updating points")
+
+    # change between coordinate systems
+    path_optitrack_sys = correction_transform.to_optitrack_sys(path)
+    projected_points = correction_transform.project_points(path_optitrack_sys, real_mean, T, H)
+    projected_points = correction_transform.from_optitrack_sys(projected_points)
+
+    # print to check they match    
+    ax = plt.axes(projection='3d')
+    ax.scatter(projected_points[0,:], projected_points[1,:], projected_points[2,:])
+    plt.show()
+
+    # solve inverse kinematics
+    print("solving inverse kinematics...")
+    thetas = cm.inverse_kinematics(projected_points) # convert to joint angles
+    grip_commands = cm.get_gripper_commands2(projected_points) # remove unnecessary wrist commands, add gripper open close instead
+    plan = mc.sort_commands(thetas, grip_commands)
+    print("solved!")
+
+    cm.plot_robot(thetas, projected_points)
+
+    np.save("Data_analytics/plan_day3_2.npy",plan)
+
+def user_menu():
+    """
+    Create a user menu with the following options:
+    1. Run calibration
+    2. generate ideal calibration pattern
+    3. generate transformed calibration pattern
+    """
+
+    print("1. Run calibration")
+    print("2. Generate ideal calibration pattern")
+    print("3. Generate transformed calibration pattern")
+    print("4. Exit")
+
+    choice = input("Select an option: ")
+
+    if choice == "1":
+        print("Running calibration")
+        run_calibration()
+    elif choice == "2":
+        print("Generating ideal calibration pattern")
+        generate_ideal_pattern()
+    elif choice == "3":
+        print("Generating transformed calibration pattern")
+        generate_transformed_pattern()
+    elif choice == "4":
+        print("Exiting")
+        exit()
+    else:
+        print("Invalid option")
 
 def old_main():
     vertices = {
@@ -202,6 +290,6 @@ def old_main():
 
 if __name__ == "__main__":
     np.set_printoptions(suppress=True, precision=2)
-
-    main()
+    user_menu()
+    # main()
     # old_main()
