@@ -78,7 +78,7 @@ def get_filename_planned():
     prints a list to the user and lets them select a file. Then returns the 
     selected file name
     """
-    file_name_generator = dirs.PLANNED_PATHS.glob("*_path_ideal.npy")
+    file_name_generator = dirs.PLANNED_PATHS.glob("*_path_*")
     file_name_list = [file_name for file_name in file_name_generator]
 
     # print the list of files
@@ -92,14 +92,20 @@ def get_filename_planned():
 
     # return the selected file name
     name = file_name_list[user_input].stem
+    name = name.split("_path_")[0]  # remove everything after and including "_ja_"
     
-    return name[:-len("_path_ideal")] # remove "_measured" from the end
+    return name # remove "_measured" from the end
 
 def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     # load path
     selected_name = get_filename_planned()
-    plan = np.load(Path(dirs.PLANNED_PATHS, selected_name+"_path_ideal.npy"))
-    angles = np.load(Path(dirs.PLANNED_PATHS, selected_name+"_ja_ideal.npy"))
+
+    for file_name in dirs.PLANNED_PATHS.glob(f"*{selected_name}*"):
+        if "path" in file_name.name:
+            plan = np.load(file_name)
+        elif "ja" in file_name.name:
+            angles = np.load(file_name)
+
     mc.load_path(angles, plan)
 
     # Initialize tracking variables
