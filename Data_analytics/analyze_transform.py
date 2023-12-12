@@ -90,9 +90,9 @@ def get_filename():
 
 def plot_3data(pts_real, fig, lab):
     # Extract x, y, and z coordinates
-    x = pts_real[:, 0]
-    y = pts_real[:, 1]
-    z = pts_real[:, 2]
+    x = pts_real[0, :]
+    y = pts_real[1, :]
+    z = pts_real[2, :]
 
     # shapes = ['circle', 'cross', 'diamond', 'square', 'x']
     shapes = ['circle']

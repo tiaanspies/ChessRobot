@@ -160,11 +160,11 @@ def generate_ideal_pattern(plot_pattern=False):
     Generate an ideal calibration pattern
     """
     vertices = {
-    "top" : 250,
+    "top" : 200,
     "bottom" : 120,
-    "right" : 120,
-    "left" : -120,
-    "close" : 120,
+    "right" : 90,
+    "left" : -90,
+    "close" : 150,
     "far" : 350}
 
     # generate waypoints
@@ -210,7 +210,7 @@ def generate_transformed_pattern():
     print("Updating points")
 
     # change between coordinate systems
-    pts_ideal = np.load(Path(dirs.PLANNED_PATHS, "250_120_120_-120_120_350_path_ideal.npy"))
+    pts_ideal = np.load(Path(dirs.PLANNED_PATHS, "200_120_90_-90_150_350_path_ideal.npy"))
     projected_points = correction_transform.project_points(pts_ideal, real_mean, T, H)
 
     # print to check they match
