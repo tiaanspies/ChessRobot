@@ -126,7 +126,7 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     start_pos = tracker.take_photo_and_estimate_pose(cam)
     
     # home_pos = np.array([[0], [230], [500]]) # home pos
-    home_pos = cm.HOME
+    home_pos = cm.HOME.reshape((3,1))
     
     print(f"Start_pos: {start_pos}")
 
