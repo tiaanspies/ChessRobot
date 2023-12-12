@@ -22,7 +22,7 @@ def main():
     # name_real = "positions_pi_cam2.npy"
     # name_real = "positions_day2.npy"
     # name_ideal = "path_big_day2.npy"
-    date = get_filename()
+    date = get_filename(path=dirs.CAL_TRACKING_DATA_PATH)
 
     name_real = date+"_measured.npy"
     name_ideal = date+"_planned_path.npy"
@@ -64,18 +64,18 @@ def main():
     # Show the plot
     fig.show()
 
-def get_filename():
+def get_filename(path, message="Select a file:", identifier="_measured"):
     """
     USES PATH SPECIFIED BY "CAL_DATA_PATH"
     A function that checks the contents of the "Arm Cal Data" file, 
     prints a list to the user and lets them select a file. Then returns the 
     selected file name
     """
-    file_name_generator = dirs.CAL_TRACKING_DATA_PATH.glob("*_measured.npy")
+    file_name_generator = path.glob(f"*{identifier}.npy")
     file_name_list = [file_name for file_name in file_name_generator]
 
     # print the list of files
-    print("Select a file:")
+    print(message)
     for i, file_name in enumerate(file_name_list):
         print(f"{i}: {file_name.name}")
 
@@ -86,7 +86,7 @@ def get_filename():
     # return the selected file name
     name = file_name_list[user_input].stem
     
-    return name[:-len("_measured")] # remove "_measured" from the end
+    return name[:-len(f"{identifier}")] # remove "_measured" from the end
 
 def plot_3data(pts_real, fig, lab):
     # Extract x, y, and z coordinates

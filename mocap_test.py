@@ -100,9 +100,19 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     # load path
     selected_name = get_filename_planned()
 
+    run_type = 0 #0: unknown, 1: ideal 2: transformed
+
+    # find the file that has the matching datetime
+    # check whether it is ideal or transformed
     for file_name in dirs.PLANNED_PATHS.glob(f"*{selected_name}*"):
         if "path" in file_name.name:
             plan = np.load(file_name)
+
+            if "transformed" in file_name.name:
+                run_type = 2
+            elif "ideal" in file_name.name:
+                run_type = 1
+
         elif "ja" in file_name.name:
             angles = np.load(file_name)
 
@@ -197,12 +207,11 @@ def generate_transformed_pattern():
     Generate a transformed calibration pattern
     """
 
-    file_prefix = analyze_transform.get_filename()
+    file_prefix = analyze_transform.get_filename(path=dirs.CAL_TRACKING_DATA_PATH)
     name_real = file_prefix+"_measured.npy"
     name_ideal = file_prefix+"_planned_path.npy"
 
-    name_joint_angles_transformed = file_prefix+"_ja_transformed"
-    name_path_transformed = file_prefix+"_path_transformed"
+   
 
     # load transformation matrix
     print("Finding transform")
@@ -210,7 +219,13 @@ def generate_transformed_pattern():
     print("Updating points")
 
     # change between coordinate systems
-    pts_ideal = np.load(Path(dirs.PLANNED_PATHS, "200_120_90_-90_150_350_path_ideal.npy"))
+    ideal_datetime = analyze_transform.get_filename(path=dirs.PLANNED_PATHS, 
+                                                message="\nWhich base path would you like to transform?",
+                                                identifier="_path_ideal")
+    name_joint_angles_transformed = ideal_datetime+"_ja_transformed"
+    name_path_transformed = ideal_datetime+"_path_transformed"
+    
+    pts_ideal = np.load(Path(dirs.PLANNED_PATHS, f"{ideal_datetime}_path_ideal.npy"))
     projected_points = correction_transform.project_points(pts_ideal, real_mean, T, H)
 
     # print to check they match
@@ -228,7 +243,8 @@ def generate_transformed_pattern():
     joint_angles = mc.sort_commands(thetas, grip_commands)
     print("solved!")
 
-    cm.plot_robot(thetas, projected_points)
+    if platform.system() == "Windows":
+        cm.plot_robot(thetas, projected_points)
 
     np.save(Path(dirs.PLANNED_PATHS, name_path_transformed), projected_points)
     np.save(Path(dirs.PLANNED_PATHS, name_joint_angles_transformed), joint_angles)
