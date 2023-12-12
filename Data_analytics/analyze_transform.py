@@ -22,31 +22,36 @@ def main():
     # name_real = "positions_pi_cam2.npy"
     # name_real = "positions_day2.npy"
     # name_ideal = "path_big_day2.npy"
-    date = get_filename(path=dirs.CAL_TRACKING_DATA_PATH)
-
+    date = get_filename(path=dirs.CAL_TRACKING_DATA_PATH, message="Select measured file: ", identifier="_measured")
     name_real = date+"_measured.npy"
-    name_ideal = date+"_planned_path.npy"
-
-    file_real = Path(dirs.CAL_TRACKING_DATA_PATH, name_real)
-    file_ideal = Path(dirs.CAL_TRACKING_DATA_PATH, name_ideal)
+    file_real = Path(dirs.CAL_TRACKING_DATA_PATH, name_real) 
 
     # Load the numpy files for current and actual positions
-    # rearrange to print nicely
-    pts_real = np.load(file_real).T[:, [0, 2, 1]]
-    pts_ideal = (np.load(file_ideal).T)[:, [0, 2, 1]]
+    pts_real = np.load(file_real)
 
-    H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize(pts_ideal, pts_real)
-    
-    # ===================================================================
     # Create a 3D scatter plot
     fig = go.Figure()
+    plot_3data(pts_real, fig, "Pts_real")
 
-    # plot target positions
-    plot_3data(pts_ideal, fig, "pts_ideal")
+    # check whether the path is with or without transformation
+    transformation = input("\nIs the path with or without transformation? (Enter 1: 'with' or 2:'without'): ")
+    if transformation == '1':
+        prefix = get_filename(path=dirs.PLANNED_PATHS, message="\nSelect ideal file: ", identifier="_path_ideal")
+        file_ideal = Path(dirs.PLANNED_PATHS, prefix+"_path_ideal.npy")
+        pts_ideal = np.load(file_ideal)
 
-    # find predictions and plot
-    plot_3data(project_points(pts_real, pts_real_mean, T, H), fig, "Projected")
-    # plot_3data(pts_real, fig, "Pts_real")
+        plot_3data(pts_ideal, fig, "pts_ideal")
+    elif transformation == '2':
+        prefix = date+"_planned_path.npy"
+        file_ideal = Path(dirs.CAL_TRACKING_DATA_PATH, date+"_planned_path.npy")
+        pts_ideal = np.load(file_ideal)
+
+        H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize(pts_ideal, pts_real)
+        plot_3data(project_points(pts_real, pts_real_mean, T, H), fig, "Projected")
+        plot_3data(pts_ideal, fig, "pts_ideal")
+    else:
+        print("Invalid input")
+        sys.exit()       
 
     # Set labels and title
     fig.update_layout(

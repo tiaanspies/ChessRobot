@@ -124,7 +124,9 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
 
     # read first pos
     start_pos = tracker.take_photo_and_estimate_pose(cam)
-    home_pos = np.array([[0], [230], [500]]) # home pos
+    
+    # home_pos = np.array([[0], [230], [500]]) # home pos
+    home_pos = cm.HOME
     
     print(f"Start_pos: {start_pos}")
 
@@ -210,8 +212,6 @@ def generate_transformed_pattern():
     file_prefix = analyze_transform.get_filename(path=dirs.CAL_TRACKING_DATA_PATH)
     name_real = file_prefix+"_measured.npy"
     name_ideal = file_prefix+"_planned_path.npy"
-
-   
 
     # load transformation matrix
     print("Finding transform")
