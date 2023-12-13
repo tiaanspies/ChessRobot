@@ -115,7 +115,7 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
 
         elif "ja" in file_name.name:
             angles = np.load(file_name)
-
+   
     mc.load_path(angles, plan)
 
     # Initialize tracking variables

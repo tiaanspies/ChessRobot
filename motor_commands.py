@@ -102,24 +102,31 @@ class MotorCommands:
         self.path_progress = 0
         self.path_len = angles.shape[1]
 
+        self.plan_start_offset = angles.shape[1] - plan_points.shape[1]
+
     def run_once(self):
         """
         Move one step in the path that is saved. Load new paths with load_path
         """
 
-        if self.path_progress >= self.path_len:
-            return False, None
-        
+        # if self.path_progress >= self.path_len:
+        #     return False, None
+        # 0 1 2 3 4 5 6 7 8 9 10
+        # ------------>
         self.base.angle = self.angles[0, self.path_progress]
-        self.shoulder.angle = self.angles[1, self.path_progress]
+        self.shoulder.angle = self.angles[1, self.path_progress] 
         self.elbow.angle = self.angles[2, self.path_progress]
         self.grip.angle = self.angles[3, self.path_progress]
         
-        plan_points = self.plan_points[:, self.path_progress].reshape(3,1)
-        
+        if self.path_progress >= self.plan_start_offset:
+            plan_points = self.plan_points[:, self.path_progress - self.plan_start_offset].reshape(3,1)
+        else:
+            plan_points = None
+            
         self.path_progress += 1
+        path_in_progress = self.path_progress < (self.path_len-1)
 
-        return True, plan_points
+        return path_in_progress, plan_points
     
     def sort_commands(self, thetas, grip_commands):
         thetas[3,:] = grip_commands
