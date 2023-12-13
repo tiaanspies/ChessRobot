@@ -12,28 +12,23 @@ def objective_function(X:np.array, pts_ideal:np.array, pts_real:np.array):
         [x'] = [1  2  3  4 ][x]
         [y'] = [5  6  7  8 ][y]
         [z'] = [9  10 11 12][z]
-        [1'] = [13 14 15 16][1]
+                            [1]
 
     Last element should always be one, therefore elements are divided by the last row in diff calc.
     Can try to modify so that minimization leaves last row of A matrix as [ 0 0 0 1].
-
-    TODO: Check that last row (elements 13 - 16 are needed)
     TODO: check for easier cost function instead of l2 norm then squaring in next step.
 
     returns cost related to error. 
     """
-    A = np.vstack([X.reshape((3,4)), [0, 0, 0, 1]])
-    # A = X.reshape((4,4))
+    A = X.reshape((3,4))
 
     #project points
     pts_transformed = A @ pts_real
 
-    # find the difference and normalize using 4th element
-    diff = pts_ideal/pts_ideal[3, :] - pts_transformed/pts_transformed[3, :]
-    # diff = pts_ideal - pts_transformed
+    diff = pts_ideal - pts_transformed
 
-    # score using l2 norm, excluding 4th element
-    dist = np.linalg.norm(diff[:3, :], axis=0)
+    # score using l2 norm
+    dist = np.linalg.norm(diff, axis=1)
 
     # add squared distance to each point. 
     total = np.sum(dist**2)
@@ -44,8 +39,8 @@ def project_points(pts:np.array, pts_mean:np.array, T:np.array, transformation_m
     """
     Inputs points that will be projected.
 
-    Points are inputted with each point using a row (shape: nx3). 
-    However the dot product requires them to be cols (shape: 3xn).
+    Points are inputted with each point using a row (shape: 3xn). 
+    However the dot product requires them to be cols (shape: nxn).
     They are switched for calculation and then returned to the original shape.
 
     pts_mean: mean of points that was used to calculate transformation matrix.
@@ -62,11 +57,8 @@ def project_points(pts:np.array, pts_mean:np.array, T:np.array, transformation_m
     pts_general_0_mean = np.vstack((pts_zero_0_mean, ones_row))
     
     # # Apply transformation
-    projected_points_general_0_mean = transformation_matrix @ pts_general_0_mean
-    
-    # Convert back to Cartesian coordinates by dividing by last col which should be ones.
-    projected_points_0_mean = projected_points_general_0_mean[:3, :] / projected_points_general_0_mean[3:, :]
-    
+    projected_points_0_mean = transformation_matrix @ pts_general_0_mean
+
     # translate points.
     # TODO: Simplify by translating directly to target instead of first to original then to target.
     translated_points = projected_points_0_mean + pts_mean + T
@@ -89,7 +81,7 @@ def attempt_minimize(pts_ideal:np.array, pts_real:np.array):
     ones_row = np.ones((1, pt_count))
 
     pts_real_zero_mean = np.vstack([pts_real-pts_real_mean, ones_row])
-    pts_ideal_zero_mean = np.vstack([pts_ideal-pts_ideal_mean, ones_row])
+    pts_ideal_zero_mean = pts_ideal-pts_ideal_mean
 
     # set points as args
     args = (pts_ideal_zero_mean, pts_real_zero_mean)
@@ -109,27 +101,12 @@ def attempt_minimize(pts_ideal:np.array, pts_real:np.array):
             # method="CG"
         )
             
-    # reshape transformation matrix
-    # H = res.x.reshape((4,4))
-    H = np.vstack([res.x.reshape((3,4)), [0, 0, 0, 1]])
+    H = res.x.reshape((3,4))
 
     # if res.success == False:
     #     raise ValueError("Unable to minimize for transformation matrix")
 
     return H, T, pts_ideal_mean, pts_real_mean
-
-def to_optitrack_sys(pts_ideal):
-    """
-    Change from coordinate order Noah used to the one used in optitrack 
-    """
-    return (pts_ideal.T)[:, [1, 2, 0]]
-
-def from_optitrack_sys(pts):
-    """
-    Change from the optitrack form to the form Noah used.
-    """
-    return (pts[:, [2, 0, 1]]).T
-
 
 def get_transform(filename_real, filename_ideal):
     """
@@ -140,7 +117,6 @@ def get_transform(filename_real, filename_ideal):
     pts_real = np.load(Path(dirs.CAL_TRACKING_DATA_PATH, filename_real))
     pts_ideal = np.load(Path(dirs.CAL_TRACKING_DATA_PATH,filename_ideal))
 
-    # H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal_subset, pts_real_subset)
     H, T, pts_ideal_mean, pts_real_mean = attempt_minimize(pts_ideal, pts_real)
 
     return H, T, pts_real_mean
