@@ -238,13 +238,20 @@ def generate_transformed_pattern():
 
     # solve inverse kinematics
     print("solving inverse kinematics...")
+
+    # Add 10 copies of the first point to the array.
+    # This is to ensure that the robot starts at an untransformed position
+    # since the first position "zeros" its coordinates
+    home_2_trans_home =  cm.quintic_line(pts_ideal[:,0], projected_points[:,0], 10)
+
+    projected_points = np.hstack((pts_ideal[:,[0]], home_2_trans_home, projected_points))
     thetas = cm.inverse_kinematics(projected_points) # convert to joint angles
     grip_commands = cm.get_gripper_commands2(projected_points) # remove unnecessary wrist commands, add gripper open close instead
     joint_angles = mc.sort_commands(thetas, grip_commands)
     print("solved!")
 
-    if platform.system() == "Windows":
-        cm.plot_robot(thetas, projected_points)
+    # if platform.system() == "Windows":
+    #     cm.plot_robot(thetas, projected_points)
 
     np.save(Path(dirs.PLANNED_PATHS, name_path_transformed), projected_points)
     np.save(Path(dirs.PLANNED_PATHS, name_joint_angles_transformed), joint_angles)
