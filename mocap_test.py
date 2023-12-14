@@ -226,7 +226,7 @@ def generate_transformed_pattern():
     name_path_transformed = ideal_datetime+"_path_transformed"
     
     pts_ideal = np.load(Path(dirs.PLANNED_PATHS, f"{ideal_datetime}_path_ideal.npy"))
-    projected_points = correction_transform.project_points_linear(pts_ideal, real_mean, T, H)
+    projected_points = correction_transform.project_points_quad(pts_ideal, real_mean, T, H)
 
     # print to check they match
     if platform.system() == "Windows":

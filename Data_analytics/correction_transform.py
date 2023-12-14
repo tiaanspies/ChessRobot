@@ -236,7 +236,7 @@ def get_transform(filename_real, filename_ideal):
     pts_real = np.load(Path(dirs.CAL_TRACKING_DATA_PATH, filename_real))
     pts_ideal = np.load(Path(dirs.CAL_TRACKING_DATA_PATH,filename_ideal))
 
-    H, T, pts_ideal_mean, pts_real_mean = attempt_minimize_linear(pts_ideal, pts_real)
+    H, T, pts_ideal_mean, pts_real_mean = attempt_minimize_quad(pts_ideal, pts_real)
 
     return H, T, pts_real_mean
 
