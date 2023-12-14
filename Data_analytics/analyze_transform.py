@@ -31,7 +31,6 @@ def main():
 
     # Create a 3D scatter plot
     fig = go.Figure()
-    plot_3data(pts_real, fig, "Pts_real")
 
     # check whether the path is with or without transformation
     transformation = input("\nIs the path with or without transformation? (Enter 1: 'with' or 2:'without'): ")
@@ -40,17 +39,18 @@ def main():
         file_ideal = Path(dirs.PLANNED_PATHS, prefix+"_path_ideal.npy")
         pts_ideal = np.load(file_ideal)
 
+        plot_3data(pts_real, fig, "Pts_real")
         plot_3data(pts_ideal, fig, "pts_ideal")
     elif transformation == '2':
         prefix = date+"_planned_path.npy"
         file_ideal = Path(dirs.CAL_TRACKING_DATA_PATH, date+"_planned_path.npy")
         pts_ideal = np.load(file_ideal)
 
-        H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize(pts_ideal, pts_real)
+        H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
         
-        # print(f"H:\n{H}\nT:\n{T}\npts_ideal_mean:\n{pts_ideal_mean}\npts_real_mean:\n{pts_real_mean}")
-        
-        plot_3data(correction_transform.project_points(pts_real, pts_real_mean, T, H), fig, "Projected")
+        print(f"H:\n{H}\nT:\n{T}\npts_ideal_mean:\n{pts_ideal_mean}\npts_real_mean:\n{pts_real_mean}")
+        # plot_3data(pts_real, fig, "Pts_real")
+        plot_3data(correction_transform.project_points_quad(pts_real, pts_real_mean, T, H), fig, "Projected")
         plot_3data(pts_ideal, fig, "pts_ideal")
     else:
         print("Invalid input")

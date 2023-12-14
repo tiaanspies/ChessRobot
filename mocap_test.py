@@ -226,7 +226,7 @@ def generate_transformed_pattern():
     name_path_transformed = ideal_datetime+"_path_transformed"
     
     pts_ideal = np.load(Path(dirs.PLANNED_PATHS, f"{ideal_datetime}_path_ideal.npy"))
-    projected_points = correction_transform.project_points(pts_ideal, real_mean, T, H)
+    projected_points = correction_transform.project_points_linear(pts_ideal, real_mean, T, H)
 
     # print to check they match
     if platform.system() == "Windows":
@@ -285,65 +285,6 @@ def user_menu():
         exit()
     else:
         print("Invalid option")
-
-def old_main():
-    vertices = {
-    "top" : 340,
-    "bottom" : 120,
-    "right" : 120,
-    "left" : -120,
-    "close" : 120,
-    "far" : 520}
-
-    path = draw_cube(vertices, 4) # generate waypoints
-    # np.save("mocap_test/path_big_day2.npy", path) # CHANGE THIS SO YOU DON'T OVERWRITE PREVIOUS!
-    # print("path generated")
-    
-    # ax = plt.axes(projection='3d')
-    # ax.scatter(path[0,:], path[1,:], path[2,:])
-    # # plt.show()
-
-    # print("solving inverse kinematics...")
-    # thetas = cm.inverse_kinematics(path) # convert to joint angles
-    # grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
-    # plan = mc.sort_commands(thetas, grip_commands)
-    # print("solved!")
-    # cm.plot_robot(thetas, path)
-
-    # np.save("mocap_test/plan_big_z.npy",plan)
-    # plan = np.load("Data_analytics/plan_big_z.npy",)
-
-    # mc.run(plan)
-
-    # ==================Using transformation matrix============
-    # load transformation matrix
-    print("finding transform")
-    H, T, real_mean = correction_transform.get_transform("positions_day2.npy", "path_big_day2.npy")
-    print("Updating points")
-
-    # change between coordinate systems
-    path_optitrack_sys = correction_transform.to_optitrack_sys(path)
-    projected_points = correction_transform.project_points(path_optitrack_sys, real_mean, T, H)
-    projected_points = correction_transform.from_optitrack_sys(projected_points)
-
-    # print to check they match    
-    ax = plt.axes(projection='3d')
-    ax.scatter(projected_points[0,:], projected_points[1,:], projected_points[2,:])
-    plt.show()
-
-    # solve inverse kinematics
-    print("solving inverse kinematics...")
-    thetas = cm.inverse_kinematics(projected_points) # convert to joint angles
-    grip_commands = cm.get_gripper_commands2(projected_points) # remove unnecessary wrist commands, add gripper open close instead
-    plan = mc.sort_commands(thetas, grip_commands)
-    print("solved!")
-
-    cm.plot_robot(thetas, projected_points)
-
-    np.save("mocap_test/plan_day3_2.npy",plan)
-    plan = np.load("mocap_test/plan_day3_2.npy")
-    
-    mc.run(plan)
 
 if __name__ == "__main__":
     np.set_printoptions(suppress=True, precision=2)
