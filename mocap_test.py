@@ -215,7 +215,12 @@ def generate_transformed_pattern():
 
     # load transformation matrix
     print("Finding transform")
-    H, T, real_mean = correction_transform.get_transform(name_real, name_ideal)
+    file_real = Path(dirs.CAL_TRACKING_DATA_PATH, name_real) 
+    file_ideal = Path(dirs.CAL_TRACKING_DATA_PATH, name_ideal)
+    pts_ideal = np.load(file_ideal)
+    pts_real = np.load(file_real)
+    H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
+    # H, T, real_mean = correction_transform.get_transform(name_real, name_ideal)
     print("Updating points")
 
     # change between coordinate systems
@@ -226,7 +231,7 @@ def generate_transformed_pattern():
     name_path_transformed = ideal_datetime+"_path_transformed"
     
     pts_ideal = np.load(Path(dirs.PLANNED_PATHS, f"{ideal_datetime}_path_ideal.npy"))
-    projected_points = correction_transform.project_points_quad(pts_ideal, real_mean, T, H)
+    projected_points = correction_transform.project_points_quad(pts_ideal, pts_real_mean, T, H)
 
     # print to check they match
     if platform.system() == "Windows":
@@ -287,7 +292,7 @@ def user_menu():
         print("Invalid option")
 
 if __name__ == "__main__":
-    np.set_printoptions(suppress=True, precision=2)
+    # np.set_printoptions(suppress=True)
     user_menu()
     # main()
     # old_main()

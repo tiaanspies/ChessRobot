@@ -178,6 +178,9 @@ def attempt_minimize_quad(pts_ideal:np.array, pts_real:np.array):
             
     H = res.x.reshape((3,10))
 
+    print(f"H: ")
+    print(H)
+
     # if res.success == False:
     #     raise ValueError("Unable to minimize for transformation matrix")
 
