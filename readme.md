@@ -9,3 +9,13 @@ The project is currently in development. The goal for the system is have the rob
 -Robot vision
 -Stockfish 15 Integration (State of the art chess engine)
 -Robot arm path planning
+
+### Installation:
+pip install numpy
+pip install matplotlib
+pip install stockfish (also need to actually download something, I haven't figured that part out yet)
+pip install chess
+pip install requests
+pip install opencv-python
+pip install scipy
+pip install scikit-learn
