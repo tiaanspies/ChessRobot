@@ -1,17 +1,20 @@
 from IK_Solvers.traditional import ChessMoves
-from motor_commands import MotorCommands
+from Positioning.motor_commands import MotorCommands
 import numpy as np
 import matplotlib.pyplot as plt
 from Data_analytics import correction_transform
 from time import sleep
 from pathlib import Path
-from Chessboard_detection import Camera_Manager
+from Camera import Camera_Manager
 from Chessboard_detection import Aruco
 import datetime
 import cv2.aruco as aruco
 import path_directories as dirs
 from Data_analytics import analyze_transform
 import platform
+import logging
+import sys
+
 try:
     import plotly.graph_objects as go
 except ModuleNotFoundError:
@@ -63,6 +66,7 @@ def draw_cube(v, slice_num):
 def create_tracker():
     # create aruco tracker object
     # use aruco_tracker to change default parameters
+    logging.debug("Creating aruco tracker.")
     aruco_obj = Aruco.ArucoTracker()
 
     # generate new pattern and save
@@ -71,14 +75,14 @@ def create_tracker():
 
     return aruco_obj
 
-def get_filename_planned():
+def get_filename_planned(search_path:Path):
     """
     USES PATH SPECIFIED BY "CAL_DATA_PATH"
     A function that checks the contents of the "Arm Cal Data" file, 
     prints a list to the user and lets them select a file. Then returns the 
     selected file name
     """
-    file_name_generator = dirs.PLANNED_PATHS.glob("*_path_*")
+    file_name_generator = search_path.glob("*_path_*")
     file_name_list = [file_name for file_name in file_name_generator]
 
     # print the list of files
@@ -98,9 +102,9 @@ def get_filename_planned():
 
 def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     # load path
-    selected_name = get_filename_planned()
+    selected_name = get_filename_planned(dirs.PLANNED_PATHS)
 
-    run_type = 0 #0: unknown, 1: ideal 2: transformed
+    run_type = 0 # 0: unknown, 1: ideal 2: transformed
 
     # find the file that has the matching datetime
     # check whether it is ideal or transformed
@@ -114,21 +118,25 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
                 run_type = 1
 
         elif "ja" in file_name.name:
+            logging.info(f"Loading {file_name.name}")
             angles = np.load(file_name)
    
     mc.load_path(angles, plan)
 
     # Initialize tracking variables
     measured = np.zeros((3,0))
-    planned_path_actual = np.zeros((3,0))
+    planned_path = np.zeros((3,0))
 
     # read first pos
-    start_pos = tracker.take_photo_and_estimate_pose(cam)
+    ccs_start_pos = tracker.take_photo_and_estimate_pose(cam)
     
-    # home_pos = np.array([[0], [230], [500]]) # home pos
-    home_pos = cm.HOME.reshape((3,1))
+    # rcs_home_pos = np.array([[0], [230], [500]]) # home pos
+    logging.debug(f"Home pos: {cm.HOME}")
+    rcs_home_pos = cm.HOME.reshape((3,1))
     
-    print(f"Start_pos: {start_pos}")
+    logging.debug(f"Start pos [CCS]: {ccs_start_pos}")
+
+    T_ccs_to_rcs = ccs_start_pos-rcs_home_pos
 
     # step through
     run_cal = True 
@@ -137,22 +145,23 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
 
         sleep(2)
         # get position
-        tvecs = tracker.take_photo_and_estimate_pose(cam)
+        ccs_current_pos = tracker.take_photo_and_estimate_pose(cam)
 
-        if tvecs is not None and plan_points is not None:
-            new_pos = tvecs-start_pos+home_pos
+        if ccs_current_pos is not None and plan_points is not None:
+            rcs_new_pos = ccs_current_pos-T_ccs_to_rcs
 
-            measured = np.hstack([measured, new_pos])
-            planned_path_actual = np.hstack([planned_path_actual, plan_points])
-
-            print(f"Position: {new_pos.reshape(1,3)}")
+            measured = np.hstack([measured, rcs_new_pos])
+            planned_path = np.hstack([planned_path, plan_points])
+            
+            logging.debug(f"Position: {ccs_current_pos.reshape(1,3)}")
         sleep(1)
 
     # save data
     prefix = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    logging.info("Saving recorded data.")
     np.save(Path(cal_path, prefix + "_measured.npy"), measured)
-    np.save(Path(cal_path, prefix + "_planned_path.npy"), planned_path_actual)
+    np.save(Path(cal_path, prefix + "_planned_path.npy"), planned_path)
 
 def run_calibration():
     """
@@ -167,7 +176,7 @@ def run_calibration():
     # calibration path
     run_and_track(aruco_obj, cam, dirs.CAL_TRACKING_DATA_PATH)
 
-def generate_ideal_pattern(plot_pattern=False):
+def generate_ideal_pattern():
     """
     Generate an ideal calibration pattern
     """
@@ -180,6 +189,8 @@ def generate_ideal_pattern(plot_pattern=False):
     "far" : 350}
 
     # generate waypoints
+    logging.info("Generating ideal pattern")
+    logging.info(f"Vertices: {vertices}")
     path = draw_cube(vertices, 4) 
 
     # create name
@@ -187,19 +198,21 @@ def generate_ideal_pattern(plot_pattern=False):
     name_path = name+"_path_ideal"
     name_joint_angles = name+"_ja_ideal"
 
+    logging.info(f"Saving path as '{name_path}'")
     np.save(Path(dirs.PLANNED_PATHS, name_path), path)
-    print("path saved")
 
-    if plot_pattern:
-        ax = plt.axes(projection='3d')
-        ax.scatter(path[0,:], path[1,:], path[2,:])
-        plt.show()    
+    # if plot_pattern:
+    #     ax = plt.axes(projection='3d')
+    #     ax.scatter(path[0,:], path[1,:], path[2,:])
+    #     plt.show()    
 
-    print("solving inverse kinematics...")
+    logging.info("solving for joint angles (Inverse Kinematics).")
     thetas = cm.inverse_kinematics(path) # convert to joint angles
+
+    logging.info("Adding gripper commands")
     grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
     joint_angles = mc.sort_commands(thetas, grip_commands)
-    print("solved!")
+    logging.info(f"Saving joing angles as '{name_joint_angles}'")
     # cm.plot_robot(thetas, path)
 
     np.save(Path(dirs.PLANNED_PATHS, name_joint_angles), joint_angles)
@@ -292,7 +305,13 @@ def user_menu():
         print("Invalid option")
 
 if __name__ == "__main__":
-    # np.set_printoptions(suppress=True)
+    log_level = sys.argv[1] if len(sys.argv) > 1 else "info"
+
+    numeric_level = getattr(logging, log_level.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % log_level)
+    logging.basicConfig(filename='example.log', filemode='w', level=logging.DEBUG)
+
     user_menu()
     # main()
     # old_main()
