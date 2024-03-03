@@ -32,7 +32,8 @@ from stockfish import Stockfish
 import numpy as np
 import chess
 import matplotlib.pyplot as plt
-from Chessboard_detection import Camera_Manager, Chess_Vision
+from Camera import Camera_Manager
+from Chessboard_detection import Chess_Vision
 from IK_Solvers.traditional import ChessMoves
 from motor_commands import MotorCommands
 

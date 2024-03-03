@@ -1,4 +1,4 @@
-from Chessboard_detection import Camera_Manager
+from Camera import Camera_Manager
 from Chessboard_detection import Chess_Vision
 import os
 import numpy as np

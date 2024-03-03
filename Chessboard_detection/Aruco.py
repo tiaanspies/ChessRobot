@@ -5,9 +5,10 @@ My aruco file
 import cv2
 import cv2.aruco as aruco
 import numpy as np
+import logging
 
 from Chessboard_detection import pi_debugging 
-from Chessboard_detection import Camera_Manager
+from Camera import Camera_Manager
 
 import json
 from pathlib import Path
@@ -73,6 +74,10 @@ class ArucoTracker:
         """
         Checks whether the marker pattern exists and creates it if it does not.
         """
+        logging.debug(f"Loading aruco pattern positions. "\
+                    "[rows: {rows}, cols: {cols}, checker_size: {checker_size}"\
+                    ", marker_size: {marker_size}]")
+
         properties = [rows, cols, checker_size, marker_size]
         properties_name = "_".join([str(i) for i in properties])
         properties_path = Path(self.marker_path_dir, properties_name+".json")

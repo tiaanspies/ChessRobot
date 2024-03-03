@@ -1,4 +1,4 @@
-import Camera_Manager, platform, threading, queue
+import Camera.Camera_Manager as Camera_Manager, platform, threading, queue
 from pathlib import Path
 import cv2 as cv
 import pi_debugging as debug

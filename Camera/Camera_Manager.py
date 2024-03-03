@@ -1,7 +1,7 @@
 import os, requests, io
 import cv2 as cv
 from time import sleep
-
+import logging
 import numpy as np
 from pathlib import Path
 try:
@@ -111,6 +111,12 @@ class RPiCamera:
 
         # Change statenum to -1 to use saved picture as first picture.
         # Change statenum to 1 to used camera for all pictures
+        logging.debug(
+            f"Creating camera object.\n"\
+            "\t loadSavedFirst: {loadSavedFirst}\n"\
+            "\t storeImgHist: {storeImgHist}\n"\
+            "\t camera.rotation: {self.camera.rotation}"\
+        )
         if loadSavedFirst:
             if absPath is None:
                 raise ValueError("absPath must be given if loadSavedFirst is true. "\

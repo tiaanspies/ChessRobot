@@ -1,5 +1,6 @@
 import os
-from Chessboard_detection import pi_debugging, Camera_Manager
+from Camera import Camera_Manager
+from Chessboard_detection import pi_debugging
 from time import sleep
 
 # start camera

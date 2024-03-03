@@ -9,10 +9,10 @@ from collections import Counter
 
 try:
     from Chessboard_detection import pi_debugging as debug
-    from Chessboard_detection import Camera_Manager
+    from Camera import Camera_Manager
 except ModuleNotFoundError:
     import pi_debugging as debug
-    import Chessboard_detection.Camera_Manager as Camera_Manager
+    import Camera.Camera_Manager as Camera_Manager
 # import Fake_Camera
 
 # CAMERA_RESOLUTION = (640, 480)

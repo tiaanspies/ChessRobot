@@ -1,0 +1,2 @@
+DEBUG:root:Creating aruco tracker.
+DEBUG:root:Loading aruco pattern positions. [rows: {rows}, cols: {cols}, checker_size: {checker_size}, marker_size: {marker_size}]

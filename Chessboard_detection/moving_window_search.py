@@ -5,7 +5,7 @@ import cv2 as cv
 from sklearn.cluster import KMeans
 from scipy import signal
 from collections import Counter
-import Chessboard_detection.Camera_Manager as Camera_Manager
+import Camera.Camera_Manager as Camera_Manager
 from matplotlib import pyplot as plt
 
 CAMERA_RESOLUTION = (480, 640)
