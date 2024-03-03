@@ -25,7 +25,7 @@ class FakeCamera:
         """
         Return the calibration matrix that was saved to cameraProperties.out
         """
-        camera_calib_file = Path("Chessboard_detection", "cameraProperties.out")
+        camera_calib_file = Path("Camera", "cameraProperties.out")
 
         with open(str(camera_calib_file.resolve()), 'rb') as f:
             camera_calib = np.load(f, allow_pickle=True)
@@ -97,7 +97,6 @@ class PhoneCamera:
 
 
 class RPiCamera:
-
     def __init__(self, absPath=None,res=(480, 640), storeImgHist=True, loadSavedFirst=True) -> None:
         self.imgHistDB = pi_debugging.imgDBManager()
 
@@ -117,6 +116,7 @@ class RPiCamera:
             "\t storeImgHist: {storeImgHist}\n"\
             "\t camera.rotation: {self.camera.rotation}"\
         )
+
         if loadSavedFirst:
             if absPath is None:
                 raise ValueError("absPath must be given if loadSavedFirst is true. "\
@@ -131,7 +131,7 @@ class RPiCamera:
         """
         Return the calibration matrix that was saved to cameraProperties.out
         """
-        camera_calib_file = Path("Chessboard_detection", "cameraProperties rpi.out")
+        camera_calib_file = Path("Camera", "cameraProperties rpi.out")
 
         with open(str(camera_calib_file.resolve()), 'rb') as f:
             camera_calib = np.load(f, allow_pickle=True)
@@ -233,7 +233,7 @@ class LaptopCamera:
         """
         Return the calibration matrix that was saved to cameraProperties.out
         """
-        camera_calib_file = Path("Chessboard_detection", "laptopCalib.npy")
+        camera_calib_file = Path("Camera", "laptopCalib.npy")
 
         with open(str(camera_calib_file.resolve()), 'rb') as f:
             camera_calib = np.load(f, allow_pickle=True)

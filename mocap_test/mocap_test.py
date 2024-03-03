@@ -305,7 +305,7 @@ def user_menu():
         print("Invalid option")
 
 if __name__ == "__main__":
-    log_level = sys.argv[1] if len(sys.argv) > 1 else "info"
+    log_level = sys.argv[1] if len(sys.argv) > 1 else "Debug"
 
     numeric_level = getattr(logging, log_level.upper(), None)
     if not isinstance(numeric_level, int):

@@ -8,6 +8,7 @@ try:
 except ModuleNotFoundError:
     print("COULD NOT FIND BOARD MODULE!!!")
 from time import sleep
+import logging
 
 
 class MotorCommands:
@@ -36,8 +37,8 @@ class MotorCommands:
             self.shoulder.set_pulse_width_range(500,2500)
             self.elbow.set_pulse_width_range(500,2500)
             self.grip.set_pulse_width_range(500,2500) # TODO: this one is probably different
-        except NameError:
-            print("COULD NOT LOAD")
+        except NameError as e:
+            logging.error(f"error creating MotorCommands Object in __init__ in motor_commands.py: {e}")
 
         self.OPEN = np.pi/4 # TODO: replace this with the angle needed for it to be open (in radians)
         self.CLOSED = 3*np.pi/4 # TODO: replace this with the angle needed for it to be closed (in radians)
