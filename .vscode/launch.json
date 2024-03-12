@@ -6,12 +6,12 @@
     "version": "0.2.0",
     "configurations": [
       {
-        "name": "Exercise",
+        "name": "Run",
         "type": "python",
         "request": "launch",
         "console": "integratedTerminal",
         // "module": "Data_analytics.${fileBasenameNoExtension}",
-        "module": "Data_analytics.analyze_transform",
+        "module": "run.py",
       }
     ]
   }

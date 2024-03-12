@@ -137,7 +137,7 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     logging.debug(f"Start pos [CCS]: {ccs_start_pos}")
 
     T_ccs_to_rcs = ccs_start_pos-rcs_home_pos
-
+    
     # step through
     run_cal = True 
     while run_cal:
