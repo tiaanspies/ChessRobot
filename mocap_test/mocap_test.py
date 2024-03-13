@@ -124,6 +124,8 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     #     run_type = 1
    
     mc.load_path(angles, plan)
+    moves_total = angles.shape[1]
+    moves_current = 0
 
     # Initialize tracking variables
     measured = np.zeros((3,0))
@@ -144,6 +146,9 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     run_cal = True 
     while run_cal:
         run_cal, plan_points = mc.run_once()
+        moves_current += 1
+
+        print(f"Progress: {moves_current/moves_total*100:.2f}%")
 
         sleep(2)
         # get position
