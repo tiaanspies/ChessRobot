@@ -96,30 +96,32 @@ def get_filename_planned(search_path:Path):
 
     # return the selected file name
     name = file_name_list[user_input].stem
-    name = name.split("_path_")[0]  # remove everything after and including "_ja_"
-    
-    return name # remove "_measured" from the end
+    dimensions = name.split("_path_")[0]  # remove everything after and including "_path_"
+    transform_type = name.split("_path_")[-1]  # remove everything before and including "_path_"
+    return dimensions, transform_type
 
 def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     # load path
-    selected_name = get_filename_planned(dirs.PLANNED_PATHS)
+    dimensions, transform_type = get_filename_planned(dirs.PLANNED_PATHS)
 
     run_type = 0 # 0: unknown, 1: ideal 2: transformed
 
     # find the file that has the matching datetime
     # check whether it is ideal or transformed
-    for file_name in dirs.PLANNED_PATHS.glob(f"*{selected_name}*"):
-        if "path" in file_name.name:
-            plan = np.load(file_name)
 
-            if "transformed" in file_name.name:
-                run_type = 2
-            elif "ideal" in file_name.name:
-                run_type = 1
+    plan = [f for f in dirs.PLANNED_PATHS.glob(f"{dimensions}_path_{transform_type}.npy")]
+    angles = [f for f in dirs.PLANNED_PATHS.glob(f"{dimensions}_ja_{transform_type}.npy")]
 
-        elif "ja" in file_name.name:
-            logging.info(f"Loading {file_name.name}")
-            angles = np.load(file_name)
+    if len(plan) != 1 or len(angles) != 1:
+        raise("Multiple or no matching files found. \n Have Tiaan fix his code")
+        
+    plan = np.load(plan[0])
+    angles = np.load(angles[0])
+
+    # if "transformed" in file_name.name:
+    #     run_type = 2
+    # elif "ideal" in file_name.name:
+    #     run_type = 1
    
     mc.load_path(angles, plan)
 
