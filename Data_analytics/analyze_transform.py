@@ -4,7 +4,6 @@ try:
     import plotly.graph_objects as go
 except ModuleNotFoundError:
     print("analyze_transform: Did not load plotly, will not plot")
-from scipy.optimize import minimize
 from Data_analytics import correction_transform
 from pathlib import Path
 import path_directories as dirs
@@ -15,48 +14,28 @@ def main():
         print("This function is not supported on linux as it requires plotly")
         sys.exit()
 
-    # declare global variables
-    global pts_real_subset
-    global pts_ideal_subset
-
-    # name_real = "positions_pi_cam2.npy"
-    # name_real = "positions_day2.npy"
-    # name_ideal = "path_big_day2.npy"
-    date = get_filename(path=dirs.CAL_TRACKING_DATA_PATH, message="Select measured file: ", identifier="_measured")
-    name_real = date+"_measured.npy"
-    file_real = Path(dirs.CAL_TRACKING_DATA_PATH, name_real) 
-
-    # Load the numpy files for current and actual positions
-    pts_real = np.load(file_real)
-
-    # Create a 3D scatter plot
-    fig = go.Figure()
-
     # check whether the path is with or without transformation
-    transformation = input("\nIs the path with or without transformation? (Enter 1: 'with' or 2:'without'): ")
-    if transformation == '1':
-        prefix = get_filename(path=dirs.PLANNED_PATHS, message="\nSelect ideal file: ", identifier="_path_ideal")
-        file_ideal = Path(dirs.PLANNED_PATHS, prefix+"_path_ideal.npy")
-        pts_ideal = np.load(file_ideal)
-
-        plot_3data(pts_real, fig, "Pts_real")
-        plot_3data(pts_ideal, fig, "pts_ideal")
-    elif transformation == '2':
-        prefix = date+"_planned_path.npy"
-        file_ideal = Path(dirs.CAL_TRACKING_DATA_PATH, date+"_planned_path.npy")
-        pts_ideal = np.load(file_ideal)
-
-        H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
-        
-        print(f"H:\n{H}\nT:\n{T}\npts_ideal_mean:\n{pts_ideal_mean}\npts_real_mean:\n{pts_real_mean}")
-        # plot_3data(pts_real, fig, "Pts_real")
-        plot_3data(correction_transform.project_points_quad(pts_real, pts_real_mean, T, H), fig, "Projected")
-        plot_3data(pts_ideal, fig, "pts_ideal")
+    reply = input(
+        "Select option:\n"\
+        "1: Recorded run with transformation\n"\
+        "2: Recorded run without transformation\n"\
+        "3: Projected run\n"\
+        "4: Plot Planned\n"\
+        )
+    if reply == '1':
+        recorded_with_transformation()
+    elif reply == '2':
+        recorded_without_transformation()
+    elif reply == '3':
+        projected_run()
+    elif reply == '4':
+        plot_planned()
     else:
         print("Invalid input")
         sys.exit()       
 
-    # Set labels and title
+def create_plot_canvas(a='3D Scatter Plot'):
+    fig = go.Figure()
     fig.update_layout(
         scene=dict(
             xaxis_title='X',
@@ -64,23 +43,160 @@ def main():
             zaxis_title='Z',
             xaxis_range=[-150, 150],
             yaxis_range=[50, 350],
-            zaxis_range=[0, 600],
+            zaxis_range=[0, 500],
         ),
-        title='3D Scatter Plot'
+        title=a
     )
+    return fig
+
+def plot_planned():
+    message = "Select measured file: "
+    date, suffix, ext = get_matching_file_name(dirs.PATH_WIN_PLANNED_PATHS, message, "*_path_*")
+
+    name_planned = date+"_path_"+suffix+ext
+
+    # Load the numpy files for current and actual positions
+    pts_planned = np.load(Path(dirs.PATH_WIN_PLANNED_PATHS, name_planned))
+
+    fig = create_plot_canvas(name_planned)
+    plot_3data(pts_planned, fig, "Planned")
 
     # Show the plot
     fig.show()
 
-def get_filename(path, message="Select a file:", identifier="_measured"):
+def recorded_with_transformation():
+    message = "Select measured file: "
+    date, suffix, ext = get_matching_file_name(dirs.PATH_WIN_CAL_TRACKING_DATA, message, "*_measured*")
+
+    name_real = date+"_measured"+suffix+ext
+    name_planned = date+"_planned_path"+suffix+ext
+
+    # Load the numpy files for current and actual positions
+    pts_real = np.load(Path(dirs.PATH_WIN_CAL_TRACKING_DATA, name_real))
+    pts_planned = np.load(Path(dirs.PATH_WIN_CAL_TRACKING_DATA, name_planned))
+
+    message="\nSelect ideal file: "
+    prefix, suffix, ext= get_matching_file_name(dirs.PATH_WIN_PLANNED_PATHS, message, "*_path_ideal*")
+
+    file_ideal = Path(dirs.PATH_WIN_PLANNED_PATHS, prefix+"_path_ideal"+suffix+ext)
+    pts_ideal = np.load(file_ideal)
+
+    fig = create_plot_canvas(name_real)
+    plot_3data(pts_real, fig, "Pts_real")
+    plot_3data(pts_ideal, fig, "pts_ideal")
+    plot_3data(pts_planned, fig, "Planned")
+
+    # Show the plot
+    fig.show()
+    
+def recorded_without_transformation():
+    message="Select measured file: "
+    date, suffix, ext = get_matching_file_name(dirs.PATH_WIN_CAL_TRACKING_DATA, message, identifier="*_measured*")
+
+    name_real = date+"_measured"+suffix+ext
+    file_real = Path(dirs.PATH_WIN_CAL_TRACKING_DATA, name_real) 
+
+    # Load the numpy files for current and actual positions
+    pts_real = np.load(file_real)
+
+    file_ideal = Path(dirs.PATH_WIN_CAL_TRACKING_DATA, date+"_planned_path"+suffix+ext)
+    pts_ideal = np.load(file_ideal)
+
+    H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
+    pts_projected = correction_transform.project_points_quad(pts_real, pts_real_mean, T, H)
+
+    # print transformation matrix and translation
+    correction_transform.print_transform(H, T, pts_real_mean, pts_ideal_mean)
+    print(f"\nMSD Error between ideal and projected: {find_msd_error(pts_ideal, pts_projected)}")
+    print(f"Max Error between ideal and projected: {find_max_error(pts_ideal, pts_projected)}")
+    print(f"Mean Error between ideal and projected: {find_mean_error(pts_ideal, pts_projected)}")
+
+    plot_error_histogram(pts_ideal, pts_projected)
+
+    fig = create_plot_canvas(name_real)
+    plot_3data(pts_real, fig, "Pts_real")
+    plot_3data(pts_ideal, fig, "pts_ideal")
+    plot_3data(pts_projected, fig, "Projected")
+    
+    # Show the plot
+    fig.show()
+
+def projected_run():
+    message = "Which file would you like to use for transformation matrix?"
+    file_prefix, suffix, ext = get_matching_file_name(dirs.PATH_WIN_CAL_TRACKING_DATA, message, "*_measured*")
+    
+    pts_ideal = np.load(Path(dirs.PATH_WIN_CAL_TRACKING_DATA, file_prefix+"_planned_path"+suffix+ext))
+    pts_real = np.load(Path(dirs.PATH_WIN_CAL_TRACKING_DATA, file_prefix+"_measured"+suffix+ext))
+
+    # Minimize
+    H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
+
+    # change between coordinate systems
+    message = "Which base path would you like to transform?"
+    ideal_prefix, suffix, ext = get_matching_file_name(dirs.PATH_WIN_PLANNED_PATHS, message,"*_path_ideal*")
+    
+    name_base = ideal_prefix+"_path_ideal"+suffix+ext
+    pts_ideal = np.load(Path(dirs.PATH_WIN_PLANNED_PATHS, name_base))
+    projected_points = correction_transform.project_points_quad(pts_ideal, pts_real_mean, T, H)
+
+    # print to check they match
+    fig = create_plot_canvas(name_base)
+    plot_3data(pts_real, fig, "Real")
+    plot_3data(pts_ideal, fig, "Ideal")
+    plot_3data(projected_points, fig, "Projected")
+    
+
+    # Show the plot
+    fig.show()
+
+def find_msd_error(pts_a, pts_b):
+    """Find the mean squared error between all the points in pts_a and pts_b"""
+
+    # Calculate the mean squared error
+    msd = np.mean(np.sum((pts_a-pts_b)**2, axis=0))
+
+    return msd
+
+def find_max_error(pts_truth, pts_test):
+    """ Find the max error between truth and test in euclidean distance"""
+
+    # Calculate the max error
+    max_error = np.max(np.sqrt(np.sum((pts_truth-pts_test)**2, axis=0)))
+
+    return max_error
+
+def find_mean_error(pts_truth, pts_test):
+    """ Find the mean error between truth and test in euclidean distance"""
+
+    # Calculate the mean error
+    mean_error = np.mean(np.sqrt(np.sum((pts_truth-pts_test)**2, axis=0)))
+
+    return mean_error
+
+def plot_error_histogram(pts_truth, pts_test):
+    """Plot a histogram of the error between the truth and test points"""
+
+    # Calculate the error
+    error = np.sqrt(np.sum((pts_truth-pts_test)**2, axis=0))
+
+    # Create a histogram
+    # Create a histogram
+    fig = go.Figure(data=[go.Histogram(x=error)])
+    fig.update_xaxes(title_text='Position Error (mm)')
+    fig.update_layout(
+        xaxis=dict(
+            dtick=0.5
+        )
+    )
+    fig.show()
+
+def get_matching_file_name(search_path:Path, message:str="Select a file: ", identifier:str="*_path_*"):
     """
-    USES PATH SPECIFIED BY "CAL_DATA_PATH"
-    A function that checks the contents of the "Arm Cal Data" file, 
-    prints a list to the user and lets them select a file. Then returns the 
-    selected file name
+    asks the user to select a file from any path that contains '*_path_*'.
+    returns the prefix and suffix of the file name.
     """
-    file_name_generator = path.glob(f"*{identifier}.npy")
-    file_name_list = [file_name for file_name in file_name_generator]
+    file_name_generator = search_path.glob(f"{identifier}")
+    file_name_list = sorted([file_name for file_name in file_name_generator], reverse=True)
 
     # print the list of files
     print(message)
@@ -93,8 +209,12 @@ def get_filename(path, message="Select a file:", identifier="_measured"):
 
     # return the selected file name
     name = file_name_list[user_input].stem
-    
-    return name[:-len(f"{identifier}")] # remove "_measured" from the end
+    ext = file_name_list[user_input].suffix
+
+    prefix = name.split(identifier.strip("*"))[0]  # remove everything after and including identifier
+    suffix = name.split(identifier.strip("*"))[-1]  # remove everything before and including identifier
+
+    return prefix, suffix, ext
 
 def plot_3data(pts_real, fig, lab):
     # Extract x, y, and z coordinates
@@ -119,18 +239,6 @@ def plot_3data(pts_real, fig, lab):
         ),
         name=lab
     ))
-
-    fig.update_layout(
-    scene=dict(
-        xaxis_title='X',
-        yaxis_title='Y',
-        zaxis_title='Z',
-        xaxis_range=[-150, 150],
-        yaxis_range=[50, 350],
-        zaxis_range=[0, 600],
-    ),
-    title='3D Scatter Plot'
-    )
 
 if __name__ == "__main__":
     main()
