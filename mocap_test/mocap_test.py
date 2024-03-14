@@ -75,18 +75,16 @@ def create_tracker():
 
     return aruco_obj
 
-def get_filename_planned(search_path:Path):
+def user_file_select(search_path:Path, message:str="Select a file: ", identifier:str="*_path_*"):
     """
-    USES PATH SPECIFIED BY "CAL_DATA_PATH"
-    A function that checks the contents of the "Arm Cal Data" file, 
-    prints a list to the user and lets them select a file. Then returns the 
-    selected file name
+    asks the user to select a file from any path that contains '*_path_*'.
+    returns the prefix and suffix of the file name.
     """
-    file_name_generator = search_path.glob("*_path_*")
+    file_name_generator = search_path.glob(f"{identifier}")
     file_name_list = [file_name for file_name in file_name_generator]
 
     # print the list of files
-    print("Select a file:")
+    print(message)
     for i, file_name in enumerate(file_name_list):
         print(f"{i}: {file_name.name}")
 
@@ -96,13 +94,34 @@ def get_filename_planned(search_path:Path):
 
     # return the selected file name
     name = file_name_list[user_input].stem
-    dimensions = name.split("_path_")[0]  # remove everything after and including "_path_"
-    transform_type = name.split("_path_")[-1]  # remove everything before and including "_path_"
-    return dimensions, transform_type
+    prefix = name.split(identifier.strip("*"))[0]  # remove everything after and including "_path_"
+    suffix = name.split(identifier.strip("*"))[-1]  # remove everything before and including "_path_"
+
+    return prefix, suffix
+
+def get_coord_offset(rcs_calibration_point: np.ndarray, tracker: Aruco.ArucoTracker, cam: Camera_Manager.RPiCamera):
+    """Input calibration point [3x1], moves robot to point. Finds position in camera coords. Returns offset"""
+
+    logging.info("Getting robot to camera coordinate offset")
+    logging.debug(f"Calibration point: {rcs_calibration_point}")
+    calibration_point_joint_angles = cm.inverse_kinematics(rcs_calibration_point)
+    
+    # move to calibration point
+    mc.run(calibration_point_joint_angles)
+
+    # take photo
+    ccs_calibration_point = tracker.take_photo_and_estimate_pose(cam)
+    logging.debug(f"CCS calibration point: {ccs_calibration_point}")
+
+    # calculate offset
+    T_ccs_to_rcs = ccs_calibration_point - rcs_calibration_point
+    logging.debug(f"T_ccs_to_rcs: {T_ccs_to_rcs}")
+
+    return T_ccs_to_rcs
 
 def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     # load path
-    dimensions, transform_type = get_filename_planned(dirs.PLANNED_PATHS)
+    dimensions, transform_type = user_file_select(dirs.PLANNED_PATHS)
 
     run_type = 0 # 0: unknown, 1: ideal 2: transformed
 
@@ -131,16 +150,9 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     measured = np.zeros((3,0))
     planned_path = np.zeros((3,0))
 
-    # read first pos
-    ccs_start_pos = tracker.take_photo_and_estimate_pose(cam)
-    
-    # rcs_home_pos = np.array([[0], [230], [500]]) # home pos
-    logging.debug(f"Home pos: {cm.HOME}")
-    rcs_home_pos = cm.HOME.reshape((3,1))
-    
-    logging.debug(f"Start pos [CCS]: {ccs_start_pos}")
-
-    T_ccs_to_rcs = ccs_start_pos-rcs_home_pos
+    # get offset
+    rcs_calibration_point = np.array([0, 225, 150])
+    T_ccs_to_rcs = get_coord_offset(rcs_calibration_point, tracker, cam)
     
     # step through
     run_cal = True 
@@ -244,13 +256,15 @@ def generate_transformed_pattern():
     print("Updating points")
 
     # change between coordinate systems
-    ideal_datetime = analyze_transform.get_filename(path=dirs.PLANNED_PATHS, 
-                                                message="\nWhich base path would you like to transform?",
-                                                identifier="_path_ideal")
-    name_joint_angles_transformed = ideal_datetime+"_ja_transformed"
-    name_path_transformed = ideal_datetime+"_path_transformed"
+    ideal_prefix, ideal_suffix = user_file_select(
+        path=dirs.PLANNED_PATHS, 
+        message="\nWhich base path would you like to transform?",
+        identifier="*_path_ideal*"
+    )
+    name_joint_angles_transformed = ideal_prefix+"_ja_transformed"+ideal_suffix
+    name_path_transformed = ideal_prefix+"_path_transformed"+ideal_suffix
     
-    pts_ideal = np.load(Path(dirs.PLANNED_PATHS, f"{ideal_datetime}_path_ideal.npy"))
+    pts_ideal = np.load(Path(dirs.PLANNED_PATHS, f"{ideal_prefix}_path_ideal{ideal_suffix}"))
     projected_points = correction_transform.project_points_quad(pts_ideal, pts_real_mean, T, H)
 
     # print to check they match
