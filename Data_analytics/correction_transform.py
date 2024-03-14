@@ -70,10 +70,10 @@ def objective_function_quad(X:np.array, pts_ideal:np.array, pts_real:np.array):
     diff = pts_ideal - pts_transformed
 
     # score using l2 norm
-    dist = np.linalg.norm(diff, axis=1)
+    # dist = np.linalg.norm(diff, axis=1)
 
     # add squared distance to each point. 
-    total = np.sum(dist**2)
+    total = np.sum(diff**2)
 
     return total
 
@@ -92,6 +92,8 @@ def project_points_lin(pts:np.array, pts_mean:np.array, T:np.array, transformati
     """
     assert pts.shape[0] == 3, "Points must be in shape (3, n)"
     assert pts_mean.shape[0] == 3, "Points must be in shape (3, n)"
+
+    raise("This function is not used. Use project_points_quad instead.")
     # Homogeneous coordinates
     pts_zero_0_mean = pts-pts_mean
     ones_row = np.ones((1, pts.shape[1]))
@@ -106,7 +108,7 @@ def project_points_lin(pts:np.array, pts_mean:np.array, T:np.array, transformati
     translated_points = projected_points_0_mean + pts_mean + T
     return translated_points
 
-def project_points_quad(pts:np.array, pts_mean:np.array, T:np.array, transformation_matrix:np.array):
+def project_points_quad(pts:np.array, transformation_matrix:np.array):
     """
     Inputs points that will be projected.
 
@@ -120,23 +122,19 @@ def project_points_quad(pts:np.array, pts_mean:np.array, T:np.array, transformat
     transformation_matrix: Used to project the zero mean points onto the zero mean target points.
     """
     assert pts.shape[0] == 3, "Points must be in shape (3, n)"
-    assert pts_mean.shape[0] == 3, "Points must be in shape (3, n)"
+
     # Homogeneous coordinates
-    pts_zero_0_mean = pts-pts_mean
     ones_row = np.ones((1, pts.shape[1]))
 
-    pts_general_0_mean = np.vstack((pts_zero_0_mean, ones_row))
-    xy = pts_zero_0_mean[0, :] * pts_zero_0_mean[1, :]
-    xz = pts_zero_0_mean[0, :] * pts_zero_0_mean[2, :]
-    yz = pts_zero_0_mean[1, :] * pts_zero_0_mean[2, :]
-    pts_quad = np.square(pts_general_0_mean[:3, :])
+    pts_padded = np.vstack((pts, ones_row))
+    xy = pts[0, :] * pts[1, :]
+    xz = pts[0, :] * pts[2, :]
+    yz = pts[1, :] * pts[2, :]
+    pts_quad = np.square(pts[:3, :])
     # project points
-    pts_transformed = transformation_matrix @ np.vstack((pts_quad,xy,xz,yz, pts_general_0_mean))
+    pts_transformed = transformation_matrix @ np.vstack((pts_quad,xy,xz,yz, pts_padded))
 
-    # translate points.
-    # TODO: Simplify by translating directly to target instead of first to original then to target.
-    translated_points = pts_transformed + pts_mean + T
-    return translated_points
+    return pts_transformed
 
 def attempt_minimize_quad(pts_ideal:np.array, pts_real:np.array):
     """
@@ -154,16 +152,18 @@ def attempt_minimize_quad(pts_ideal:np.array, pts_real:np.array):
     pt_count = pts_real.shape[1]
     ones_row = np.ones((1, pt_count))
 
-    pts_real_zero_mean = np.vstack([pts_real-pts_real_mean, ones_row])
-    pts_ideal_zero_mean = pts_ideal-pts_ideal_mean
+    pts_real_padded = np.vstack([pts_real, ones_row])
 
     # set points as args
-    args = (pts_ideal_zero_mean, pts_real_zero_mean)
+    args = (pts_ideal, pts_real_padded)
 
     # initialize matrix
     init = np.array([[0, 0, 0, 0, 0, 0, 1, 0, 0, 0], 
                      [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, 1, 0]]).reshape((-1))
+                     [0, 0, 0, 0, 0, 0, 0, 0, 1, 0]])
+    
+    init[:, -1] = T[:, 0]
+    init = init.reshape((-1))
     tolerance = 1e-3 * pt_count
     # minimize
     res = minimize(
@@ -181,8 +181,7 @@ def attempt_minimize_quad(pts_ideal:np.array, pts_real:np.array):
 
     # if res.success == False:
     #     raise ValueError("Unable to minimize for transformation matrix")
-
-    return H, T, pts_ideal_mean, pts_real_mean
+    return H
 
 def attempt_minimize_linear(pts_ideal:np.array, pts_real:np.array):
     """
@@ -191,6 +190,8 @@ def attempt_minimize_linear(pts_ideal:np.array, pts_real:np.array):
     """
     assert pts_ideal.shape[0] == 3, "Points must be in shape (3, n)"
     assert pts_real.shape[0] == 3, "Points must be in shape (3, n)"
+
+    raise("This function is not used. Use attempt_minimize_quad instead.")
     pts_ideal_mean = pts_ideal.mean(axis=1, keepdims=True)
     pts_real_mean = pts_real.mean(axis=1, keepdims=True)
 
@@ -207,7 +208,10 @@ def attempt_minimize_linear(pts_ideal:np.array, pts_real:np.array):
     args = (pts_ideal_zero_mean, pts_real_zero_mean)
 
     # initialize matrix
-    init = np.eye(4)[:3,:].reshape((-1))
+    init = np.eye(4)[:3,:]
+    init[:, 3] = T
+
+    init = init.reshape((-1))
     tolerance = 1e-3 * pt_count
     # minimize
     res = minimize(
@@ -226,7 +230,7 @@ def attempt_minimize_linear(pts_ideal:np.array, pts_real:np.array):
     # if res.success == False:
     #     raise ValueError("Unable to minimize for transformation matrix")
 
-    return H, T, pts_ideal_mean, pts_real_mean
+    return H
 
 def get_transform(filename_real, filename_ideal):
     """
@@ -237,24 +241,9 @@ def get_transform(filename_real, filename_ideal):
     pts_real = np.load(Path(dirs.CAL_TRACKING_DATA_PATH, filename_real))
     pts_ideal = np.load(Path(dirs.CAL_TRACKING_DATA_PATH,filename_ideal))
 
-    H, T, pts_ideal_mean, pts_real_mean = attempt_minimize_quad(pts_ideal, pts_real)
+    H = attempt_minimize_quad(pts_ideal, pts_real)
 
-    return H, T, pts_real_mean
-
-def print_transform(H, T, pts_real_mean, pts_ideal_mean):
-    """
-    Print transformation matrix and translation. Prints data from minimize function.
-    """
-    # Convert H to a pandas DataFrame
-    H_df = pd.DataFrame(H)
-    T_df = pd.DataFrame(T)
-    pts_real_mean_df = pd.DataFrame(pts_real_mean)
-    pts_ideal_mean_df = pd.DataFrame(pts_ideal_mean)
-    # Print the DataFrame
-    print("\nH DataFrame:\n", H_df)
-    print("\nT DataFrame:\n", T_df)
-    print("\npts_real_mean DataFrame:\n", pts_real_mean_df)
-    print("\npts_ideal_mean DataFrame:\n", pts_ideal_mean_df)
+    return H
 
 if __name__ == "__main__":
     # main()

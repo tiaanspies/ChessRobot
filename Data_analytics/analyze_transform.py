@@ -102,11 +102,12 @@ def recorded_without_transformation():
     file_ideal = Path(dirs.PATH_WIN_CAL_TRACKING_DATA, date+"_planned_path"+suffix+ext)
     pts_ideal = np.load(file_ideal)
 
-    H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
-    pts_projected = correction_transform.project_points_quad(pts_real, pts_real_mean, T, H)
+    H = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
+    pts_projected = correction_transform.project_points_quad(pts_real, H)
 
     # print transformation matrix and translation
-    correction_transform.print_transform(H, T, pts_real_mean, pts_ideal_mean)
+    # correction_transform.print_transform(H, T, pts_real_mean, pts_ideal_mean)
+    print(f"Transformation matrix:\n{H}")
     print(f"\nMSD Error between ideal and projected: {find_msd_error(pts_ideal, pts_projected)}")
     print(f"Max Error between ideal and projected: {find_max_error(pts_ideal, pts_projected)}")
     print(f"Mean Error between ideal and projected: {find_mean_error(pts_ideal, pts_projected)}")
@@ -129,7 +130,7 @@ def projected_run():
     pts_real = np.load(Path(dirs.PATH_WIN_CAL_TRACKING_DATA, file_prefix+"_measured"+suffix+ext))
 
     # Minimize
-    H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
+    H = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
 
     # change between coordinate systems
     message = "Which base path would you like to transform?"
@@ -137,7 +138,7 @@ def projected_run():
     
     name_base = ideal_prefix+"_path_ideal"+suffix+ext
     pts_ideal = np.load(Path(dirs.PATH_WIN_PLANNED_PATHS, name_base))
-    projected_points = correction_transform.project_points_quad(pts_ideal, pts_real_mean, T, H)
+    projected_points = correction_transform.project_points_quad(pts_ideal, H)
 
     # print to check they match
     fig = create_plot_canvas(name_base)
