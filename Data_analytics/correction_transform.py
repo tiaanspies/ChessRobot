@@ -2,6 +2,7 @@ import numpy as np
 from scipy.optimize import minimize
 import path_directories as dirs
 from pathlib import Path
+import pandas as pd
 
 def objective_function_lin(X:np.array, pts_ideal:np.array, pts_real:np.array):
     """
@@ -178,9 +179,6 @@ def attempt_minimize_quad(pts_ideal:np.array, pts_real:np.array):
             
     H = res.x.reshape((3,10))
 
-    print(f"H: ")
-    print(H)
-
     # if res.success == False:
     #     raise ValueError("Unable to minimize for transformation matrix")
 
@@ -242,6 +240,21 @@ def get_transform(filename_real, filename_ideal):
     H, T, pts_ideal_mean, pts_real_mean = attempt_minimize_quad(pts_ideal, pts_real)
 
     return H, T, pts_real_mean
+
+def print_transform(H, T, pts_real_mean, pts_ideal_mean):
+    """
+    Print transformation matrix and translation. Prints data from minimize function.
+    """
+    # Convert H to a pandas DataFrame
+    H_df = pd.DataFrame(H)
+    T_df = pd.DataFrame(T)
+    pts_real_mean_df = pd.DataFrame(pts_real_mean)
+    pts_ideal_mean_df = pd.DataFrame(pts_ideal_mean)
+    # Print the DataFrame
+    print("\nH DataFrame:\n", H_df)
+    print("\nT DataFrame:\n", T_df)
+    print("\npts_real_mean DataFrame:\n", pts_real_mean_df)
+    print("\npts_ideal_mean DataFrame:\n", pts_ideal_mean_df)
 
 if __name__ == "__main__":
     # main()
