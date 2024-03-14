@@ -99,34 +99,9 @@ def user_file_select(search_path:Path, message:str="Select a file: ", identifier
 
     return prefix, suffix
 
-def get_coord_offset(rcs_calibration_point: np.ndarray, tracker: Aruco.ArucoTracker, cam: Camera_Manager.RPiCamera):
-    """Input calibration point [3x1], moves robot to point. Finds position in camera coords. Returns offset"""
-
-    logging.info("Getting robot to camera coordinate offset")
-    logging.debug(f"Calibration point: {rcs_calibration_point}")
-    calibration_point_joint_angles = cm.inverse_kinematics(rcs_calibration_point)
-    
-    # move to calibration point
-    mc.run(calibration_point_joint_angles)
-
-    # take photo
-    ccs_calibration_point = tracker.take_photo_and_estimate_pose(cam)
-    logging.debug(f"CCS calibration point: {ccs_calibration_point}")
-
-    # calculate offset
-    T_ccs_to_rcs = ccs_calibration_point - rcs_calibration_point
-    logging.debug(f"T_ccs_to_rcs: {T_ccs_to_rcs}")
-
-    return T_ccs_to_rcs
-
 def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     # load path
     dimensions, transform_type = user_file_select(dirs.PLANNED_PATHS)
-
-    run_type = 0 # 0: unknown, 1: ideal 2: transformed
-
-    # find the file that has the matching datetime
-    # check whether it is ideal or transformed
 
     plan = [f for f in dirs.PLANNED_PATHS.glob(f"{dimensions}_path_{transform_type}.npy")]
     angles = [f for f in dirs.PLANNED_PATHS.glob(f"{dimensions}_ja_{transform_type}.npy")]
@@ -136,11 +111,6 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
         
     plan = np.load(plan[0])
     angles = np.load(angles[0])
-
-    # if "transformed" in file_name.name:
-    #     run_type = 2
-    # elif "ideal" in file_name.name:
-    #     run_type = 1
    
     mc.load_path(angles, plan)
     moves_total = angles.shape[1]
@@ -150,10 +120,6 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     measured = np.zeros((3,0))
     planned_path = np.zeros((3,0))
 
-    # get offset
-    rcs_calibration_point = np.array([0, 225, 150])
-    T_ccs_to_rcs = get_coord_offset(rcs_calibration_point, tracker, cam)
-    
     # step through
     run_cal = True 
     while run_cal:
@@ -167,9 +133,8 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
         ccs_current_pos = tracker.take_photo_and_estimate_pose(cam)
 
         if ccs_current_pos is not None and plan_points is not None:
-            rcs_new_pos = ccs_current_pos-T_ccs_to_rcs
 
-            measured = np.hstack([measured, rcs_new_pos])
+            measured = np.hstack([measured, ccs_current_pos])
             planned_path = np.hstack([planned_path, plan_points])
             
             logging.debug(f"Position: {ccs_current_pos.reshape(1,3)}")
@@ -249,10 +214,11 @@ def generate_transformed_pattern():
     print("Finding transform")
     file_real = Path(dirs.CAL_TRACKING_DATA_PATH, name_real) 
     file_ideal = Path(dirs.CAL_TRACKING_DATA_PATH, name_ideal)
+
     pts_ideal = np.load(file_ideal)
     pts_real = np.load(file_real)
-    H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
-    # H, T, real_mean = correction_transform.get_transform(name_real, name_ideal)
+
+    H = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
     print("Updating points")
 
     # change between coordinate systems
@@ -265,15 +231,7 @@ def generate_transformed_pattern():
     name_path_transformed = ideal_prefix+"_path_transformed"+ideal_suffix
     
     pts_ideal = np.load(Path(dirs.PLANNED_PATHS, f"{ideal_prefix}_path_ideal{ideal_suffix}"))
-    projected_points = correction_transform.project_points_quad(pts_ideal, pts_real_mean, T, H)
-
-    # print to check they match
-    if platform.system() == "Windows":
-        fig = go.Figure()
-        analyze_transform.plot_3data(projected_points, fig, "projected")
-
-        # Show the plot
-        fig.show()
+    compensated_points = correction_transform.project_points_quad(pts_ideal, H)
 
     # solve inverse kinematics
     print("solving inverse kinematics...")
@@ -281,18 +239,18 @@ def generate_transformed_pattern():
     # Add 10 copies of the first point to the array.
     # This is to ensure that the robot starts at an untransformed position
     # since the first position "zeros" its coordinates
-    home_2_trans_home =  cm.quintic_line(pts_ideal[:,0], projected_points[:,0], 10)
+    home_2_trans_home =  cm.quintic_line(pts_ideal[:,0], compensated_points[:,0], 10)
 
-    projected_points = np.hstack((pts_ideal[:,[0]], home_2_trans_home, projected_points))
-    thetas = cm.inverse_kinematics(projected_points) # convert to joint angles
-    grip_commands = cm.get_gripper_commands2(projected_points) # remove unnecessary wrist commands, add gripper open close instead
+    compensated_points = np.hstack((pts_ideal[:,[0]], home_2_trans_home, compensated_points))
+    thetas = cm.inverse_kinematics(compensated_points) # convert to joint angles
+    grip_commands = cm.get_gripper_commands2(compensated_points) # remove unnecessary wrist commands, add gripper open close instead
     joint_angles = mc.sort_commands(thetas, grip_commands)
     print("solved!")
 
     # if platform.system() == "Windows":
-    #     cm.plot_robot(thetas, projected_points)
+    #     cm.plot_robot(thetas, compensated_points)
 
-    np.save(Path(dirs.PLANNED_PATHS, name_path_transformed), projected_points)
+    np.save(Path(dirs.PLANNED_PATHS, name_path_transformed), compensated_points)
     np.save(Path(dirs.PLANNED_PATHS, name_joint_angles_transformed), joint_angles)
 
 def user_menu():
