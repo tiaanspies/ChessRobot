@@ -2,7 +2,6 @@ import numpy as np
 from scipy.optimize import minimize
 import path_directories as dirs
 from pathlib import Path
-import pandas as pd
 
 def objective_function_lin(X:np.array, pts_ideal:np.array, pts_real:np.array):
     """
