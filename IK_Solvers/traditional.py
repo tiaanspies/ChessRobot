@@ -6,10 +6,11 @@ except ModuleNotFoundError:
     print("Could not install 'chess' module")
 from IK_Solvers.NLinkArm3d import NLinkArm
 from IK_Solvers.quintic_polynomials_planner import QuinticPolynomial
+from Data_analytics.correction_transform import project_points_quad
 
 class ChessMoves():
     
-    def __init__(self, lift=50, square_width=40, base_dist=150, board_height=25, grip_height=60, L1=296, L2=284.76):
+    def __init__(self, apply_compensation=True, lift=50, square_width=40, base_dist=150, board_height=25, grip_height=60, L1=296, L2=284.76):
         self.LIFT = lift # distance to clear the other pieces in mm
         self.SQUARE_WIDTH = square_width # width of one board square in mm
         self.BASE_DIST = base_dist # distance from edge of the board to the robot base in mm
@@ -22,6 +23,8 @@ class ChessMoves():
 
         self.generate_coords()
         self.initialize_arm()
+
+        self.apply_compensation = apply_compensation
 
     def __str__(self):
         return f"Board width: {self.BOARD_WIDTH} mm \nBoard height: {self.BOARD_HEIGHT} mm \nDistance from robot base: {self.BASE_DIST} mm \nSafe lift height: {self.LIFT} mm"
@@ -116,6 +119,10 @@ class ChessMoves():
 
     def inverse_kinematics(self, path):
         """generates a 4xN list of joint angles from a 3xN list of waypoints"""
+
+        if self.apply_compensation:
+            pass
+            # TODO: this
         # execute IK on each point in the path
         num_waypoints = np.size(path,1)
         theta_path = np.zeros((4,num_waypoints))
