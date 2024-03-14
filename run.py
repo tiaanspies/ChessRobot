@@ -1,3 +1,4 @@
 from mocap_test import mocap_test
+from Data_analytics import analyze_transform
 
-mocap_test.user_menu()
+analyze_transform.main()
