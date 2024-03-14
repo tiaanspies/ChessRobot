@@ -130,7 +130,7 @@ def projected_run():
     pts_real = np.load(Path(dirs.PATH_WIN_CAL_TRACKING_DATA, file_prefix+"_measured"+suffix+ext))
 
     # Minimize
-    H, T, pts_ideal_mean, pts_real_mean = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
+    H = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
 
     # change between coordinate systems
     message = "Which base path would you like to transform?"
@@ -138,7 +138,7 @@ def projected_run():
     
     name_base = ideal_prefix+"_path_ideal"+suffix+ext
     pts_ideal = np.load(Path(dirs.PATH_WIN_PLANNED_PATHS, name_base))
-    projected_points = correction_transform.project_points_quad(pts_ideal, pts_real_mean, T, H)
+    projected_points = correction_transform.project_points_quad(pts_ideal, H)
 
     # print to check they match
     fig = create_plot_canvas(name_base)

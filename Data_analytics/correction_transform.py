@@ -92,6 +92,8 @@ def project_points_lin(pts:np.array, pts_mean:np.array, T:np.array, transformati
     """
     assert pts.shape[0] == 3, "Points must be in shape (3, n)"
     assert pts_mean.shape[0] == 3, "Points must be in shape (3, n)"
+
+    raise("This function is not used. Use project_points_quad instead.")
     # Homogeneous coordinates
     pts_zero_0_mean = pts-pts_mean
     ones_row = np.ones((1, pts.shape[1]))
@@ -132,10 +134,7 @@ def project_points_quad(pts:np.array, transformation_matrix:np.array):
     # project points
     pts_transformed = transformation_matrix @ np.vstack((pts_quad,xy,xz,yz, pts_padded))
 
-    # translate points.
-    # TODO: Simplify by translating directly to target instead of first to original then to target.
-    translated_points = pts_transformed
-    return translated_points
+    return pts_transformed
 
 def attempt_minimize_quad(pts_ideal:np.array, pts_real:np.array):
     """
@@ -191,6 +190,8 @@ def attempt_minimize_linear(pts_ideal:np.array, pts_real:np.array):
     """
     assert pts_ideal.shape[0] == 3, "Points must be in shape (3, n)"
     assert pts_real.shape[0] == 3, "Points must be in shape (3, n)"
+
+    raise("This function is not used. Use attempt_minimize_quad instead.")
     pts_ideal_mean = pts_ideal.mean(axis=1, keepdims=True)
     pts_real_mean = pts_real.mean(axis=1, keepdims=True)
 
@@ -240,24 +241,9 @@ def get_transform(filename_real, filename_ideal):
     pts_real = np.load(Path(dirs.CAL_TRACKING_DATA_PATH, filename_real))
     pts_ideal = np.load(Path(dirs.CAL_TRACKING_DATA_PATH,filename_ideal))
 
-    H, T, pts_ideal_mean, pts_real_mean = attempt_minimize_quad(pts_ideal, pts_real)
+    H = attempt_minimize_quad(pts_ideal, pts_real)
 
-    return H, T, pts_real_mean
-
-def print_transform(H, T, pts_real_mean, pts_ideal_mean):
-    """
-    Print transformation matrix and translation. Prints data from minimize function.
-    """
-    # Convert H to a pandas DataFrame
-    H_df = pd.DataFrame(H)
-    T_df = pd.DataFrame(T)
-    pts_real_mean_df = pd.DataFrame(pts_real_mean)
-    pts_ideal_mean_df = pd.DataFrame(pts_ideal_mean)
-    # Print the DataFrame
-    print("\nH DataFrame:\n", H_df)
-    print("\nT DataFrame:\n", T_df)
-    print("\npts_real_mean DataFrame:\n", pts_real_mean_df)
-    print("\npts_ideal_mean DataFrame:\n", pts_ideal_mean_df)
+    return H
 
 if __name__ == "__main__":
     # main()
