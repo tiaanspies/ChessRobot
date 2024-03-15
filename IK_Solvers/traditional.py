@@ -21,6 +21,9 @@ class ChessMoves():
         self.BOARD_WIDTH = 8 * self.SQUARE_WIDTH # total width of the board
         self.HOME = np.array([0, self.BASE_DIST, 350]) # location of home for the robot arm between moves
 
+        self.camera_to_control_pt_offset = np.array([[-7],[2],[45]])
+        self.rcs_to_ccs_offset = np.array([[221],[-62],[+5]])
+
         self.generate_coords()
         self.initialize_arm()
 
@@ -239,5 +242,29 @@ class ChessMoves():
         z_points = np.linspace(start[2], goal[2], n_steps, endpoint=False)
         
         return np.vstack((x_points, y_points, z_points))
-    
-    
+
+    def control_pt_to_camera_pos(self, control_pt_coords: np.ndarray):
+        """Gets the position of the camera when given the control pt position"""
+        #TODO: Use more complex method to project backwards from camera.
+        # this method assumes the camera is perfectly vertical.
+        camera_coords = control_pt_coords - self.camera_to_control_pt_offset
+
+        return camera_coords
+
+    def camera_to_control_pt_pos(self, camera_coords:np.ndarray):
+        """Gets the control point position when given the camera position."""
+        control_pt_coords = camera_coords + self.camera_to_control_pt_offset
+
+        return control_pt_coords
+
+    def rcs_to_ccs(self, rcs_coords:np.ndarray):
+        """Converts from robot coordinate system to camera coordinate system."""
+        ccs_coords = rcs_coords + self.rcs_to_ccs_offset
+
+        return ccs_coords
+
+    def ccs_to_rcs(self, ccs_coords:np.ndarray):
+        """Converts from camera coordinate system to robot coordinate system."""
+        rcs_coords = ccs_coords - self.rcs_to_ccs_offset
+
+        return rcs_coords

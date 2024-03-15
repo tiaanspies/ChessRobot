@@ -131,10 +131,12 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
         sleep(2)
         # get position
         ccs_current_pos = tracker.take_photo_and_estimate_pose(cam)
-
+        ccs_control_pt_pos = cm.camera_to_control_pt_pos(ccs_current_pos)
+        rcs_control_pt_pos = cm.ccs_to_rcs(ccs_control_pt_pos)
+        
         if ccs_current_pos is not None and plan_points is not None:
 
-            measured = np.hstack([measured, ccs_current_pos])
+            measured = np.hstack([measured, rcs_control_pt_pos])
             planned_path = np.hstack([planned_path, plan_points])
             
             logging.debug(f"Position: {ccs_current_pos.reshape(1,3)}")
@@ -205,8 +207,8 @@ def generate_transformed_pattern():
     """
     Generate a transformed calibration pattern
     """
-
-    file_prefix = analyze_transform.get_filename(path=dirs.CAL_TRACKING_DATA_PATH)
+    message = "Select file for Transformation matrix"
+    file_prefix, suffix = user_file_select(dirs.CAL_TRACKING_DATA_PATH, message, '*_measured*')
     name_real = file_prefix+"_measured.npy"
     name_ideal = file_prefix+"_planned_path.npy"
 
@@ -222,15 +224,13 @@ def generate_transformed_pattern():
     print("Updating points")
 
     # change between coordinate systems
-    ideal_prefix, ideal_suffix = user_file_select(
-        path=dirs.PLANNED_PATHS, 
-        message="\nWhich base path would you like to transform?",
-        identifier="*_path_ideal*"
-    )
+    message="\nWhich base path would you like to transform?"
+    ideal_prefix, ideal_suffix = user_file_select(dirs.PLANNED_PATHS, message,"*_path_ideal*")
+
     name_joint_angles_transformed = ideal_prefix+"_ja_transformed"+ideal_suffix
     name_path_transformed = ideal_prefix+"_path_transformed"+ideal_suffix
     
-    pts_ideal = np.load(Path(dirs.PLANNED_PATHS, f"{ideal_prefix}_path_ideal{ideal_suffix}"))
+    pts_ideal = np.load(Path(dirs.PLANNED_PATHS, f"{ideal_prefix}_path_ideal{ideal_suffix}.npy"))
     compensated_points = correction_transform.project_points_quad(pts_ideal, H)
 
     # solve inverse kinematics
