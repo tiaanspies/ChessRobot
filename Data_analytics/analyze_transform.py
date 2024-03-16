@@ -21,6 +21,7 @@ def main():
         "2: Recorded run without transformation\n"\
         "3: Projected run\n"\
         "4: Plot Planned\n"\
+        "5: Transformation on transformed points\n"\
         )
     if reply == '1':
         recorded_with_transformation()
@@ -30,6 +31,8 @@ def main():
         projected_run()
     elif reply == '4':
         plot_planned()
+    elif reply == '5':
+        transformation_on_transformed_pts()     
     else:
         print("Invalid input")
         sys.exit()       
@@ -41,9 +44,9 @@ def create_plot_canvas(a='3D Scatter Plot'):
             xaxis_title='X',
             yaxis_title='Y',
             zaxis_title='Z',
-            xaxis_range=[-150, 150],
-            yaxis_range=[50, 350],
-            zaxis_range=[0, 500],
+    #         xaxis_range=[-150, 150],
+    #         yaxis_range=[50, 350],
+    #         zaxis_range=[0, 500],
         ),
         title=a
     )
@@ -88,6 +91,49 @@ def recorded_with_transformation():
 
     # Show the plot
     fig.show()
+
+def transformation_on_transformed_pts():
+    """Applies transformation on measured points and compares with ideal points."""
+
+    message="Select measured file: "
+    date, suffix, ext = get_matching_file_name(dirs.PATH_WIN_CAL_TRACKING_DATA, message, identifier="*_measured*")
+
+    name_real = date+"_measured"+suffix+ext
+    file_real = Path(dirs.PATH_WIN_CAL_TRACKING_DATA, name_real) 
+
+    # Load the numpy files for current and actual positions
+    pts_real = np.load(file_real)
+
+    message = "Which Transformation matrix?"
+    file_prefix, suffix, ext = get_matching_file_name(dirs.PATH_WIN_H_MATRIX_PATH, message, "*_H_matrix*")
+    
+    H_path = Path(dirs.PATH_WIN_H_MATRIX_PATH, file_prefix+'_H_matrix'+suffix+ext)
+    H = correction_transform.load_transformation_matrix(H_path)
+
+    message = "What is the ideal path"
+    ideal_prefix, suffix, ext = get_matching_file_name(dirs.PATH_WIN_PLANNED_PATHS, message,"*_path_ideal*")
+    
+    name_base = ideal_prefix+"_path_ideal"+suffix+ext
+    pts_ideal = np.load(Path(dirs.PATH_WIN_PLANNED_PATHS, name_base))
+
+    pts_projected = correction_transform.project_points_quad(pts_real, H)
+
+    # print transformation matrix and translation
+    # correction_transform.print_transform(H, T, pts_real_mean, pts_ideal_mean)
+    # print(f"Transformation matrix:\n{H}")
+    # print(f"\nMSD Error between ideal and projected: {find_msd_error(pts_ideal, pts_projected)}")
+    # print(f"Max Error between ideal and projected: {find_max_error(pts_ideal, pts_projected)}")
+    # print(f"Mean Error between ideal and projected: {find_mean_error(pts_ideal, pts_projected)}")
+
+    # plot_error_histogram(pts_ideal, pts_projected)
+
+    fig = create_plot_canvas(name_real)
+    plot_3data(pts_real, fig, "Pts_real")
+    plot_3data(pts_ideal, fig, "pts_ideal")
+    plot_3data(pts_projected, fig, "Projected")
+    
+    # Show the plot
+    fig.show()
     
 def recorded_without_transformation():
     message="Select measured file: "
@@ -122,17 +168,24 @@ def recorded_without_transformation():
     # Show the plot
     fig.show()
 
-def projected_run():
-    message = "Which file would you like to use for transformation matrix?"
-    file_prefix, suffix, ext = get_matching_file_name(dirs.PATH_WIN_CAL_TRACKING_DATA, message, "*_measured*")
+def filter_unused_ideal_pts(pts_ideal, pts_planned):
+    """Filter out the ideal points that are not used in the planned path"""
     
-    pts_ideal = np.load(Path(dirs.PATH_WIN_CAL_TRACKING_DATA, file_prefix+"_planned_path"+suffix+ext))
-    pts_real = np.load(Path(dirs.PATH_WIN_CAL_TRACKING_DATA, file_prefix+"_measured"+suffix+ext))
+    pts_ideal_copy = pts_ideal.copy()
+    ideal_index = 0
+    for pt in pts_planned.T:
+        if pt != pts_ideal.T[pts_ideal_copy]:
+            pts_ideal_copy = np.delete(pts_ideal_copy, ideal_index, axis=1)
+            
+    return pts_ideal_copy
 
-    # Minimize
-    H = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
-
-    # change between coordinate systems
+def projected_run():
+    message = "Which Transformation matrix?"
+    file_prefix, suffix, ext = get_matching_file_name(dirs.PATH_WIN_H_MATRIX_PATH, message, "*_H_matrix*")
+    
+    H_path = Path(dirs.PATH_WIN_H_MATRIX_PATH, file_prefix+'_H_matrix'+suffix+ext)
+    H = correction_transform.load_transformation_matrix(H_path)
+    
     message = "Which base path would you like to transform?"
     ideal_prefix, suffix, ext = get_matching_file_name(dirs.PATH_WIN_PLANNED_PATHS, message,"*_path_ideal*")
     
@@ -142,7 +195,6 @@ def projected_run():
 
     # print to check they match
     fig = create_plot_canvas(name_base)
-    plot_3data(pts_real, fig, "Real")
     plot_3data(pts_ideal, fig, "Ideal")
     plot_3data(projected_points, fig, "Projected")
     
@@ -200,7 +252,7 @@ def get_matching_file_name(search_path:Path, message:str="Select a file: ", iden
     file_name_list = sorted([file_name for file_name in file_name_generator], reverse=True)
 
     # print the list of files
-    print(message)
+    print("\n"+message)
     for i, file_name in enumerate(file_name_list):
         print(f"{i}: {file_name.name}")
 
