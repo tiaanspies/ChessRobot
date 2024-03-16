@@ -81,7 +81,7 @@ def user_file_select(search_path:Path, message:str="Select a file: ", identifier
     returns the prefix and suffix of the file name.
     """
     file_name_generator = search_path.glob(f"{identifier}")
-    file_name_list = [file_name for file_name in file_name_generator]
+    file_name_list = sorted([file_name for file_name in file_name_generator], reverse=True)
 
     # print the list of files
     print(message)
@@ -98,6 +98,37 @@ def user_file_select(search_path:Path, message:str="Select a file: ", identifier
     suffix = name.split(identifier.strip("*"))[-1]  # remove everything before and including "_path_"
 
     return prefix, suffix
+
+def user_file_select_multiple(search_path:Path, message:str="Select a file: ", identifier:str="*_path_*"):
+    """
+    asks the user to select a file from any path that contains '*_path_*'.
+    returns the prefix and suffix of the file name.
+    """
+    file_name_generator = search_path.glob(f"{identifier}")
+    file_name_list = sorted([file_name for file_name in file_name_generator], reverse=True)
+
+    # print the list of files
+    print(message)
+    for i, file_name in enumerate(file_name_list):
+        print(f"{i}: {file_name.name}")
+
+    # get user input
+    user_input = input("Enter a number or q to continue: ")
+    selected_file_prefixes = []
+    selected_file_suffixes = []
+
+    while user_input != "q":
+        
+        user_input = int(user_input)
+
+        # return the selected file name
+        name = file_name_list[user_input].stem
+        selected_file_prefixes.append(name.split(identifier.strip("*"))[0])  # remove everything after and including "_path_"
+        selected_file_suffixes.append(name.split(identifier.strip("*"))[-1])  # remove everything before and including "_path_"
+
+        user_input = input("Enter a number or q to continue: ")
+
+    return selected_file_prefixes, selected_file_suffixes
 
 def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     # load path
@@ -203,10 +234,7 @@ def generate_ideal_pattern():
 
     np.save(Path(dirs.PLANNED_PATHS, name_joint_angles), joint_angles)
 
-def generate_transformed_pattern():
-    """
-    Generate a transformed calibration pattern
-    """
+def calculate_H_matrix():
     message = "Select file for Transformation matrix"
     file_prefix, suffix = user_file_select(dirs.CAL_TRACKING_DATA_PATH, message, '*_measured*')
     name_real = file_prefix+"_measured.npy"
@@ -221,7 +249,17 @@ def generate_transformed_pattern():
     pts_real = np.load(file_real)
 
     H = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
-    print("Updating points")
+    print(f"Saving as {file_prefix}_H_matrix{suffix}")
+
+    correction_transform.save_transformation_matrix(file_prefix+"_H_matrix"+suffix+'.csv', H)
+
+def generate_transformed_pattern():
+    """
+    Generate a transformed calibration pattern
+    """
+    message = "Select transformation Matrix"
+    file_prefix, suffix = user_file_select_multiple(dirs.H_MATRIX_PATH, message, '*_H_matrix*')
+    H = correction_transform.load_transformation_matrix(file_prefix+"_H_matrix"+suffix+'.csv')
 
     # change between coordinate systems
     message="\nWhich base path would you like to transform?"
@@ -264,7 +302,8 @@ def user_menu():
     print("\n1. Run calibration")
     print("2. Generate ideal calibration pattern")
     print("3. Generate transformed calibration pattern")
-    print("4. Exit")
+    print('4. Calculate Transformation Matrix')
+    print("0. Exit")
 
     choice = input("Select an option: ")
 
@@ -277,7 +316,10 @@ def user_menu():
     elif choice == "3":
         print("\nGenerating transformed calibration pattern\n")
         generate_transformed_pattern()
-    elif choice == "4":
+    elif choice == '4':
+        print('Calculate Transformation Matrix')
+        calculate_H_matrix()
+    elif choice == "0":
         print("Exiting")
         exit()
     else:
