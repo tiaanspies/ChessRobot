@@ -248,10 +248,10 @@ if __name__ == "__main__":
     # main()
     pass
 
-def save_transformation_matrix(filename:str, H:np.array):
+def save_transformation_matrix(path:str, H:np.array):
     """Saves the transformation matrix in a csv file"""
-    np.savetxt(Path(dirs.H_MATRIX_PATH, filename), H, delimiter=",")
+    np.savetxt(path, H, delimiter=",")
 
-def load_transformation_matrix(filename:str):
+def load_transformation_matrix(path):
     """Loads the transformation matrix from a csv file"""
-    return np.loadtxt(Path(dirs.H_MATRIX_PATH, filename), delimiter=",")
+    return np.loadtxt(path, delimiter=",")
