@@ -260,7 +260,7 @@ def calculate_H_matrix_ideal():
     H = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
     print(f"Saving as {file_prefix}_H_matrix{suffix}")
 
-    H_path = Path(dirs.PATH_WIN_H_MATRIX_PATH,file_prefix+"_H_matrix"+suffix+'.csv')
+    H_path = Path(dirs.H_MATRIX_PATH,file_prefix+"_H_matrix"+suffix+'.csv')
     correction_transform.save_transformation_matrix(H_path, H)
 
 def calculate_H_matrix_planned():
