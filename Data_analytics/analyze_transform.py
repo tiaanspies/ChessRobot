@@ -186,6 +186,9 @@ def filter_unused_ideal_pts(pts_ideal, pts_planned, pts_planned_full):
         pts_planned_full_copy = np.delete(pts_planned_full_copy, pts_planned_full_copy.shape[1] - 1, axis=1)
         pts_ideal_copy = np.delete(pts_ideal_copy, pts_planned_full_copy.shape[1] - 1, axis=1)
 
+    assert pts_planned.shape[1] == pts_ideal_copy.shape[1], f"pts_planned {pts_planned.shape[1]} "\
+        f"and pts_ideal_copy {pts_ideal_copy.shape[1]} must have the same number of points"
+
     return pts_ideal_copy
 
 def projected_run():

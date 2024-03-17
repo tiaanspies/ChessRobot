@@ -59,6 +59,10 @@ def objective_function_quad(X:np.array, pts_ideal:np.array, pts_real:np.array):
     """
     A = X.reshape((3,10))
 
+    # Remove columns where z values are larger than 210
+    mask = pts_real[2, :] <= 210
+    pts_real = pts_real[:, mask]
+
     pts_quad = np.square(pts_real)
     # project points
     xy = pts_real[0, :] * pts_real[1, :]
@@ -66,7 +70,7 @@ def objective_function_quad(X:np.array, pts_ideal:np.array, pts_real:np.array):
     yz = pts_real[1, :] * pts_real[2, :]
     pts_transformed = A @ np.vstack([pts_quad[:3, :], xy, xz, yz, pts_real])
 
-    diff = pts_ideal - pts_transformed
+    diff = pts_ideal[:,mask] - pts_transformed
 
     # score using l2 norm
     # dist = np.linalg.norm(diff, axis=1)
@@ -106,6 +110,13 @@ def project_points_lin(pts:np.array, pts_mean:np.array, T:np.array, transformati
     # TODO: Simplify by translating directly to target instead of first to original then to target.
     translated_points = projected_points_0_mean + pts_mean + T
     return translated_points
+
+def project_points_quad_multiple(pts:np.array, transformation_matrices:list[np.array]):
+    """Apply multiple transformations in series to points"""
+    for transformation_matrix in transformation_matrices:
+        pts = project_points_quad(pts, transformation_matrix)
+
+    return pts
 
 def project_points_quad(pts:np.array, transformation_matrix:np.array):
     """
@@ -256,3 +267,9 @@ def save_transformation_matrix(path:str, H:np.array):
 def load_transformation_matrix(path):
     """Loads the transformation matrix from a csv file"""
     return np.loadtxt(path, delimiter=",")
+
+def load_transformation_matrix_multiple(paths):
+    """Loads the transformation matrix from a csv file"""
+    matrices = [np.loadtxt(path, delimiter=",") for path in paths]
+
+    return matrices

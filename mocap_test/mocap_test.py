@@ -296,18 +296,19 @@ def generate_transformed_pattern():
     Generate a transformed calibration pattern
     """
     message = "Select transformation Matrix"
-    file_prefix, suffix = user_file_select(dirs.H_MATRIX_PATH, message, '*_H_matrix*')
-    H = correction_transform.load_transformation_matrix(file_prefix+"_H_matrix"+suffix+'.csv')
+    file_prefixes, suffixes = user_file_select_multiple(dirs.H_MATRIX_PATH, message, '*_H_matrix*')
+    paths = [Path(dirs.H_MATRIX_PATH, f"{p}_H_matrix{s}.csv") for p, s in zip(file_prefixes, suffixes)]
+    H_list = correction_transform.load_transformation_matrix_multiple(paths)
 
     # change between coordinate systems
     message="\nWhich base path would you like to transform?"
     ideal_prefix, ideal_suffix = user_file_select(dirs.PLANNED_PATHS, message,"*_path_ideal*")
     pts_ideal = np.load(Path(dirs.PLANNED_PATHS, f"{ideal_prefix}_path_ideal{ideal_suffix}.npy"))
 
-    name_joint_angles_transformed = ideal_prefix+"_ja_transformed"+ideal_suffix
-    name_path_transformed = ideal_prefix+"_path_transformed"+ideal_suffix
+    name_joint_angles_transformed = ideal_prefix+"_ja_transformed_2x"+ideal_suffix
+    name_path_transformed = ideal_prefix+"_path_transformed_2x"+ideal_suffix
     
-    compensated_points = correction_transform.project_points_quad(pts_ideal, H)
+    compensated_points = correction_transform.project_points_quad_multiple(pts_ideal, H_list)
 
     # solve inverse kinematics
     print("solving inverse kinematics...")
