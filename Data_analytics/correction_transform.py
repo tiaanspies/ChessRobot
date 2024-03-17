@@ -137,8 +137,7 @@ def project_points_quad(pts:np.array, transformation_matrix:np.array):
 
 def attempt_minimize_quad(pts_ideal:np.array, pts_real:np.array):
     """
-    Make points zero mean and save mean to return functions later.  
-    
+ 
     """
     assert pts_ideal.shape[0] == 3, "Points must be in shape (3, n)"
     assert pts_real.shape[0] == 3, "Points must be in shape (3, n)"
@@ -175,6 +174,8 @@ def attempt_minimize_quad(pts_ideal:np.array, pts_real:np.array):
             method="BFGS"
             # method="CG"
         )
+
+    print(f"Iterations used: {res.nit}")
             
     H = res.x.reshape((3,10))
 

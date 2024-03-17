@@ -231,7 +231,23 @@ def generate_ideal_pattern():
 
 def calculate_H_matrix_ideal():
     """Calculates H from ideal points, some work is dont to map ideal to real since not all ideal points are measured."""
+    # As user which file is ideal
+    message = "Select full version of planned path"
+    file_prefix, suffix = user_file_select(dirs.PLANNED_PATHS, message, '*_path_*')
     
+    #Load ideal points
+    name_planned_full = file_prefix+"_path_"+suffix+'.npy'
+    file_planned_full = Path(dirs.PLANNED_PATHS, name_planned_full)
+    pts_planned_full = np.load(file_planned_full)
+
+    message = "Select ideal path"
+    file_prefix, suffix = user_file_select(dirs.PLANNED_PATHS, message, '*_path_*')
+    
+    #Load ideal points
+    name_ideal = file_prefix+"_path_"+suffix+'.npy'
+    file_ideal = Path(dirs.PLANNED_PATHS, name_ideal)
+    pts_ideal = np.load(file_ideal)
+
     # Ask user which file to use for real points
     message = "Select measured files to calculate compensation for:"
     file_prefix, suffix = user_file_select(dirs.CAL_TRACKING_DATA_PATH, message, '*_measured*')
@@ -244,23 +260,14 @@ def calculate_H_matrix_ideal():
     name_planned = file_prefix+"_planned_path.npy"
     file_planned = Path(dirs.CAL_TRACKING_DATA_PATH, name_planned)
     pts_planned = np.load(file_planned)
-
-    # As user which file is ideal
-    message = "Select ideal path"
-    file_prefix, suffix = user_file_select(dirs.PLANNED_PATHS, message, '*_path_transformed*')
-    
-    #Load ideal points
-    name_ideal = file_prefix+"_path_transformed"+suffix+'.npy'
-    file_ideal = Path(dirs.PLANNED_PATHS, name_ideal)
-    pts_ideal = np.load(file_ideal)
     
     # filter out the between planned 
-    pts_ideal = analyze_transform.filter_unused_ideal_pts(pts_ideal, pts_planned)
+    pts_ideal = analyze_transform.filter_unused_ideal_pts(pts_ideal, pts_planned, pts_planned_full)
 
     H = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
     print(f"Saving as {file_prefix}_H_matrix{suffix}")
 
-    H_path = Path(dirs.H_MATRIX_PATH,file_prefix+"_H_matrix"+suffix+'.csv')
+    H_path = Path(dirs.H_MATRIX_PATH, file_prefix+"_H_matrix"+suffix+'.csv')
     correction_transform.save_transformation_matrix(H_path, H)
 
 def calculate_H_matrix_planned():
@@ -289,17 +296,17 @@ def generate_transformed_pattern():
     Generate a transformed calibration pattern
     """
     message = "Select transformation Matrix"
-    file_prefix, suffix = user_file_select_multiple(dirs.H_MATRIX_PATH, message, '*_H_matrix*')
+    file_prefix, suffix = user_file_select(dirs.H_MATRIX_PATH, message, '*_H_matrix*')
     H = correction_transform.load_transformation_matrix(file_prefix+"_H_matrix"+suffix+'.csv')
 
     # change between coordinate systems
     message="\nWhich base path would you like to transform?"
     ideal_prefix, ideal_suffix = user_file_select(dirs.PLANNED_PATHS, message,"*_path_ideal*")
+    pts_ideal = np.load(Path(dirs.PLANNED_PATHS, f"{ideal_prefix}_path_ideal{ideal_suffix}.npy"))
 
     name_joint_angles_transformed = ideal_prefix+"_ja_transformed"+ideal_suffix
     name_path_transformed = ideal_prefix+"_path_transformed"+ideal_suffix
     
-    pts_ideal = np.load(Path(dirs.PLANNED_PATHS, f"{ideal_prefix}_path_ideal{ideal_suffix}.npy"))
     compensated_points = correction_transform.project_points_quad(pts_ideal, H)
 
     # solve inverse kinematics
@@ -308,9 +315,9 @@ def generate_transformed_pattern():
     # Add 10 copies of the first point to the array.
     # This is to ensure that the robot starts at an untransformed position
     # since the first position "zeros" its coordinates
-    home_2_trans_home =  cm.quintic_line(pts_ideal[:,0], compensated_points[:,0], 10)
+    # home_2_trans_home =  cm.quintic_line(pts_ideal[:,0], compensated_points[:,0], 10)
 
-    compensated_points = np.hstack((pts_ideal[:,[0]], home_2_trans_home, compensated_points))
+    # compensated_points = np.hstack((pts_ideal[:,[0]], home_2_trans_home, compensated_points))
     thetas = cm.inverse_kinematics(compensated_points) # convert to joint angles
     grip_commands = cm.get_gripper_commands2(compensated_points) # remove unnecessary wrist commands, add gripper open close instead
     joint_angles = mc.sort_commands(thetas, grip_commands)

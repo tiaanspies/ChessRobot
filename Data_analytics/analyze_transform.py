@@ -168,16 +168,23 @@ def recorded_without_transformation():
     # Show the plot
     fig.show()
 
-def filter_unused_ideal_pts(pts_ideal, pts_planned):
+def filter_unused_ideal_pts(pts_ideal, pts_planned, pts_planned_full):
     """Filter out the ideal points that are not used in the planned path"""
     
+    assert pts_ideal.shape == pts_planned_full.shape, f"pts_ideal {pts_ideal.shape} "\
+        f"and pts_planned_full {pts_planned_full.shape} must have the same shape"
+    
+    pts_planned_full_copy = pts_planned_full.copy()
     pts_ideal_copy = pts_ideal.copy()
+
     for i, pt in enumerate(pts_planned.T):
-        if not np.array_equal(pt, pts_ideal.T[i]):
+        if not np.array_equal(pt, pts_planned_full_copy.T[i]):
+            pts_planned_full_copy = np.delete(pts_planned_full_copy, i, axis=1)
             pts_ideal_copy = np.delete(pts_ideal_copy, i, axis=1)
 
-    if pts_ideal_copy.shape[1] - pts_planned.shape[1] == 1:
-        pts_ideal_copy = np.delete(pts_ideal_copy, pts_ideal_copy.shape[1] - 1, axis=1)
+    if pts_planned_full_copy.shape[1] - pts_planned.shape[1] == 1:
+        pts_planned_full_copy = np.delete(pts_planned_full_copy, pts_planned_full_copy.shape[1] - 1, axis=1)
+        pts_ideal_copy = np.delete(pts_ideal_copy, pts_planned_full_copy.shape[1] - 1, axis=1)
 
     return pts_ideal_copy
 
