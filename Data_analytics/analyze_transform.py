@@ -172,11 +172,13 @@ def filter_unused_ideal_pts(pts_ideal, pts_planned):
     """Filter out the ideal points that are not used in the planned path"""
     
     pts_ideal_copy = pts_ideal.copy()
-    ideal_index = 0
-    for pt in pts_planned.T:
-        if pt != pts_ideal.T[pts_ideal_copy]:
-            pts_ideal_copy = np.delete(pts_ideal_copy, ideal_index, axis=1)
-            
+    for i, pt in enumerate(pts_planned.T):
+        if not np.array_equal(pt, pts_ideal.T[i]):
+            pts_ideal_copy = np.delete(pts_ideal_copy, i, axis=1)
+
+    if pts_ideal_copy.shape[1] - pts_planned.shape[1] == 1:
+        pts_ideal_copy = np.delete(pts_ideal_copy, pts_ideal_copy.shape[1] - 1, axis=1)
+
     return pts_ideal_copy
 
 def projected_run():

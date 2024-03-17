@@ -84,7 +84,7 @@ def user_file_select(search_path:Path, message:str="Select a file: ", identifier
     file_name_list = sorted([file_name for file_name in file_name_generator], reverse=True)
 
     # print the list of files
-    print(message)
+    print("\n"+message)
     for i, file_name in enumerate(file_name_list):
         print(f"{i}: {file_name.name}")
 
@@ -218,11 +218,6 @@ def generate_ideal_pattern():
     logging.info(f"Saving path as '{name_path}'")
     np.save(Path(dirs.PLANNED_PATHS, name_path), path)
 
-    # if plot_pattern:
-    #     ax = plt.axes(projection='3d')
-    #     ax.scatter(path[0,:], path[1,:], path[2,:])
-    #     plt.show()    
-
     logging.info("solving for joint angles (Inverse Kinematics).")
     thetas = cm.inverse_kinematics(path) # convert to joint angles
 
@@ -234,21 +229,57 @@ def generate_ideal_pattern():
 
     np.save(Path(dirs.PLANNED_PATHS, name_joint_angles), joint_angles)
 
-def calculate_H_matrix():
-    message = "Select file for Transformation matrix"
+def calculate_H_matrix_ideal():
+    """Calculates H from ideal points, some work is dont to map ideal to real since not all ideal points are measured."""
+    
+    # Ask user which file to use for real points
+    message = "Select measured files to calculate compensation for:"
     file_prefix, suffix = user_file_select(dirs.CAL_TRACKING_DATA_PATH, message, '*_measured*')
+    
+    # load real and planned points
     name_real = file_prefix+"_measured.npy"
-    name_ideal = file_prefix+"_planned_path.npy"
-
-    # load transformation matrix
-    print("Finding transform")
-    file_real = Path(dirs.CAL_TRACKING_DATA_PATH, name_real) 
-    file_ideal = Path(dirs.CAL_TRACKING_DATA_PATH, name_ideal)
-
-    pts_ideal = np.load(file_ideal)
+    file_real = Path(dirs.CAL_TRACKING_DATA_PATH, name_real)
     pts_real = np.load(file_real)
 
+    name_planned = file_prefix+"_planned_path.npy"
+    file_planned = Path(dirs.CAL_TRACKING_DATA_PATH, name_planned)
+    pts_planned = np.load(file_planned)
+
+    # As user which file is ideal
+    message = "Select ideal path"
+    file_prefix, suffix = user_file_select(dirs.PLANNED_PATHS, message, '*_path_transformed*')
+    
+    #Load ideal points
+    name_ideal = file_prefix+"_path_transformed"+suffix+'.npy'
+    file_ideal = Path(dirs.PLANNED_PATHS, name_ideal)
+    pts_ideal = np.load(file_ideal)
+    
+    # filter out the between planned 
+    pts_ideal = analyze_transform.filter_unused_ideal_pts(pts_ideal, pts_planned)
+
     H = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
+    print(f"Saving as {file_prefix}_H_matrix{suffix}")
+
+    H_path = Path(dirs.PATH_WIN_H_MATRIX_PATH,file_prefix+"_H_matrix"+suffix+'.csv')
+    correction_transform.save_transformation_matrix(H_path, H)
+
+def calculate_H_matrix_planned():
+    """Calculates H from planned points corresponding to measured points. Planned points must be equal to ideal pts"""
+    
+    # Ask user which file to use for real points
+    message = "Select file for Transformation matrix"
+    file_prefix, suffix = user_file_select(dirs.CAL_TRACKING_DATA_PATH, message, '*_measured*')
+    
+    # load real and planned points
+    name_real = file_prefix+"_measured.npy"
+    file_real = Path(dirs.CAL_TRACKING_DATA_PATH, name_real)
+    pts_real = np.load(file_real)
+
+    name_planned = file_prefix+"_planned_path.npy"
+    file_planned = Path(dirs.CAL_TRACKING_DATA_PATH, name_planned)
+    pts_planned = np.load(file_planned)
+    
+    H = correction_transform.attempt_minimize_quad(pts_planned, pts_real)
     print(f"Saving as {file_prefix}_H_matrix{suffix}")
 
     correction_transform.save_transformation_matrix(file_prefix+"_H_matrix"+suffix+'.csv', H)
@@ -302,7 +333,8 @@ def user_menu():
     print("\n1. Run calibration")
     print("2. Generate ideal calibration pattern")
     print("3. Generate transformed calibration pattern")
-    print('4. Calculate Transformation Matrix')
+    print('4. Calculate Transformation Matrix (Planned)')
+    print('5. Calculate Transformation Matrix (Ideal)')
     print("0. Exit")
 
     choice = input("Select an option: ")
@@ -318,7 +350,9 @@ def user_menu():
         generate_transformed_pattern()
     elif choice == '4':
         print('Calculate Transformation Matrix')
-        calculate_H_matrix()
+        calculate_H_matrix_planned()
+    elif choice == '5':
+        calculate_H_matrix_ideal()
     elif choice == "0":
         print("Exiting")
         exit()
