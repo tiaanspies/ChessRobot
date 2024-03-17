@@ -305,20 +305,16 @@ def generate_transformed_pattern():
     ideal_prefix, ideal_suffix = user_file_select(dirs.PLANNED_PATHS, message,"*_path_ideal*")
     pts_ideal = np.load(Path(dirs.PLANNED_PATHS, f"{ideal_prefix}_path_ideal{ideal_suffix}.npy"))
 
-    name_joint_angles_transformed = ideal_prefix+"_ja_transformed_2x"+ideal_suffix
-    name_path_transformed = ideal_prefix+"_path_transformed_2x"+ideal_suffix
+    # get the current time for a prefix
+    prefix = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    name_joint_angles_transformed = prefix+"_ja_transformed_2x"+ideal_suffix
+    name_path_transformed = prefix+"_path_transformed_2x"+ideal_suffix
     
     compensated_points = correction_transform.project_points_quad_multiple(pts_ideal, H_list)
 
     # solve inverse kinematics
     print("solving inverse kinematics...")
-
-    # Add 10 copies of the first point to the array.
-    # This is to ensure that the robot starts at an untransformed position
-    # since the first position "zeros" its coordinates
-    # home_2_trans_home =  cm.quintic_line(pts_ideal[:,0], compensated_points[:,0], 10)
-
-    # compensated_points = np.hstack((pts_ideal[:,[0]], home_2_trans_home, compensated_points))
     thetas = cm.inverse_kinematics(compensated_points) # convert to joint angles
     grip_commands = cm.get_gripper_commands2(compensated_points) # remove unnecessary wrist commands, add gripper open close instead
     joint_angles = mc.sort_commands(thetas, grip_commands)

@@ -2,6 +2,7 @@ import numpy as np
 
 try:
     import plotly.graph_objects as go
+    from plotly.tools import make_subplots
 except ModuleNotFoundError:
     print("analyze_transform: Did not load plotly, will not plot")
 from Data_analytics import correction_transform
@@ -22,7 +23,9 @@ def main():
         "3: Projected run\n"\
         "4: Plot Planned\n"\
         "5: Transformation on transformed points\n"\
+        "6: Analyze transformed results\n"
         )
+    
     if reply == '1':
         recorded_with_transformation()
     elif reply == '2':
@@ -33,6 +36,8 @@ def main():
         plot_planned()
     elif reply == '5':
         transformation_on_transformed_pts()     
+    elif reply == '6':
+        analyze_transformed_results()
     else:
         print("Invalid input")
         sys.exit()       
@@ -92,17 +97,60 @@ def recorded_with_transformation():
     # Show the plot
     fig.show()
 
-def transformation_on_transformed_pts():
-    """Applies transformation on measured points and compares with ideal points."""
-
+def analyze_transformed_results():
+    # Get the tracked data points and their planned pts
     message="Select measured file: "
     date, suffix, ext = get_matching_file_name(dirs.PATH_WIN_CAL_TRACKING_DATA, message, identifier="*_measured*")
 
+    # Measured points
     name_real = date+"_measured"+suffix+ext
-    file_real = Path(dirs.PATH_WIN_CAL_TRACKING_DATA, name_real) 
+    pts_real = np.load(Path(dirs.PATH_WIN_CAL_TRACKING_DATA, name_real))
 
-    # Load the numpy files for current and actual positions
-    pts_real = np.load(file_real)
+    # planned points
+    name_planned = date+"_planned_path"+suffix+ext
+    pts_planned = np.load(Path(dirs.PATH_WIN_CAL_TRACKING_DATA, name_planned))
+
+    # Ask user which planned path file was used as the target
+    message = "Select full version of planned path"
+    file_prefix, suffix, ext = get_matching_file_name(dirs.PATH_WIN_PLANNED_PATHS, message, '*_path_*')
+    
+    #Load planned points
+    name_planned_full = file_prefix+"_path_"+suffix+'.npy'
+    pts_planned_full = np.load(Path(dirs.PATH_WIN_PLANNED_PATHS, name_planned_full))
+
+    # get the original untransformed ideal path
+    message = "What is the untransformed ideal path"
+    ideal_prefix, suffix, ext = get_matching_file_name(dirs.PATH_WIN_PLANNED_PATHS, message,"*_path_ideal*")
+    
+    name_base = ideal_prefix+"_path_ideal"+suffix+ext
+    pts_ideal = np.load(Path(dirs.PATH_WIN_PLANNED_PATHS, name_base))
+
+    # Remove ideal points that were not captured by measurements
+    pts_ideal = filter_unused_ideal_pts(pts_ideal, pts_planned, pts_planned_full)
+
+    # Print results
+    print(f"\nMSD Error between ideal and projected: {find_msd_error(pts_ideal, pts_real)}")
+    print(f"Max Error between ideal and projected: {find_max_error(pts_ideal, pts_real)}")
+    print(f"Mean Error between ideal and projected: {find_mean_error(pts_ideal, pts_real)}")
+
+    plot_euclid_error_hist(pts_ideal, pts_real)
+    plot_individual_error_hist(pts_ideal, pts_real)
+
+    fig = create_plot_canvas(name_real)
+    plot_3data(pts_real, fig, "Pts_real")
+    plot_3data(pts_ideal, fig, "pts_ideal")
+    fig.show()
+
+def transformation_on_transformed_pts():
+    """Applies transformation on measured points and compares with ideal points."""
+
+    # Get the tracked data points and their planned pts
+    message="Select measured file: "
+    date, suffix, ext = get_matching_file_name(dirs.PATH_WIN_CAL_TRACKING_DATA, message, identifier="*_measured*")
+
+    # Measured points
+    name_real = date+"_measured"+suffix+ext
+    pts_real = np.load(Path(dirs.PATH_WIN_CAL_TRACKING_DATA, name_real))
 
     message = "Which Transformation matrix?"
     file_prefix, suffix, ext = get_matching_file_name(dirs.PATH_WIN_H_MATRIX_PATH, message, "*_H_matrix*")
@@ -110,6 +158,7 @@ def transformation_on_transformed_pts():
     H_path = Path(dirs.PATH_WIN_H_MATRIX_PATH, file_prefix+'_H_matrix'+suffix+ext)
     H = correction_transform.load_transformation_matrix(H_path)
 
+    # get the ideal path
     message = "What is the ideal path"
     ideal_prefix, suffix, ext = get_matching_file_name(dirs.PATH_WIN_PLANNED_PATHS, message,"*_path_ideal*")
     
@@ -125,7 +174,7 @@ def transformation_on_transformed_pts():
     # print(f"Max Error between ideal and projected: {find_max_error(pts_ideal, pts_projected)}")
     # print(f"Mean Error between ideal and projected: {find_mean_error(pts_ideal, pts_projected)}")
 
-    # plot_error_histogram(pts_ideal, pts_projected)
+    # plot_euclid_error_hist(pts_ideal, pts_projected)
 
     fig = create_plot_canvas(name_real)
     plot_3data(pts_real, fig, "Pts_real")
@@ -158,7 +207,7 @@ def recorded_without_transformation():
     print(f"Max Error between ideal and projected: {find_max_error(pts_ideal, pts_projected)}")
     print(f"Mean Error between ideal and projected: {find_mean_error(pts_ideal, pts_projected)}")
 
-    plot_error_histogram(pts_ideal, pts_projected)
+    plot_euclid_error_hist(pts_ideal, pts_projected)
 
     fig = create_plot_canvas(name_real)
     plot_3data(pts_real, fig, "Pts_real")
@@ -238,7 +287,7 @@ def find_mean_error(pts_truth, pts_test):
 
     return mean_error
 
-def plot_error_histogram(pts_truth, pts_test):
+def plot_euclid_error_hist(pts_truth, pts_test):
     """Plot a histogram of the error between the truth and test points"""
 
     # Calculate the error
@@ -253,6 +302,18 @@ def plot_error_histogram(pts_truth, pts_test):
             dtick=0.5
         )
     )
+    fig.show()
+
+def plot_individual_error_hist(pts_truth, pts_test):
+    """Plot a histogram for the difference between point and target for each axis seperate"""
+
+    # Calculate the error
+    error = pts_truth - pts_test
+
+    # Create a histogram
+    fig = make_subplots(rows=3, cols=1, subplot_titles=("X position error (mm)", "Y position error (mm)", "Z position error (mm)"))
+    for i in range(3):
+        fig.add_trace(go.Histogram(x=error[i, :]), row=i+1, col=1)
     fig.show()
 
 def get_matching_file_name(search_path:Path, message:str="Select a file: ", identifier:str="*_path_*"):
