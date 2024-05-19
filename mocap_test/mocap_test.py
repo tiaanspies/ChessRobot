@@ -35,7 +35,23 @@ def main():
 def fake_inverse_kinematics(path):
     return np.vstack((path,np.zeros_like(path[0,:])))
 
+def draw_flat_cube(z, x_neg, x_pos, y_neg, y_pos):
+    """Draws a flat cube"""
+    step = 10
+    path = np.hstack([
+        cm.quintic_line(cm.HOME, np.array([x_neg, y_neg, z]), step),
+        cm.quintic_line(np.array([x_neg, y_neg, z]), np.array([x_pos, y_neg, z]), step),
+        cm.quintic_line(np.array([x_pos, y_neg, z]), np.array([x_pos, y_pos, z]), step),
+        cm.quintic_line(np.array([x_pos, y_pos, z]), np.array([x_neg, y_pos, z]), step),
+        cm.quintic_line(np.array([x_neg, y_pos, z]), np.array([x_neg, y_neg, z]), step),
+        cm.quintic_line(np.array([x_neg, y_neg, z]), cm.HOME, step)
+    ])
+
+    return path
+
 def draw_cube(v, slice_num):
+    logging.info("Generating ideal pattern: Cube")
+    logging.info(f"Vertices: {vertices}")
     top_left = np.array([v["left"],v["close"],v["top"]])
     bottom_left = np.array([v["left"],v["close"],v["bottom"]])
     top_right = np.array([v["right"],v["close"],v["top"]])
@@ -47,10 +63,10 @@ def draw_cube(v, slice_num):
     slice_step = np.array([0.0, slice_width, 0.0], dtype=int)
 
     for i in range(slice_num):
-        path = np.hstack((path, \
-                          cm.quintic_line(top_left, bottom_right, step), \
-                          cm.quintic_line(bottom_right, bottom_left, step), \
-                          cm.quintic_line(bottom_left, top_right, step), \
+        path = np.hstack((path, 
+                          cm.quintic_line(top_left, bottom_right, step), 
+                          cm.quintic_line(bottom_right, bottom_left, step), 
+                          cm.quintic_line(bottom_left, top_right, step), 
                           cm.quintic_line(top_right, top_left, step)))
         if i < (slice_num)-1: # - 1):
             path = np.hstack((path, cm.quintic_line(top_left, top_left + slice_step, step)))
@@ -66,7 +82,6 @@ def draw_cube(v, slice_num):
 def create_tracker():
     # create aruco tracker object
     # use aruco_tracker to change default parameters
-    logging.debug("Creating aruco tracker.")
     aruco_obj = Aruco.ArucoTracker()
 
     # generate new pattern and save
@@ -199,35 +214,53 @@ def generate_ideal_pattern():
     """
     vertices = {
     "top" : 200,
-    "bottom" : 120,
-    "right" : 90,
-    "left" : -90,
-    "close" : 150,
-    "far" : 350}
+    "bottom" : 100,
+    "right" : 160,
+    "left" : -160,
+    "close" : 110,
+    "far" : 420}
+
+    print("Did you update the code to make the new shape? (Y/N)")
+    if input() != "Y":
+        print("Please update the code to make the new shape.")
+        return
 
     # generate waypoints
-    logging.info("Generating ideal pattern")
-    logging.info(f"Vertices: {vertices}")
     path = draw_cube(vertices, 4) 
+    # path = draw_flat_cube(125, -90, 90, 150, 350)
 
-    # create name
+    # # create name
     name = "_".join([str(v) for v in vertices.values()])
+    # name = "flat_cube_125_-90_90_150_250"
     name_path = name+"_path_ideal"
     name_joint_angles = name+"_ja_ideal"
-
-    logging.info(f"Saving path as '{name_path}'")
-    np.save(Path(dirs.PLANNED_PATHS, name_path), path)
 
     logging.info("solving for joint angles (Inverse Kinematics).")
     thetas = cm.inverse_kinematics(path) # convert to joint angles
 
     logging.info("Adding gripper commands")
     grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
-    joint_angles = mc.sort_commands(thetas, grip_commands)
-    logging.info(f"Saving joing angles as '{name_joint_angles}'")
-    # cm.plot_robot(thetas, path)
+    joint_angles, exceeds_lim = mc.sort_commands(thetas, grip_commands)
 
+    logging.info("Correcting joint angles")
+    joint_angles, path = mc.correct_limits(joint_angles, path, exceeds_lim)
+    
+    logging.info(f"Saving path as '{name_path}'")
+    np.save(Path(dirs.PLANNED_PATHS, name_path), path)
+    
+    logging.info(f"Saving joing angles as '{name_joint_angles}'")
     np.save(Path(dirs.PLANNED_PATHS, name_joint_angles), joint_angles)
+
+def go_to(pos):
+    """Take an input position, find the joint angles and go to that position"""
+
+    if pos.shape == np.array((3,)).shape:
+        pos = pos.reshape(3,1)
+
+    thetas = cm.inverse_kinematics(pos)
+    grip_commands = cm.get_gripper_commands2(pos)
+    joint_angles, _ = mc.sort_commands(thetas, grip_commands)
+    mc.run(joint_angles)
 
 def calculate_H_matrix_ideal():
     """Calculates H from ideal points, some work is dont to map ideal to real since not all ideal points are measured."""
@@ -314,11 +347,14 @@ def generate_transformed_pattern():
     compensated_points = correction_transform.project_points_quad_multiple(pts_ideal, H_list)
 
     # solve inverse kinematics
-    print("solving inverse kinematics...")
+    logging.info("solving inverse kinematics...")
     thetas = cm.inverse_kinematics(compensated_points) # convert to joint angles
     grip_commands = cm.get_gripper_commands2(compensated_points) # remove unnecessary wrist commands, add gripper open close instead
-    joint_angles = mc.sort_commands(thetas, grip_commands)
-    print("solved!")
+    joint_angles, exceeds_lim = mc.sort_commands(thetas, grip_commands)
+
+    logging.info("Correcting joint angles")
+    joint_angles, compensated_points = mc.correct_limits(joint_angles, compensated_points, exceeds_lim)
+    logging.info("Solved inverse kinetatics. Saving...")
 
     # if platform.system() == "Windows":
     #     cm.plot_robot(thetas, compensated_points)
@@ -369,7 +405,7 @@ if __name__ == "__main__":
     numeric_level = getattr(logging, log_level.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError('Invalid log level: %s' % log_level)
-    logging.basicConfig(filename='example.log', filemode='w', level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
 
     user_menu()
     # main()

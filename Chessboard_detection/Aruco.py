@@ -29,6 +29,7 @@ class ArucoTracker:
         self.aruco_dict = aruco_dict
 
         self.max_id = 0
+        logging.debug("Creating aruco tracker.")
 
         if Path(self.marker_path_dir).is_dir() == False:
             raise ValueError("Marker path directory does not exist")
@@ -75,8 +76,8 @@ class ArucoTracker:
         Checks whether the marker pattern exists and creates it if it does not.
         """
         logging.debug(f"Loading aruco pattern positions. "\
-                    "[rows: {rows}, cols: {cols}, checker_size: {checker_size}"\
-                    ", marker_size: {marker_size}]")
+                    f"[rows: {rows}, cols: {cols}, checker_size: {checker_size}"\
+                    f", marker_size: {marker_size}]")
 
         properties = [rows, cols, checker_size, marker_size]
         properties_name = "_".join([str(i) for i in properties])

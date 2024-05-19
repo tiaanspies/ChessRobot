@@ -112,9 +112,9 @@ class RPiCamera:
         # Change statenum to 1 to used camera for all pictures
         logging.debug(
             f"Creating camera object.\n"\
-            "\t loadSavedFirst: {loadSavedFirst}\n"\
-            "\t storeImgHist: {storeImgHist}\n"\
-            "\t camera.rotation: {self.camera.rotation}"\
+            f"\t loadSavedFirst: {loadSavedFirst}\n"\
+            f"\t storeImgHist: {storeImgHist}\n"\
+            f"\t camera.rotation: {self.camera.rotation}"
         )
 
         if loadSavedFirst:

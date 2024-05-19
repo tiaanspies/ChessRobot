@@ -129,6 +129,11 @@ class MotorCommands:
 
         return path_in_progress, plan_points
     
+    def correct_limits(self, thetas, pos, lim_map):
+        """Remove values from theta and pos where lim_map is 1"""
+        return thetas[:, lim_map == 0], pos[:, lim_map == 0]
+
+    
     def sort_commands(self, thetas, grip_commands):
         thetas[3,:] = grip_commands
         thetas = thetas % (2 * np.pi)
@@ -137,7 +142,11 @@ class MotorCommands:
         thetas[2,:] = 2*np.pi - thetas[2,:] # make any necessary changes to the elbow angles
         thetas =  thetas % (2 * np.pi)
 
-        if any(thetas.ravel() > np.pi):
-            raise ValueError('IK solution requires angles greater than the 180-degree limits of motors')
+        exceeds_pi = np.any(thetas > np.pi, axis=0)
+        # if any(thetas.ravel() > np.pi):
+        #     raveled = thetas.ravel()
+        #     logging.error(f'Thetas greater than pi: {raveled[raveled > np.pi]}')
+        #     raise ValueError(f'IK solution requires angles greater than the 180-degree limits of motors\n'\
+        #         f'thetas: {thetas}')
         
-        return thetas
+        return thetas, exceeds_pi
