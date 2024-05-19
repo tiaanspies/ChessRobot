@@ -2,7 +2,7 @@ import numpy as np
 
 try:
     import plotly.graph_objects as go
-    from plotly.tools import make_subplots
+    from plotly.subplots import make_subplots
 except ModuleNotFoundError:
     print("analyze_transform: Did not load plotly, will not plot")
 from Data_analytics import correction_transform

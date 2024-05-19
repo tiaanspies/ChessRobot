@@ -21,8 +21,8 @@ class ChessMoves():
         self.BOARD_WIDTH = 8 * self.SQUARE_WIDTH # total width of the board
         self.HOME = np.array([0, self.BASE_DIST, 350]) # location of home for the robot arm between moves
 
-        self.camera_to_control_pt_offset = np.array([[-7],[2],[45]])
-        self.rcs_to_ccs_offset = np.array([[221],[-62],[+55]])
+        self.camera_to_control_pt_offset: np.ndarray = np.array([[-7],[2],[45]])
+        self.rcs_to_ccs_offset: np.ndarray = np.array([[221],[-62],[+55]])
 
         self.generate_coords()
         self.initialize_arm()
@@ -248,9 +248,8 @@ class ChessMoves():
         #TODO: Use more complex method to project backwards from camera.
         # this method assumes the camera is perfectly vertical.
 
-        if control_pt_coords is None:
-            return None
-        
+        control_pt_coords
+
         camera_coords = control_pt_coords - self.camera_to_control_pt_offset
 
         return camera_coords
@@ -258,16 +257,18 @@ class ChessMoves():
     def camera_to_control_pt_pos(self, camera_coords:np.ndarray):
         """Gets the control point position when given the camera position."""
 
-        if camera_coords is None:
-            return None
+        if (camera_coords == np.nan).any():
+            return camera_coords
+        
         control_pt_coords = camera_coords + self.camera_to_control_pt_offset
 
         return control_pt_coords
 
     def rcs_to_ccs(self, rcs_coords:np.ndarray):
         """Converts from robot coordinate system to camera coordinate system."""
-        if rcs_coords is None:
-            return None
+        
+        if (rcs_coords == np.nan).any():
+            return rcs_coords
 
         ccs_coords = rcs_coords + self.rcs_to_ccs_offset
 
@@ -275,8 +276,9 @@ class ChessMoves():
 
     def ccs_to_rcs(self, ccs_coords:np.ndarray):
         """Converts from camera coordinate system to robot coordinate system."""
-        if ccs_coords is None:
-            return None
+
+        if (ccs_coords == np.nan).any():
+            return ccs_coords
         
         rcs_coords = ccs_coords - self.rcs_to_ccs_offset
 

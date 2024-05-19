@@ -149,51 +149,51 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     # load path
     dimensions, transform_type = user_file_select(dirs.PLANNED_PATHS)
 
-    plan = [f for f in dirs.PLANNED_PATHS.glob(f"{dimensions}_path_{transform_type}.npy")]
-    angles = [f for f in dirs.PLANNED_PATHS.glob(f"{dimensions}_ja_{transform_type}.npy")]
+    plan_cartesian = [f for f in dirs.PLANNED_PATHS.glob(f"{dimensions}_path_{transform_type}.npy")]
+    plan_ja = [f for f in dirs.PLANNED_PATHS.glob(f"{dimensions}_ja_{transform_type}.npy")]
 
-    if len(plan) != 1 or len(angles) != 1:
-        raise("Multiple or no matching files found. \n Have Tiaan fix his code")
-        
-    plan = np.load(plan[0])
-    angles = np.load(angles[0])
+    assert len(plan_cartesian) == 1 and len(plan_ja) == 1, "Multiple or no matching files found. \n Have Tiaan fix his code"
+
+    plan_cartesian = np.load(plan_cartesian[0])
+    plan_ja = np.load(plan_ja[0])
    
-    mc.load_path(angles, plan)
-    moves_total = angles.shape[1]
+    # Load path into motion controller
+    mc.load_path(plan_ja, plan_cartesian)
+
+    # init counters
+    moves_total = plan_ja.shape[1]
     moves_current = 0
 
     # Initialize tracking variables
-    measured = np.zeros((3,0))
-    planned_path = np.zeros((3,0))
+    measured_cartesian = np.full(plan_ja.shape, np.nan)
 
     # step through
     run_cal = True 
     while run_cal:
+
+        # Move to next position
         run_cal, plan_points = mc.run_once()
-        moves_current += 1
-
-        print(f"Progress: {moves_current/moves_total*100:.2f}%")
-
         sleep(2)
+        
         # get position
         ccs_current_pos = tracker.take_photo_and_estimate_pose(cam)
         ccs_control_pt_pos = cm.camera_to_control_pt_pos(ccs_current_pos)
         rcs_control_pt_pos = cm.ccs_to_rcs(ccs_control_pt_pos)
         
-        if ccs_current_pos is not None and plan_points is not None:
-
-            measured = np.hstack([measured, rcs_control_pt_pos])
-            planned_path = np.hstack([planned_path, plan_points])
+        measured_cartesian[:, moves_current] = rcs_control_pt_pos
             
-            logging.debug(f"Position: {ccs_current_pos.reshape(1,3)}")
+        logging.debug(f"Position: {ccs_current_pos.reshape(1,3)}")
         sleep(1)
+
+        moves_current += 1
+        print(f"Progress: {moves_current/moves_total*100:.2f}%")
 
     # save data
     prefix = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     logging.info("Saving recorded data.")
-    np.save(Path(cal_path, prefix + "_measured.npy"), measured)
-    np.save(Path(cal_path, prefix + "_planned_path.npy"), planned_path)
+    np.save(Path(cal_path, prefix + "_measured.npy"), measured_cartesian)
+    np.save(Path(cal_path, prefix + "_planned_path.npy"), plan_cartesian)
 
 def run_calibration():
     """

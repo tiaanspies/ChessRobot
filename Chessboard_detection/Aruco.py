@@ -115,12 +115,9 @@ class ArucoTracker:
         """
         Gets image from camera and estimates the pose of the camera.
 
-        Returns None if no markers are found.
+        Returns nan col if no markers are found.
         Returns the camera position
         """
-        
-        # Camera parameters
-        camera_matrix, dist_coeffs = cam.readCalibMatrix()
 
         # Load the image
         _, image = cam.read()
@@ -129,18 +126,18 @@ class ArucoTracker:
 
         if ids is None:
             print("No markers found")
-            return None
+            return np.array([[np.nan], [np.nan], [np.nan]])
         
-        rvecs, tvec = estimate_pose(corners, ids, camera_matrix, dist_coeffs, self.marker_positions, self.max_id)
+        rvecs, tvec = estimate_pose(corners, ids, cam.camera_matrix, cam.dist_coeffs, self.marker_positions, self.max_id)
         
         if rvecs is not None:
             # Draw the detected markers and axes on the image
             # for id in ids:
             #     cv2.aruco.drawDetectedMarkers(image, corners)
-                # cv2.aruco.drawAxis(image, camera_matrix, dist_coeffs, rvecs[i], tvecs[i], marker_size * 0.5)
+                # cv2.aruco.drawAxis(image, cam.camera_matrix, cam.dist_coeffs, rvecs[i], tvecs[i], marker_size * 0.5)
 
             # Draw the origin on the board
-            cv2.drawFrameAxes(image, camera_matrix, dist_coeffs, rvecs, tvec, 100, 1)
+            cv2.drawFrameAxes(image, cam.camera_matrix, cam.dist_coeffs, rvecs, tvec, 100, 1)
             label_markers(image, ids, corners)
             pi_debugging.saveTempImg(image, "Aruco_markers_w_axes.png")
 
