@@ -108,6 +108,8 @@ class RPiCamera:
         self.path_full = absPath
         self.storeImgHist = storeImgHist
 
+        self.cal_matrix, self.dist_matrix = self.readCalibMatrix()
+
         # Change statenum to -1 to use saved picture as first picture.
         # Change statenum to 1 to used camera for all pictures
         logging.debug(
@@ -228,6 +230,7 @@ def read_images_from_webcam():
 class LaptopCamera:
     def __init__(self, camera_num=0) -> None:
         self.cam = cv.VideoCapture(camera_num)
+        self.camera_matrix, self.dist_matrix = self.readCalibMatrix()
 
     def readCalibMatrix(self):
         """
