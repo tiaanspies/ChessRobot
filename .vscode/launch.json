@@ -11,7 +11,7 @@
         "request": "launch",
         "console": "integratedTerminal",
         // "module": "Data_analytics.${fileBasenameNoExtension}",
-        "module": "run.py",
+        "module": "run",
       }
     ]
   }

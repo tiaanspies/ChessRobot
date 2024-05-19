@@ -114,6 +114,7 @@ class MotorCommands:
         #     return False, None
         # 0 1 2 3 4 5 6 7 8 9 10
         # ------------>
+        logging.debug(f"moving to {self.angles[:, self.path_progress]}")
         self.base.angle = self.angles[0, self.path_progress]
         self.shoulder.angle = self.angles[1, self.path_progress] 
         self.elbow.angle = self.angles[2, self.path_progress]

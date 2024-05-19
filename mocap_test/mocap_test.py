@@ -165,7 +165,7 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     moves_current = 0
 
     # Initialize tracking variables
-    measured_cartesian = np.full(plan_ja.shape, np.nan)
+    measured_cartesian = np.full(plan_cartesian.shape, np.nan)
 
     # step through
     run_cal = True 
@@ -180,7 +180,7 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
         ccs_control_pt_pos = cm.camera_to_control_pt_pos(ccs_current_pos)
         rcs_control_pt_pos = cm.ccs_to_rcs(ccs_control_pt_pos)
         
-        measured_cartesian[:, moves_current] = rcs_control_pt_pos
+        measured_cartesian[:, [moves_current]] = rcs_control_pt_pos
             
         logging.debug(f"Position: {ccs_current_pos.reshape(1,3)}")
         sleep(1)
