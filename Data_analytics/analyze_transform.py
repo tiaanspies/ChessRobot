@@ -10,7 +10,7 @@ from pathlib import Path
 import path_directories as dirs
 import sys
 
-def main():
+def main(): 
     if sys.platform == "linux":
         print("This function is not supported on linux as it requires plotly")
         sys.exit()
@@ -196,6 +196,11 @@ def recorded_without_transformation():
 
     file_ideal = Path(dirs.PATH_WIN_CAL_TRACKING_DATA, date+"_planned_path"+suffix+ext)
     pts_ideal = np.load(file_ideal)
+
+    #remove points that contain NAN
+    mask = ~np.isnan(pts_real).any(axis=0)
+    pts_ideal = pts_ideal[:, mask]
+    pts_real = pts_real[:, mask]
 
     H = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
     pts_projected = correction_transform.project_points_quad(pts_real, H)

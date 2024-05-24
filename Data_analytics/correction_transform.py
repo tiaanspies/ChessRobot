@@ -151,9 +151,9 @@ def attempt_minimize_quad(pts_ideal:np.array, pts_real:np.array):
  
     """
     # Remove columns where pts_real contains np.nan
-    mask = ~np.isnan(pts_real).any(axis=0)
-    pts_ideal = pts_ideal[:, mask]
-    pts_real = pts_real[:, mask]
+    # mask = ~np.isnan(pts_real).any(axis=0)
+    # pts_ideal = pts_ideal[:, mask]
+    # pts_real = pts_real[:, mask]
     
     assert pts_ideal.shape[0] == 3, "Points must be in shape (3, n)"
     assert pts_real.shape[0] == 3, "Points must be in shape (3, n)"
@@ -174,7 +174,7 @@ def attempt_minimize_quad(pts_ideal:np.array, pts_real:np.array):
     # initialize matrix
     init = np.array([[0, 0, 0, 0, 0, 0, 1, 0, 0, 0], 
                      [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, 1, 0]])
+                     [0, 0, 0, 0, 0, 0, 0, 0, 1, 0]], dtype=np.float64)
     
     init[:, -1] = T[:, 0]
     init = init.reshape((-1))
