@@ -124,8 +124,13 @@ class ArucoTracker:
 
         corners, ids = detect_markers(self.aruco_dict, image)
 
+        #check that enough markers are found
         if ids is None:
-            print("No markers found")
+            logging.debug("No markers found.")
+            return np.array([[np.nan], [np.nan], [np.nan]])
+
+        if len(ids) < 2:
+            logging.debug("Not enough markers found.")
             return np.array([[np.nan], [np.nan], [np.nan]])
         
         rvecs, tvec = estimate_pose(corners, ids, cam.camera_matrix, cam.dist_matrix, self.marker_positions, self.max_id)

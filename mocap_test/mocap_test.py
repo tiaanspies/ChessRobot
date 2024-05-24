@@ -145,6 +145,10 @@ def user_file_select_multiple(search_path:Path, message:str="Select a file: ", i
 
     return selected_file_prefixes, selected_file_suffixes
 
+def contains_nan(arr):
+    return np.isnan(arr).any()
+
+
 def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     # load path
     dimensions, transform_type = user_file_select(dirs.PLANNED_PATHS)
@@ -175,8 +179,14 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
         run_cal, plan_points = mc.run_once()
         sleep(2)
         
-        # get position
+        # attempt twice to take photo
+        iter = 0
         ccs_current_pos = tracker.take_photo_and_estimate_pose(cam)
+        while iter < 2 and contains_nan(ccs_current_pos):
+            logging.debug("Failed to take photo, trying again.")
+            ccs_current_pos = tracker.take_photo_and_estimate_pose(cam)
+            iter += 1
+
         ccs_control_pt_pos = cm.camera_to_control_pt_pos(ccs_current_pos)
         rcs_control_pt_pos = cm.ccs_to_rcs(ccs_control_pt_pos)
         
@@ -318,12 +328,18 @@ def calculate_H_matrix_planned():
     name_planned = file_prefix+"_planned_path.npy"
     file_planned = Path(dirs.CAL_TRACKING_DATA_PATH, name_planned)
     pts_planned = np.load(file_planned)
+
+    #remove points that contain NAN
+    mask = ~np.isnan(pts_real).any(axis=0)
+    pts_planned = pts_planned[:, mask]
+    pts_real = pts_real[:, mask]
     
     H = correction_transform.attempt_minimize_quad(pts_planned, pts_real)
     print(f"Saving as {file_prefix}_H_matrix{suffix}")
 
-    correction_transform.save_transformation_matrix(file_prefix+"_H_matrix"+suffix+'.csv', H)
-
+    H_path = Path(dirs.H_MATRIX_PATH, file_prefix+"_H_matrix"+suffix+'.csv')
+    correction_transform.save_transformation_matrix(H_path, H)
+    
 def generate_transformed_pattern():
     """
     Generate a transformed calibration pattern
@@ -341,8 +357,8 @@ def generate_transformed_pattern():
     # get the current time for a prefix
     prefix = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    name_joint_angles_transformed = prefix+"_ja_transformed_2x"+ideal_suffix
-    name_path_transformed = prefix+"_path_transformed_2x"+ideal_suffix
+    name_joint_angles_transformed = prefix+"_ja_transformed"+ideal_suffix
+    name_path_transformed = prefix+"_path_transformed"+ideal_suffix
     
     compensated_points = correction_transform.project_points_quad_multiple(pts_ideal, H_list)
 
