@@ -140,7 +140,7 @@ class MotorCommands:
     def correct_limits(self, thetas, pos, lim_map):
         """Sets values out of limits equal to NAN"""
         thetas[:, lim_map == 1] = np.nan
-        pos[:, lim_map == 0] = np.nan
+        pos[:, lim_map == 1] = np.nan
         return thetas, pos
 
     
