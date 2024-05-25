@@ -184,7 +184,9 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
         ccs_current_pos = tracker.take_photo_and_estimate_pose(cam)
         while iter < 2 and contains_nan(ccs_current_pos):
             logging.debug("Failed to take photo, trying again.")
+            sleep(2)
             ccs_current_pos = tracker.take_photo_and_estimate_pose(cam)
+            sleep(1)
             iter += 1
 
         ccs_control_pt_pos = cm.camera_to_control_pt_pos(ccs_current_pos)
@@ -329,8 +331,8 @@ def calculate_H_matrix_planned():
     file_planned = Path(dirs.CAL_TRACKING_DATA_PATH, name_planned)
     pts_planned = np.load(file_planned)
 
-    #remove points that contain NAN
-    mask = ~np.isnan(pts_real).any(axis=0)
+    # remove points that contain NAN
+    mask = ~(np.isnan(pts_real).any(axis=0) | np.isnan(pts_planned).any(axis=0))
     pts_planned = pts_planned[:, mask]
     pts_real = pts_real[:, mask]
     
@@ -374,7 +376,8 @@ def generate_transformed_pattern():
 
     # if platform.system() == "Windows":
     #     cm.plot_robot(thetas, compensated_points)
-
+    print(f"SHAPE: {compensated_points.shape}")
+    print(f"SHAPE JOINTS: {joint_angles.shape}")
     np.save(Path(dirs.PLANNED_PATHS, name_path_transformed), compensated_points)
     np.save(Path(dirs.PLANNED_PATHS, name_joint_angles_transformed), joint_angles)
 

@@ -114,6 +114,13 @@ class MotorCommands:
         #     return False, None
         # 0 1 2 3 4 5 6 7 8 9 10
         # ------------>
+
+        # check if next pos contains np.nan
+        if np.any(np.isnan(self.angles[:, self.path_progress])):
+            logging.debug(f"skipping {self.angles[:, self.path_progress]}")
+            self.path_progress += 1
+            return True, self.angles[:, self.path_progress]
+        
         logging.debug(f"moving to {self.angles[:, self.path_progress]}")
         self.base.angle = self.angles[0, self.path_progress]
         self.shoulder.angle = self.angles[1, self.path_progress] 
@@ -131,8 +138,10 @@ class MotorCommands:
         return path_in_progress, plan_points
     
     def correct_limits(self, thetas, pos, lim_map):
-        """Remove values from theta and pos where lim_map is 1"""
-        return thetas[:, lim_map == 0], pos[:, lim_map == 0]
+        """Sets values out of limits equal to NAN"""
+        thetas[:, lim_map == 1] = np.nan
+        pos[:, lim_map == 0] = np.nan
+        return thetas, pos
 
     
     def sort_commands(self, thetas, grip_commands):
