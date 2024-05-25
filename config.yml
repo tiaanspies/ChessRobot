@@ -1,0 +1,27 @@
+IK_CONFIG:
+  apply_compensation: True
+  lift: 50
+  chess_square_width: 40
+  base_dist: 150
+  board_height: 25
+  grip_height: 60
+  L1: 296
+  L2: 284.76
+
+  camera_to_control_pt_offset: 
+    x: -7
+    y: 2
+    z: 45
+
+  rcs_to_ccs_offset: 
+    x: 221
+    y: -62
+    z: 55
+
+  home_position:
+    x: 0
+    y: 150
+    z: 350
+
+  position_compensation_matrices:
+    - "/home/tpie/mnt/gdrive/Transformation Matrices/20240523_215249_H_matrix.csv"

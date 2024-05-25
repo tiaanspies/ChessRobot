@@ -1,4 +1,4 @@
-from IK_Solvers.traditional import ChessMoves
+from IK_Solvers.traditional import MotionPlanner
 from Positioning.motor_commands import MotorCommands
 import numpy as np
 import matplotlib.pyplot as plt
@@ -20,17 +20,8 @@ try:
 except ModuleNotFoundError:
     print("analyze_transform: Did not load plotly, will not plot")
 
-cm = ChessMoves()
+cm = MotionPlanner()
 mc = MotorCommands()
-
-def main():
-    # load aruco obj things
-    aruco_obj = create_tracker()
-
-    # # create camera object
-    cam = Camera_Manager.RPiCamera(loadSavedFirst=False, storeImgHist=False)
-
-    run_and_track(aruco_obj, cam, dirs.CAL_TRACKING_DATA_PATH)
 
 def fake_inverse_kinematics(path):
     return np.vstack((path,np.zeros_like(path[0,:])))
@@ -427,5 +418,3 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     user_menu()
-    # main()
-    # old_main()

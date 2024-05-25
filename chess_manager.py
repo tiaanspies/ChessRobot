@@ -34,8 +34,8 @@ import chess
 import matplotlib.pyplot as plt
 from Camera import Camera_Manager
 from Chessboard_detection import Chess_Vision
-from IK_Solvers.traditional import ChessMoves
-from motor_commands import MotorCommands
+from IK_Solvers.traditional import MotionPlanner
+from Positioning.motor_commands import MotorCommands
 
 ### INITIALIZE ###
 
@@ -154,9 +154,9 @@ def play_again():
         play_again()
 
 def turn_on_robot():
-    sim_thetas = cm.inverse_kinematics(cm.HOME.reshape((3,1)))
-    thetas = mc.sort_commands(sim_thetas, mc.OPEN)
-    mc.go_to(thetas)    
+    sim_thetas = motion_planner.inverse_kinematics(motion_planner.HOME.reshape((3,1)))
+    thetas = motor_driver.sort_commands(sim_thetas, motor_driver.OPEN)
+    motor_driver.go_to(thetas)    
 
 # functions for handling visboard (the -1, 0, 1 representation)
 def seeBoardReal():
@@ -395,29 +395,29 @@ def robotsVirtualMove(visboard, human_move=None):
 
 def robotsPhysicalMove(robot_move, capture_square):
     """creates and executes the robot's physical move"""
-    start = cm.get_coords(robot_move[:2])
-    goal = cm.get_coords(robot_move[2:])
+    start = motion_planner.get_coords(robot_move[:2])
+    goal = motion_planner.get_coords(robot_move[2:])
     if capture_square is not None:
-        capture_square = cm.getCoords(capture_square)
-    path = cm.generate_quintic_path(start, goal, capture_square) # generate waypoints
-    thetas = cm.inverse_kinematics(path) # convert to joint angles
-    grip_commands = cm.get_gripper_commands(path) # remove unnecessary wrist commands, add gripper open close instead
-    thetas = mc.sort_commands(thetas, grip_commands)
-    mc.run(thetas) # pass joint angles to motors
+        capture_square = motion_planner.getCoords(capture_square)
+    path = motion_planner.generate_quintic_path(start, goal, capture_square) # generate waypoints
+    thetas = motion_planner.inverse_kinematics(path) # convert to joint angles
+    grip_commands = motion_planner.get_gripper_commands(path) # remove unnecessary wrist commands, add gripper open close instead
+    thetas = motor_driver.sort_commands(thetas, grip_commands)
+    motor_driver.run(thetas) # pass joint angles to motors
     
     # simulate
-    # cm.plot_robot(thetas, path)
+    # motion_planner.plot_robot(thetas, path)
 
 ### Global variables ###
 # create an instance of of the stockfish engine with the parameters requested
 #stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=15, parameters={"UCI_Elo":500})
 stockfish = Stockfish(r"/home/tpie/ChessRobot/Stockfish/Stockfish-sf_15/src/stockfish", depth=15, parameters={"UCI_Elo":500})
 
-# create an instance of the ChessMoves class, which holds all functions for converting a algebraic notation move to a theta trajectory
-cm = ChessMoves() # this class takes all the board and robot measurements as optional args
+# create an instance of the MotionPlanner class, which holds all functions for converting a algebraic notation move to a theta trajectory
+motion_planner = MotionPlanner() # this class takes all the board and robot measurements as optional args
 
 # create an instance of the MotorCommands class, which is used to communicate with the raspberry pi
-mc = MotorCommands()
+motor_driver = MotorCommands()
 
 # turn on the robot
 turn_on_robot()

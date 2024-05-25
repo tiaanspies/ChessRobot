@@ -89,6 +89,12 @@ def recorded_with_transformation():
     file_ideal = Path(dirs.PATH_WIN_PLANNED_PATHS, prefix+"_path_ideal"+suffix+ext)
     pts_ideal = np.load(file_ideal)
 
+    # remove NAN points
+    mask = ~(np.isnan(pts_real).any(axis=0) | np.isnan(pts_ideal).any(axis=0))
+    pts_ideal = pts_ideal[:, mask]
+    pts_real = pts_real[:, mask]
+    pts_planned = pts_planned[:, mask]
+
     fig = create_plot_canvas(name_real)
     plot_3data(pts_real, fig, "Pts_real")
     plot_3data(pts_ideal, fig, "pts_ideal")
@@ -96,6 +102,24 @@ def recorded_with_transformation():
 
     # Show the plot
     fig.show()
+
+    # Remove points with large z values
+    mask = pts_real[2, :] <= 150
+    pts_real = pts_real[:, mask]
+    pts_ideal = pts_ideal[:, mask]
+    pts_planned = pts_planned[:, mask]
+
+    # print transformation matrix and translation
+    # correction_transform.print_transform(H, T, pts_real_mean, pts_ideal_mean)
+    # print(f"Transformation matrix:\n{H}")
+    print(f"\nMSD Error between ideal and projected: {find_msd_error(pts_ideal, pts_real)}")
+    print(f"Max Error between ideal and projected: {find_max_error(pts_ideal, pts_real)}")
+    print(f"Mean Error between ideal and projected: {find_mean_error(pts_ideal, pts_real)}")
+
+    plot_euclid_error_hist(pts_ideal, pts_real)
+    plot_individual_error_hist(pts_ideal, pts_real)
+
+    
 
 def analyze_transformed_results():
     # Get the tracked data points and their planned pts
@@ -198,7 +222,7 @@ def recorded_without_transformation():
     pts_ideal = np.load(file_ideal)
 
     #remove points that contain NAN
-    mask = ~np.isnan(pts_real).any(axis=0)
+    mask = ~(np.isnan(pts_real).any(axis=0) | np.isnan(pts_ideal).any(axis=0))
     pts_ideal = pts_ideal[:, mask]
     pts_real = pts_real[:, mask]
 
@@ -297,10 +321,10 @@ def plot_euclid_error_hist(pts_truth, pts_test):
 
     # Calculate the error
     error = np.sqrt(np.sum((pts_truth-pts_test)**2, axis=0))
-
+    error = error[error<40]
     # Create a histogram
     # Create a histogram
-    fig = go.Figure(data=[go.Histogram(x=error)])
+    fig = go.Figure(data=[go.Histogram(x=error, nbinsx=40)])
     fig.update_xaxes(title_text='Position Error (mm)')
     fig.update_layout(
         xaxis=dict(

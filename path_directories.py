@@ -8,3 +8,5 @@ H_MATRIX_PATH = Path("/home", "tpie", "mnt", "gdrive", "Transformation Matrices"
 PATH_WIN_CAL_TRACKING_DATA = Path('G:\My Drive\Programming\RPiCLone\Arm Cal Tracking Data')
 PATH_WIN_PLANNED_PATHS = Path('G:\My Drive\Programming\RPiCLone\Planned Paths')
 PATH_WIN_H_MATRIX_PATH = Path('G:\My Drive\Programming\RPiCLone',"Transformation Matrices")
+
+YAML_CONFIG_PATH = Path("config.yaml")

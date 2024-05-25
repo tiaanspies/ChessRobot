@@ -7,27 +7,58 @@ except ModuleNotFoundError:
 from IK_Solvers.NLinkArm3d import NLinkArm
 from IK_Solvers.quintic_polynomials_planner import QuinticPolynomial
 from Data_analytics.correction_transform import project_points_quad
+import yaml
+from path_directories import YAML_CONFIG_PATH
+from Data_analytics import correction_transform
 
-class ChessMoves():
-    
-    def __init__(self, apply_compensation=True, lift=50, square_width=40, base_dist=150, board_height=25, grip_height=60, L1=296, L2=284.76):
-        self.LIFT = lift # distance to clear the other pieces in mm
-        self.SQUARE_WIDTH = square_width # width of one board square in mm
-        self.BASE_DIST = base_dist # distance from edge of the board to the robot base in mm
-        self.BOARD_HEIGHT = board_height # height of the board off the ground in mm
-        self.GRIP_HEIGHT = grip_height # how high off the board to grip the pieces in mm
-        self.L1 = L1 # length of the first link in mm
-        self.L2 = L2 # length of the second link in mm
+class MotionPlanner():
+    def __init__(self, ):
+        config = yaml.safe_load(open(YAML_CONFIG_PATH))['IK_CONFIG']
+        self.LIFT = config['lift'] # distance to clear the other pieces in mm
+        self.SQUARE_WIDTH = config['chess_square_width'] # width of one board square in mm
+        self.BASE_DIST = config['base_dist'] # distance from edge of the board to the robot base in mm
+        self.BOARD_HEIGHT = config['board_height'] # height of the board off the ground in mm
+        self.GRIP_HEIGHT = config['grip_height'] # how high off the board to grip the pieces in mm
+        self.L1 = config['L1'] # length of the first link in mm
+        self.L2 = config['L2'] # length of the second link in mm
         self.BOARD_WIDTH = 8 * self.SQUARE_WIDTH # total width of the board
-        self.HOME = np.array([0, self.BASE_DIST, 350]) # location of home for the robot arm between moves
 
-        self.camera_to_control_pt_offset: np.ndarray = np.array([[-7],[2],[45]])
-        self.rcs_to_ccs_offset: np.ndarray = np.array([[221],[-62],[+55]])
+        # offset between camera and hinge point that IK solver uses
+        c2cpt = config['camera_to_control_pt_offset']
+        self.camera_to_control_pt_offset: np.ndarray = np.array([
+            [c2cpt['x']],
+            [c2cpt['y']],
+            [c2cpt['z']]
+        ])
+
+        #offset between robot base and aruco board orgin 
+        rcs2ccs = config['rcs_to_ccs_offset']
+        self.rcs_to_ccs_offset: np.ndarray = np.array([
+            [rcs2ccs['x']],
+            [rcs2ccs['y']],
+            [rcs2ccs['z']]
+        ])
+
+        #home position that robot waits at and takes pics of board
+        home = config['home_position']
+        self.HOME = np.array([
+            [home['x']],
+            [home['y']],
+            [home['z']]
+        ])
 
         self.generate_coords()
         self.initialize_arm()
 
-        self.apply_compensation = apply_compensation
+        self.apply_compensation = config['apply_compensation']
+        if self.apply_compensation:
+            h_list_paths = config['position_compensation_matrices']
+
+            self.h_list = []
+            for path in h_list_paths:
+                self.h_list.append(np.loadtxt(path, delimiter=','))
+
+
 
     def __str__(self):
         return f"Board width: {self.BOARD_WIDTH} mm \nBoard height: {self.BOARD_HEIGHT} mm \nDistance from robot base: {self.BASE_DIST} mm \nSafe lift height: {self.LIFT} mm"
@@ -124,7 +155,7 @@ class ChessMoves():
         """generates a 4xN list of joint angles from a 3xN list of waypoints"""
 
         if self.apply_compensation:
-            pass
+            path = correction_transform.project_points_quad_multiple(path, self.h_list)
             # TODO: this
         # execute IK on each point in the path
         num_waypoints = np.size(path,1)
