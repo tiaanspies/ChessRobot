@@ -9,7 +9,9 @@ except ModuleNotFoundError:
     print("COULD NOT FIND BOARD MODULE!!!")
 from time import sleep
 import logging
-
+import datetime
+from pathlib import Path
+import path_directories
 
 class MotorCommands:
     def __init__(self):
@@ -64,6 +66,12 @@ class MotorCommands:
 
     def run(self, thetas, angletype='rad'):
         """runs the full set of theta commands"""
+        # save data
+        prefix = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        logging.info("Saving recorded data.")
+        np.save(Path(path_directories.RUN_PATH, prefix + "_measured.npy"), thetas)
+        
         if angletype == 'rad':
             angles = np.rad2deg(thetas)
         elif angletype == 'deg':
@@ -77,7 +85,7 @@ class MotorCommands:
                 self.shoulder.angle = angle[1]
                 self.elbow.angle = angle[2]
                 self.grip.angle = angle[3]
-                sleep(.01) # will need to decrease eventually
+                sleep(.1) # will need to decrease eventually
 
         except KeyboardInterrupt:
             self.grip.angle = np.rad2deg(self.OPEN)
@@ -140,8 +148,20 @@ class MotorCommands:
     def correct_limits(self, thetas, pos, lim_map):
         """Sets values out of limits equal to NAN"""
         thetas[:, lim_map == 1] = np.nan
-        pos[:, lim_map == 1] = np.nan
+
+        if pos is not None:
+            pos[:, lim_map == 1] = np.nan
+
         return thetas, pos
+
+    def filter_run(self, thetas, grip_commands):
+        """Sort commands -> correct_lims -> run"""
+        joint_angles, exceeds_lim = self.sort_commands(thetas, grip_commands)
+
+        logging.info("Correcting joint angles")
+        joint_angles, _ = self.correct_limits(joint_angles, None, exceeds_lim)
+        
+        self.run(joint_angles)
 
     
     def sort_commands(self, thetas, grip_commands):

@@ -10,6 +10,7 @@ from Data_analytics.correction_transform import project_points_quad
 import yaml
 from path_directories import YAML_CONFIG_PATH
 from Data_analytics import correction_transform
+import logging
 
 class MotionPlanner():
     def __init__(self, ):
@@ -41,22 +42,16 @@ class MotionPlanner():
 
         #home position that robot waits at and takes pics of board
         home = config['home_position']
-        self.HOME = np.array([
-            [home['x']],
-            [home['y']],
-            [home['z']]
-        ])
+        self.HOME = np.array([home['x'],home['y'],home['z']])
 
         self.generate_coords()
         self.initialize_arm()
 
-        self.apply_compensation = config['apply_compensation']
-        if self.apply_compensation:
-            h_list_paths = config['position_compensation_matrices']
+        h_list_paths = config['position_compensation_matrices']
 
-            self.h_list = []
-            for path in h_list_paths:
-                self.h_list.append(np.loadtxt(path, delimiter=','))
+        self.h_list = []
+        for path in h_list_paths:
+            self.h_list.append(np.loadtxt(path, delimiter=','))
 
 
 
@@ -95,6 +90,14 @@ class MotionPlanner():
             self.param_list = param_list
         self.chess_arm = NLinkArm(self.param_list)
 
+    def coords_to_joint_angles(self, path, apply_compensation=False):
+        """Inputs path and returns joint_angles, gripp commands"""
+        logging.info("solving inverse kinematics...")
+        thetas = self.inverse_kinematics(path, apply_compensation) # convert to joint angles
+        grip_commands = self.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
+        
+        return thetas, grip_commands
+    
     def get_coords(self, name):
         """gives real-world coordinates in mm based on algebraic move notation (e.g. 'e2e4')"""
         i_file = FILE_NAMES.index(name[0])
@@ -126,7 +129,7 @@ class MotionPlanner():
 
         return np.hstack((first_moves, second_moves))
 
-    def generate_quintic_path(self, start, goal, cap_sq=None, step=10):
+    def generate_quintic_path(self, start, goal, cap_sq=None, step=5):
         """creates a 3xN array of waypoints to and from home, handling captures and lifting over pieces"""
         lift_vector = np.array([0,0,self.LIFT])
         if cap_sq is not None:
@@ -151,12 +154,12 @@ class MotionPlanner():
 
         return np.hstack((first_moves, second_moves))
 
-    def inverse_kinematics(self, path):
+    def inverse_kinematics(self, path, apply_compensation):
         """generates a 4xN list of joint angles from a 3xN list of waypoints"""
 
-        if self.apply_compensation:
+        if apply_compensation:
             path = correction_transform.project_points_quad_multiple(path, self.h_list)
-            # TODO: this
+ 
         # execute IK on each point in the path
         num_waypoints = np.size(path,1)
         theta_path = np.zeros((4,num_waypoints))
@@ -223,6 +226,7 @@ class MotionPlanner():
 
     def quintic_line(self, start, goal, avg_step):
         """Creates a 3xN nparray of 3D waypoints between start and goal using a quintec polynomial"""
+        
         dist = np.linalg.norm(goal - start)
         n_steps = int(dist // avg_step)
         xqnt = QuinticPolynomial(start[0],goal[0],n_steps)
