@@ -36,7 +36,7 @@ from Camera import Camera_Manager
 from Chessboard_detection import Chess_Vision
 from IK_Solvers.traditional import MotionPlanner
 from Positioning.motor_commands import MotorCommands
-
+import logging
 ### INITIALIZE ###
 
 # define global variables for tracking the running score
@@ -399,11 +399,13 @@ def robotsPhysicalMove(robot_move, capture_square):
     goal = motion_planner.get_coords(robot_move[2:])
     if capture_square is not None:
         capture_square = motion_planner.getCoords(capture_square)
+
+    logging.debug(f"Start: {start}, Goal: {goal}, Capture: {capture_square}")
     path = motion_planner.generate_quintic_path(start, goal, capture_square) # generate waypoints
-    thetas = motion_planner.inverse_kinematics(path) # convert to joint angles
-    grip_commands = motion_planner.get_gripper_commands(path) # remove unnecessary wrist commands, add gripper open close instead
-    thetas = motor_driver.sort_commands(thetas, grip_commands)
-    motor_driver.run(thetas) # pass joint angles to motors
+    
+    joint_angles, gripp_commands = motion_planner.coords_to_joint_angles(path, True)
+
+    motor_driver.filter_run(joint_angles, gripp_commands)
     
     # simulate
     # motion_planner.plot_robot(thetas, path)
@@ -419,16 +421,16 @@ motion_planner = MotionPlanner() # this class takes all the board and robot meas
 # create an instance of the MotorCommands class, which is used to communicate with the raspberry pi
 motor_driver = MotorCommands()
 
-# turn on the robot
-turn_on_robot()
+# # turn on the robot
+# turn_on_robot()
 
-# create an instance of the cam and board classes for converting input from the camera
-cam, board = initializeCamera()
+# # create an instance of the cam and board classes for converting input from the camera
+# cam, board = initializeCamera()
 
-# Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
-starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*-1))
-pyboard = chess.Board()
-# cboard, storage_list, home = defBoardCoords()
+# # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
+# starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*-1))
+# pyboard = chess.Board()
+# # cboard, storage_list, home = defBoardCoords()
 
 def main():
     
