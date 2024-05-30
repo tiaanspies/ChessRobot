@@ -357,7 +357,7 @@ def generate_transformed_pattern():
 
     # solve inverse kinematics
     logging.info("solving inverse kinematics...")
-    thetas = cm.inverse_kinematics(compensated_points) # convert to joint angles
+    thetas = cm.inverse_kinematics(compensated_points, False) # convert to joint angles
     grip_commands = cm.get_gripper_commands2(compensated_points) # remove unnecessary wrist commands, add gripper open close instead
     joint_angles, exceeds_lim = mc.sort_commands(thetas, grip_commands)
 
