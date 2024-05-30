@@ -267,6 +267,10 @@ def go_to(pos):
 
 def calculate_H_matrix_ideal():
     """Calculates H from ideal points, some work is dont to map ideal to real since not all ideal points are measured."""
+
+    print("Not in use")
+
+    return
     # As user which file is ideal
     message = "Select full version of planned path"
     file_prefix, suffix = user_file_select(dirs.PLANNED_PATHS, message, '*_path_*')
@@ -307,7 +311,7 @@ def calculate_H_matrix_ideal():
     correction_transform.save_transformation_matrix(H_path, H)
 
 def calculate_H_matrix_planned():
-    """Calculates H from planned points corresponding to measured points. Planned points must be equal to ideal pts"""
+    """Calculates H between measured and ideal points"""
     
     # Ask user which file to use for real points
     message = "Select file for Transformation matrix"
@@ -318,16 +322,20 @@ def calculate_H_matrix_planned():
     file_real = Path(dirs.CAL_TRACKING_DATA_PATH, name_real)
     pts_real = np.load(file_real)
 
-    name_planned = file_prefix+"_planned_path.npy"
-    file_planned = Path(dirs.CAL_TRACKING_DATA_PATH, name_planned)
-    pts_planned = np.load(file_planned)
+    message = "Select ideal path"
+    file_prefix, suffix = user_file_select(dirs.PLANNED_PATHS, message, '*_path_*')
+    
+    #Load ideal points
+    name_ideal = file_prefix+"_path_"+suffix+'.npy'
+    file_ideal = Path(dirs.PLANNED_PATHS, name_ideal)
+    pts_ideal = np.load(file_ideal)
 
     # remove points that contain NAN
-    mask = ~(np.isnan(pts_real).any(axis=0) | np.isnan(pts_planned).any(axis=0))
-    pts_planned = pts_planned[:, mask]
+    mask = ~(np.isnan(pts_real).any(axis=0) | np.isnan(pts_ideal).any(axis=0))
+    pts_ideal = pts_ideal[:, mask]
     pts_real = pts_real[:, mask]
     
-    H = correction_transform.attempt_minimize_quad(pts_planned, pts_real)
+    H = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
     print(f"Saving as {file_prefix}_H_matrix{suffix}")
 
     H_path = Path(dirs.H_MATRIX_PATH, file_prefix+"_H_matrix"+suffix+'.csv')
