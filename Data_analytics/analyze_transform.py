@@ -269,19 +269,51 @@ def filter_unused_ideal_pts(pts_ideal, pts_planned, pts_planned_full):
 
     return pts_ideal_copy
 
+
+def user_file_select_multiple(search_path:Path, message:str="Select a file: ", identifier:str="*_path_*"):
+    """
+    asks the user to select a file from any path that contains '*_path_*'.
+    returns the prefix and suffix of the file name.
+    """
+    file_name_generator = search_path.glob(f"{identifier}")
+    file_name_list = sorted([file_name for file_name in file_name_generator], reverse=True)
+
+    # print the list of files
+    print(message)
+    for i, file_name in enumerate(file_name_list):
+        print(f"{i}: {file_name.name}")
+
+    # get user input
+    user_input = input("Enter a number or q to continue: ")
+    selected_file_prefixes = []
+    selected_file_suffixes = []
+
+    while user_input != "q":
+        
+        user_input = int(user_input)
+
+        # return the selected file name
+        name = file_name_list[user_input].stem
+        selected_file_prefixes.append(name.split(identifier.strip("*"))[0])  # remove everything after and including "_path_"
+        selected_file_suffixes.append(name.split(identifier.strip("*"))[-1])  # remove everything before and including "_path_"
+
+        user_input = input("Enter a number or q to continue: ")
+
+    return selected_file_prefixes, selected_file_suffixes
+
 def projected_run():
     message = "Which Transformation matrix?"
-    file_prefix, suffix, ext = get_matching_file_name(dirs.PATH_WIN_H_MATRIX_PATH, message, "*_H_matrix*")
+    file_prefixes, suffixes = user_file_select_multiple(dirs.PATH_WIN_H_MATRIX_PATH, message, '*_H_matrix*')
     
-    H_path = Path(dirs.PATH_WIN_H_MATRIX_PATH, file_prefix+'_H_matrix'+suffix+ext)
-    H = correction_transform.load_transformation_matrix(H_path)
+    paths = [Path(dirs.PATH_WIN_H_MATRIX_PATH, f"{p}_H_matrix{s}.csv") for p, s in zip(file_prefixes, suffixes)]
+    H_list = correction_transform.load_transformation_matrix_multiple(paths)
     
     message = "Which base path would you like to transform?"
     ideal_prefix, suffix, ext = get_matching_file_name(dirs.PATH_WIN_PLANNED_PATHS, message,"*_path_ideal*")
     
     name_base = ideal_prefix+"_path_ideal"+suffix+ext
     pts_ideal = np.load(Path(dirs.PATH_WIN_PLANNED_PATHS, name_base))
-    projected_points = correction_transform.project_points_quad(pts_ideal, H)
+    projected_points = correction_transform.project_points_quad_multiple(pts_ideal, H_list)
 
     # print to check they match
     fig = create_plot_canvas(name_base)
