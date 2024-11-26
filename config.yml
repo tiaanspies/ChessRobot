@@ -24,4 +24,5 @@ IK_CONFIG:
     z: 350
 
   position_compensation_matrices:
-    - "/home/tpie/mnt/gdrive/Transformation Matrices/20240523_215249_H_matrix.csv"
+    - "/home/tpie/mnt/gdrive/Transformation Matrices/20240528_193309_H_matrix.csv"
+    - "/home/tpie/mnt/gdrive/Transformation Matrices/20240528_212338_H_matrix.csv"

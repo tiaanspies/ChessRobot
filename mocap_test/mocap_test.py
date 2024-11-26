@@ -23,6 +23,43 @@ except ModuleNotFoundError:
 cm = MotionPlanner()
 mc = MotorCommands()
 
+def user_menu():
+    """
+    Create a user menu with the following options:
+    1. Run calibration
+    2. generate ideal calibration pattern
+    3. generate transformed calibration pattern
+    """
+
+    print("\n1. Run calibration")
+    print("2. Generate ideal calibration pattern")
+    print("3. Generate transformed calibration pattern")
+    print('4. Calculate Transformation Matrix (Planned)')
+    print('5. Calculate Transformation Matrix (Ideal)')
+    print("0. Exit")
+
+    choice = input("Select an option: ")
+
+    if choice == "1":
+        print("\nRunning calibration\n")
+        run_calibration()
+    elif choice == "2":
+        print("\nGenerating ideal calibration pattern\n")
+        generate_ideal_pattern()
+    elif choice == "3":
+        print("\nGenerating transformed calibration pattern\n")
+        generate_transformed_pattern()
+    elif choice == '4':
+        print('Calculate Transformation Matrix')
+        calculate_H_matrix_planned()
+    elif choice == '5':
+        calculate_H_matrix_ideal()
+    elif choice == "0":
+        print("Exiting")
+        exit()
+    else:
+        print("Invalid option")
+
 def fake_inverse_kinematics(path):
     return np.vstack((path,np.zeros_like(path[0,:])))
 
@@ -313,15 +350,6 @@ def calculate_H_matrix_ideal():
 def calculate_H_matrix_planned():
     """Calculates H between measured and ideal points"""
     
-    # Ask user which file to use for real points
-    message = "Select file for Transformation matrix"
-    file_prefix, suffix = user_file_select(dirs.CAL_TRACKING_DATA_PATH, message, '*_measured*')
-    
-    # load real and planned points
-    name_real = file_prefix+"_measured.npy"
-    file_real = Path(dirs.CAL_TRACKING_DATA_PATH, name_real)
-    pts_real = np.load(file_real)
-
     message = "Select ideal path"
     file_prefix, suffix = user_file_select(dirs.PLANNED_PATHS, message, '*_path_*')
     
@@ -330,6 +358,15 @@ def calculate_H_matrix_planned():
     file_ideal = Path(dirs.PLANNED_PATHS, name_ideal)
     pts_ideal = np.load(file_ideal)
 
+    # Ask user which file to use for real points
+    message = "Select file for Transformation matrix"
+    file_prefix, suffix = user_file_select(dirs.CAL_TRACKING_DATA_PATH, message, '*_measured*')
+    
+    # load real and planned points
+    name_real = file_prefix+"_measured.npy"
+    file_real = Path(dirs.CAL_TRACKING_DATA_PATH, name_real)
+    pts_real = np.load(file_real)
+    
     # remove points that contain NAN
     mask = ~(np.isnan(pts_real).any(axis=0) | np.isnan(pts_ideal).any(axis=0))
     pts_ideal = pts_ideal[:, mask]
@@ -379,43 +416,6 @@ def generate_transformed_pattern():
     print(f"SHAPE JOINTS: {joint_angles.shape}")
     np.save(Path(dirs.PLANNED_PATHS, name_path_transformed), compensated_points)
     np.save(Path(dirs.PLANNED_PATHS, name_joint_angles_transformed), joint_angles)
-
-def user_menu():
-    """
-    Create a user menu with the following options:
-    1. Run calibration
-    2. generate ideal calibration pattern
-    3. generate transformed calibration pattern
-    """
-
-    print("\n1. Run calibration")
-    print("2. Generate ideal calibration pattern")
-    print("3. Generate transformed calibration pattern")
-    print('4. Calculate Transformation Matrix (Planned)')
-    print('5. Calculate Transformation Matrix (Ideal)')
-    print("0. Exit")
-
-    choice = input("Select an option: ")
-
-    if choice == "1":
-        print("\nRunning calibration\n")
-        run_calibration()
-    elif choice == "2":
-        print("\nGenerating ideal calibration pattern\n")
-        generate_ideal_pattern()
-    elif choice == "3":
-        print("\nGenerating transformed calibration pattern\n")
-        generate_transformed_pattern()
-    elif choice == '4':
-        print('Calculate Transformation Matrix')
-        calculate_H_matrix_planned()
-    elif choice == '5':
-        calculate_H_matrix_ideal()
-    elif choice == "0":
-        print("Exiting")
-        exit()
-    else:
-        print("Invalid option")
 
 if __name__ == "__main__":
     log_level = sys.argv[1] if len(sys.argv) > 1 else "Debug"
