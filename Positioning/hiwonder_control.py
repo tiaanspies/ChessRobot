@@ -9,13 +9,14 @@ COMMAND_READ_POS_MULTI = 21
 class SerialServoCtrl:
     def __init__(self, config_file="config/servo_config.yml"):
         self.serial_con = serial.Serial('/dev/ttyS0', 9600, timeout=1)
+        self.config_file = config_file
 
         # Load configuration from YAML file
         with open(config_file, 'r') as file:
             config = yaml.safe_load(file)
 
         # Set min and max values for servo angles from config
-        self.servo_config = config["serial_servo_settings"]     
+        self.servo_config = config   
 
     def __del__(self):
         self.serial_con.close()
@@ -70,7 +71,7 @@ class SerialServoCtrl:
             serial_position = self.interpolate_angles(pos_req_dict[axis], self.servo_config[axis])
             serial_positions.append(self.servo_config[axis], serial_position)
 
-        self.move_to_multi_serial_pos(move_time, ids, serial_positions)
+        # self.move_to_multi_serial_pos(move_time, ids, serial_positions)
 
     def interpolate_angles(self, target_angle, limit_dict):
         serial_pos_range = (limit_dict["serial_pos_max"]-limit_dict["serial_pos_min"])
@@ -111,18 +112,33 @@ class SerialServoCtrl:
         return positions
 
     def calibrate_home_positions(self):
-
+        calib_pos = {}
         for axis in ["base", "shoulder", "elbow", "gripper"]:
+            bool_save_axis = input(f"Do you want to save a new calibration position for {axis} joint? Y/N")
+
+            if bool_save_axis != "Y":
+                continue
+
             input(f"Move {axis} to {self.servo_config[axis]["angle_min"]} degrees. Press enter when complete.")
             serial_position = self.read_pos_multi([self.servo_config[axis]["servo_id"]])
 
-            #TODO: ADD SOME WAY TO WRITE THIS POSITION BACK TO THE YAML
+            calib_pos[axis]["servo_pos_min"] = serial_position
 
             input(f"Move {axis} to {self.servo_config[axis]["angle_max"]} degrees. Press enter when complete.")
             serial_position = self.read_pos_multi([self.servo_config[axis]["servo_id"]])
 
-            #TODO: ADD SOME WAY TO WRITE THIS POSITION BACK TO THE YAML
+            calib_pos[axis]["servo_pos_max"] = serial_position
 
+        self.save_calibration_to_file(calib_pos)
+
+    def save_calibration_to_file(self, calib_pos):
+
+        for axis in calib_pos:
+            self.servo_config[axis]["servo_pos_min"] = calib_pos[axis]["servo_pos_min"]
+            self.servo_config[axis]["servo_pos_max"] = calib_pos[axis]["servo_pos_max"]
+
+        with open(self.config_file, 'w') as file:
+            yaml.safe_dump(self.servo_config, file)
 
 # move_time = 3000
 # motor_ids = [5, 6, 7]
