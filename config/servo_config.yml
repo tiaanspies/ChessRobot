@@ -1,0 +1,25 @@
+serial_servo_settings:
+  base:
+    servo_id: 5
+    angle_min: 0
+    angle_max: 180
+    serial_pos_min: 0
+    serial_pos_max: 1000
+  shoulder:
+    servo_id: 6
+    angle_min: 0
+    angle_max: 180
+    serial_pos_min: 0
+    serial_pos_max: 1000
+  elbow:
+  servo_id: 7
+    angle_min: 0
+    angle_max: 180
+    serial_pos_min: 0
+    serial_pos_max: 1000
+  gripper:
+    servo_id: -1
+    angle_min: 0
+    angle_max: 90   
+    serial_pos_min: 0
+    serial_pos_max: 1000
