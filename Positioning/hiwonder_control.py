@@ -113,7 +113,7 @@ class SerialServoCtrl:
 
     def calibrate_home_positions(self):
         calib_pos = {}
-        for axis in ["base", "shoulder", "elbow", "gripper"]:
+        for axis in ["base", "shoulder", "elbow"]:
             bool_save_axis = input(f"Do you want to save a new calibration position for {axis} joint? Y/N")
 
             if bool_save_axis != "Y":

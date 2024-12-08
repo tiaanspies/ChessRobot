@@ -13,7 +13,7 @@ import datetime
 from pathlib import Path
 import path_directories
 
-class MotorCommands:
+class MotorCommandsPWM:
     def __init__(self):
         try:
             # Create the I2C bus interface.
@@ -180,3 +180,7 @@ class MotorCommands:
         #         f'thetas: {thetas}')
         
         return thetas, exceeds_pi
+
+class MotorCommandsSerial:
+    def __init__(self):
+        pass
