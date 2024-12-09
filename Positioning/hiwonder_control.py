@@ -68,16 +68,26 @@ class SerialServoCtrl:
 
         for axis in pos_req_dict:
             ids.append(self.servo_config[axis]["servo_id"])
-            serial_position = self.interpolate_angles(pos_req_dict[axis], self.servo_config[axis])
-            serial_positions.append(self.servo_config[axis], serial_position)
 
-        # self.move_to_multi_serial_pos(move_time, ids, serial_positions)
+            angle_req = pos_req_dict[axis]
+            if angle_req < self.servo_config[axis]["angle_min"]:
+                angle_req = self.servo_config[axis]["angle_min"]
+                print(f"Requested angle for {axis} is below minimum. Setting to minimum.")
+
+            if angle_req > self.servo_config[axis]["angle_max"]:
+                angle_req = self.servo_config[axis]["angle_max"]
+                print(f"Requested angle for {axis} is above maximum. Setting to maximum.")
+
+            serial_position = self.interpolate_angles(angle_req, self.servo_config[axis])
+            serial_positions.append(serial_position)
+
+        self.move_to_multi_serial_pos(move_time, ids, serial_positions)
 
     def interpolate_angles(self, target_angle, limit_dict):
         serial_pos_range = (limit_dict["serial_pos_max"]-limit_dict["serial_pos_min"])
-        angle_pos_range = limit_dict["angle_max"]-limit_dict["angle_min"]
-        return (target_angle-limit_dict["angle_min"])/angle_pos_range*serial_pos_range
-        
+        angle_pos_range = limit_dict["servo_range_max"]-limit_dict["servo_range_min"]
+        serial_angle = target_angle/angle_pos_range*serial_pos_range
+        return round(serial_angle)
 
     def read_pos_multi(self, servo_ids):
         """
@@ -114,17 +124,17 @@ class SerialServoCtrl:
     def calibrate_home_positions(self):
         calib_pos = {}
         for axis in ["base", "shoulder", "elbow"]:
-            bool_save_axis = input(f"Do you want to save a new calibration position for {axis} joint? Y/N")
 
+            bool_save_axis = input(f"Do you want to save a new calibration position for {axis} joint? Y/N")
             if bool_save_axis != "Y":
                 continue
 
-            input(f"Move {axis} to {self.servo_config[axis]["angle_min"]} degrees. Press enter when complete.")
+            input(f"Move {axis} to {self.servo_config[axis]['angle_min']} degrees. Press enter when complete.")
             serial_position = self.read_pos_multi([self.servo_config[axis]["servo_id"]])
 
             calib_pos[axis]["servo_pos_min"] = serial_position
 
-            input(f"Move {axis} to {self.servo_config[axis]["angle_max"]} degrees. Press enter when complete.")
+            input(f"Move {axis} to {self.servo_config[axis]['angle_max']} degrees. Press enter when complete.")
             serial_position = self.read_pos_multi([self.servo_config[axis]["servo_id"]])
 
             calib_pos[axis]["servo_pos_max"] = serial_position
