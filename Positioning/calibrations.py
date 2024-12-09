@@ -2,7 +2,7 @@ import time
 import Positioning.gripperElec as gripperElec
 
 MUC_THRESHOLD = 10
-MOTOR_ANGLE_INIT = 80
+MOTOR_ANGLE_INIT = 60
 def calGripper():
     print("Calibrating gripper")    
 
@@ -86,9 +86,12 @@ def calGripper():
     # PRINT RESULTS AND SAVE
     print(f"max motor angle: {max_motor_angle}, max encoder angle: {max_encoder_angle}")
     print("Gripper calibration complete")
+    print("")
     print("=====================================")
     print("Results:")
-    print(f"Min Encoder Angle: {min_encoder_angle}, Max Encoder Angle: {max_encoder_angle}")
+    print(f"Min Encoder Angle: {min_encoder_angle}")
+    print(f"Max Encoder Angle: {max_encoder_angle}")
+    print(f"Average Offset: {average_offset}")
     print("Do you want to save these values? Y/N")
     save = input()
     gripperMotor.gripper_config["angle_min_enc"] = min_encoder_angle
