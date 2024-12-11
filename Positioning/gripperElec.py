@@ -24,11 +24,11 @@ class GripperEncoder:
         read_bytes = self.bus.read_i2c_block_data(self.DEVICE_AS5600, 0x1B, 2)
         return (read_bytes[0]<<8) | read_bytes[1]
 
-    def readAngle(self):
+    def readAngleUncorrected(self):
         return self.readRawAngle() * 360.0 / 4096.0
     
-    def readAngleCorrected(self):
-        angle = self.readAngle()
+    def readAngle(self):
+        angle = self.readAngleUncorrected()
         return angle + self.config["offset_enc_to_motor"]
 
 class GripperMotor:
@@ -92,7 +92,7 @@ class GripperMotor:
         if force > self.gripper_config["force_max"]:
             force = self.gripper_config["force_max"]
 
-        current_angle = self.gripperEncoder.readAngleCorrected()
+        current_angle = self.gripperEncoder.readAngle()
         current_force = self.gripper_servo.angle - current_angle
 
         # update at least once.
@@ -100,14 +100,14 @@ class GripperMotor:
 
         # Update force
         time.sleep(self.gripper_config["force_time_step"])
-        current_angle = self.gripperEncoder.readAngleCorrected()
+        current_angle = self.gripperEncoder.readAngle()
         current_force = self.gripper_servo.angle - current_angle
 
         while abs(force - current_force) > self.gripper_config["force_threshold"]:
             self.gripper_servo.angle = self.gripper_servo.angle + min(force-current_force, self.gripper_config["force_step_dist"])
 
             time.sleep(self.gripper_config["force_time_step"])
-            current_angle = self.gripperEncoder.readAngleCorrected()
+            current_angle = self.gripperEncoder.readAngle()
             current_force = self.gripper_servo.angle - current_angle
 
             print(f"Force: {current_force:.2f}, Angle: {current_angle:.2f}, Motor angle: {self.gripper_servo.angle:.2f}")

@@ -14,7 +14,7 @@ def calGripper():
     time.sleep(1)
 
     # read angle
-    angle = gripperEncoder.readAngle()
+    angle = gripperEncoder.readAngleUncorrected()
     enc_angle_init = angle
     
     min_motor_angle = MOTOR_ANGLE_INIT
@@ -25,7 +25,7 @@ def calGripper():
         gripperMotor.set_angle(min_motor_angle)
         time.sleep(0.5)
         
-        min_encoder_angle = gripperEncoder.readAngle()
+        min_encoder_angle = gripperEncoder.readAngleUncorrected()
         motor_angle_diff = MOTOR_ANGLE_INIT - min_motor_angle
         enc_angle_diff = enc_angle_init - min_encoder_angle
 
@@ -42,7 +42,7 @@ def calGripper():
     time.sleep(1)
 
     # read angle
-    angle = gripperEncoder.readAngle()
+    angle = gripperEncoder.readAngleUncorrected()
     enc_angle_init = angle
     
     max_motor_angle = MOTOR_ANGLE_INIT
@@ -53,7 +53,7 @@ def calGripper():
         gripperMotor.set_angle(max_motor_angle)
         time.sleep(0.5)
         
-        max_encoder_angle = gripperEncoder.readAngle()
+        max_encoder_angle = gripperEncoder.readAngleUncorrected()
         motor_angle_diff = MOTOR_ANGLE_INIT - max_motor_angle
         enc_angle_diff = enc_angle_init - max_encoder_angle
 
@@ -73,7 +73,7 @@ def calGripper():
         position_motor = min_pos + x * (max_pos - min_pos) / 9
         gripperMotor.set_angle(position_motor)
         time.sleep(0.5)
-        position_encoder = gripperEncoder.readAngle()
+        position_encoder = gripperEncoder.readAngleUncorrected()
 
         positions_motor.append(position_motor)
         positions_encoder.append(position_encoder)

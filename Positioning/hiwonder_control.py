@@ -16,7 +16,11 @@ class SerialServoCtrl:
             config = yaml.safe_load(file)
 
         # Set min and max values for servo angles from config
-        self.servo_config = config   
+        self.servo_config = config
+
+        self.config_ids = {}
+        for axis in self.servo_config:
+            self.config_ids[self.servo_config[axis]["servo_id"]] = axis
 
     def __del__(self):
         self.serial_con.close()
@@ -41,9 +45,10 @@ class SerialServoCtrl:
         move_time = max(200, move_time)
 
         # clamp position values between 0 and 1000
-        for pos in positions:
-            pos = max(0, pos)
-            pos = min(1000, pos)
+        for id, pos in zip(motor_ids, positions):
+            axis = self.config_ids[id]
+            pos = max(self.servo_config[axis]["serial_pos_min"], pos)
+            pos = min(self.servo_config[axis]["serial_pos_max"], pos)
 
         num_servos = len(motor_ids) # Parameter 1
         time_hex_low = move_time & 0xFF # Parameter 2 (Low 8 bits of time)
@@ -51,7 +56,7 @@ class SerialServoCtrl:
 
         position_parameters = [[id, position & 0xFF, (position >> 8) & 0xFF] for id, position in zip(motor_ids, positions)]
         flat_position = [x for xs in position_parameters for x in xs] # Flatten the list
-        
+        print(f"Flat position: {flat_position}")
         parameters = [num_servos, time_hex_low, time_hex_high] + flat_position
 
         self.send_command(self.serial_con, COMMAND_MOVE_MULTI, parameters)
@@ -69,23 +74,32 @@ class SerialServoCtrl:
         for axis in pos_req_dict:
             ids.append(self.servo_config[axis]["servo_id"])
 
-            angle_req = pos_req_dict[axis]
-            if angle_req < self.servo_config[axis]["angle_min"]:
-                angle_req = self.servo_config[axis]["angle_min"]
+            angle_req = pos_req_dict[axis] + self.servo_config[axis]["zero_offset"]
+            if angle_req < self.servo_config[axis]["angle_min_overtravel"]:
+                angle_req = self.servo_config[axis]["angle_min_overtravel"]
                 print(f"Requested angle for {axis} is below minimum. Setting to minimum.")
 
-            if angle_req > self.servo_config[axis]["angle_max"]:
-                angle_req = self.servo_config[axis]["angle_max"]
+            if angle_req > self.servo_config[axis]["angle_max_overtravel"]:
+                angle_req = self.servo_config[axis]["angle_max_overtravel"]
                 print(f"Requested angle for {axis} is above maximum. Setting to maximum.")
 
+            print(f"Angle: {angle_req}")
             serial_position = self.interpolate_angles(angle_req, self.servo_config[axis])
+            print(f"Serial position: {serial_position}")
             serial_positions.append(serial_position)
 
         self.move_to_multi_serial_pos(move_time, ids, serial_positions)
 
     def interpolate_angles(self, target_angle, limit_dict):
-        serial_pos_range = (limit_dict["serial_pos_max"]-limit_dict["serial_pos_min"])
+        serial_pos_range = limit_dict["serial_pos_max"]-limit_dict["serial_pos_min"]
         angle_pos_range = limit_dict["servo_range_max"]-limit_dict["servo_range_min"]
+        
+        target_angle = min(limit_dict["angle_max_overtravel"], target_angle)
+        target_angle = max(limit_dict["angle_min_overtravel"], target_angle)
+
+        if limit_dict["reverse"]:
+            target_angle = limit_dict["servo_range_max"] - target_angle
+        
         serial_angle = target_angle/angle_pos_range*serial_pos_range
         return round(serial_angle)
 
@@ -94,23 +108,28 @@ class SerialServoCtrl:
         Input: Array of servo motor positions to read.
         Output: Dict of servo positions of the servos (integers 0-1000)
         """
-        num_servos = len(servo_ids) + 3
+        num_servos = len(servo_ids)
         parameters = [num_servos] + servo_ids
-
+    
         self.send_command(self.serial_con, COMMAND_READ_POS_MULTI, parameters)
 
-        response = self.serial_con.read_all()
+        # 5 + x*3 bytes are returned, where x is the number of servos
+        response = self.serial_con.read(5)
 
         if len(response) < 5:
+            print(f"Invalid response received from servo master: {response}")
             return None  # Invalid response
 
         if response[0] != 0x55 or response[1] != 0x55:
+            print(f"Invalid header received from servo master: {response[0:2]}")
             return None  # Invalid header
 
         num_servos_returned = response[4]
+
+        response = self.serial_con.read(3 * num_servos_returned)
         positions = {}
 
-        index = 5
+        index = 0
         for _ in range(num_servos_returned):
             servo_id = response[index]
             pos_low = response[index + 1]
@@ -120,40 +139,84 @@ class SerialServoCtrl:
             index += 3
 
         return positions
+    
+    def interpolate_serial(self, serial_pos, limit_dict):
+        """
+        Input: Serial position of servo motor
+        Output: Angle in degrees
+        """
+        serial_pos_range = (limit_dict["serial_pos_max"]-limit_dict["serial_pos_min"])
+        angle_pos_range = limit_dict["servo_range_max"]-limit_dict["servo_range_min"]
+        return round(serial_pos/serial_pos_range*angle_pos_range)
+    
+    def read_pos_multi_angle(self, servo_ids):
+        """
+        Input: Array of servo motor positions to read.
+        Output: Dict of servo positions in degrees.
+        """
+        positions = self.read_pos_multi(servo_ids)
+        angle_positions = {}
+
+        for servo_id in positions:
+            servo_config = self.servo_config[self.config_ids[servo_id]]
+            angle_positions[servo_id] = self.interpolate_serial(positions[servo_id], servo_config)
+
+        return angle_positions
+    
+    def read_pos_angle(self, servo_id):
+        """
+        Input: Servo motor position to read.
+        Output: Position of servo motor in degrees.
+        """
+        position = self.read_pos_multi_angle([servo_id])
+        print(f"Angle: {position[servo_id]}")
+        return position[servo_id]
 
     def calibrate_home_positions(self):
-        calib_pos = {}
+
         for axis in ["base", "shoulder", "elbow"]:
 
             bool_save_axis = input(f"Do you want to save a new calibration position for {axis} joint? Y/N")
             if bool_save_axis != "Y":
                 continue
+            
+            ## Calibrate direction
+            input(f"Move {axis} closest to 0 degrees. This is to detect if direction is reversed. Press enter when complete.")
+            serial_position = self.read_pos_angle(self.servo_config[axis]["servo_id"])
 
-            input(f"Move {axis} to {self.servo_config[axis]['angle_min']} degrees. Press enter when complete.")
-            serial_position = self.read_pos_multi([self.servo_config[axis]["servo_id"]])
+            self.servo_config[axis]["reverse"] = serial_position < 500
 
-            calib_pos[axis]["servo_pos_min"] = serial_position
+            ## Calibrate zero offset
+            input(f"Move {axis} exactly to 0 or 180 degrees. This is to set the zero offset. Press enter when complete.")
+            serial_position = self.read_pos_angle(self.servo_config[axis]["servo_id"])
 
-            input(f"Move {axis} to {self.servo_config[axis]['angle_max']} degrees. Press enter when complete.")
-            serial_position = self.read_pos_multi([self.servo_config[axis]["servo_id"]])
+            if serial_position < 500:
+                self.servo_config[axis]["zero_offset"] = serial_position
 
-            calib_pos[axis]["servo_pos_max"] = serial_position
+            else:
+                self.servo_config[axis]["zero_offset"] = self.servo_config[axis]["servo_range_max"] - serial_position
+            
+            ## Calibrate overtravel limits
+            input(f"Move {axis} to lower overtravel limit. Press enter when complete.")
+            serial_position = self.read_pos_angle(self.servo_config[axis]["servo_id"])
+            self.servo_config[axis]["angle_min_overtravel"] = serial_position
 
-        self.save_calibration_to_file(calib_pos)
+            input(f"Move {axis} to upper overtravel limit. Press enter when complete.")
+            serial_position = self.read_pos_angle(self.servo_config[axis]["servo_id"])
+            self.servo_config[axis]["angle_max_overtravel"] = serial_position
 
-    def save_calibration_to_file(self, calib_pos):
+            if self.servo_config[axis]["reverse"]:
+                max = self.servo_config[axis]["servo_range_max"]
+                self.servo_config[axis]["angle_min_overtravel"] = max - self.servo_config[axis]["angle_min_overtravel"]
+                self.servo_config[axis]["angle_max_overtravel"] = max - self.servo_config[axis]["angle_max_overtravel"]
+                self.servo_config[axis]["zero_offset"] = max - self.servo_config[axis]["zero_offset"]
+        self.save_calibration_to_file()
 
-        for axis in calib_pos:
-            self.servo_config[axis]["servo_pos_min"] = calib_pos[axis]["servo_pos_min"]
-            self.servo_config[axis]["servo_pos_max"] = calib_pos[axis]["servo_pos_max"]
-
+    def save_calibration_to_file(self):
         with open(self.config_file, 'w') as file:
             yaml.safe_dump(self.servo_config, file)
 
-# move_time = 3000
-# motor_ids = [5, 6, 7]
-# positions = [600, 1000, 500]
-# positions = [400, 1000, 1000]
-# position_params = parameters_for_position(move_time, motor_ids, positions)
-
-# send_command(ser, 3, position_params)  # Send the command
+if __name__ == "__main__":
+    controller = SerialServoCtrl()
+    controller.move_to_multi_angle_pos(2000, {"shoulder": 0})
+    # controller.calibrate_home_positions()
