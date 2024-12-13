@@ -56,10 +56,11 @@ class SerialServoCtrl:
 
         position_parameters = [[id, position & 0xFF, (position >> 8) & 0xFF] for id, position in zip(motor_ids, positions)]
         flat_position = [x for xs in position_parameters for x in xs] # Flatten the list
-        print(f"Flat position: {flat_position}")
+        
         parameters = [num_servos, time_hex_low, time_hex_high] + flat_position
 
         self.send_command(self.serial_con, COMMAND_MOVE_MULTI, parameters)
+        time.sleep(move_time/1000)
 
     def move_to_multi_angle_pos(self, move_time, pos_req_dict):
         """
@@ -74,19 +75,16 @@ class SerialServoCtrl:
         for axis in pos_req_dict:
             ids.append(self.servo_config[axis]["servo_id"])
             
-            print(f"Angle req pre adjustment: {pos_req_dict[axis]}")
             if self.servo_config[axis]["reverse"]:
                 angle_req = self.servo_config[axis]["zero_offset"] - pos_req_dict[axis]
             else:
                 angle_req = self.servo_config[axis]["zero_offset"] + pos_req_dict[axis]
 
-            print(f"Angle req post zero offset: {angle_req}")
-
             serial_position = self.interpolate_angles(angle_req, self.servo_config[axis])
-            print(f"Serial position: {serial_position}")
             serial_positions.append(serial_position)
 
         self.move_to_multi_serial_pos(move_time, ids, serial_positions)
+        
 
     def interpolate_angles(self, target_angle, limit_dict):
         serial_pos_range = limit_dict["serial_pos_max"]-limit_dict["serial_pos_min"]
@@ -241,11 +239,12 @@ class SerialServoCtrl:
 
 if __name__ == "__main__":
     controller = SerialServoCtrl()
-    controller.move_to_multi_angle_pos(1500, {"base": 180, "shoulder": 30, "elbow":40})
-    time.sleep(1.5)
-    controller.move_to_multi_angle_pos(1500, {"base": 90, "shoulder": 90, "elbow":90})
-    time.sleep(1.5)
-    controller.move_to_multi_angle_pos(1500, {"base": 0, "shoulder": 30, "elbow":40})
+    controller.move_to_multi_angle_pos(2000, {"shoulder": 90, "elbow":0})
+    # controller.move_to_multi_angle_pos(3000, {"base": 180, "shoulder": 30, "elbow":40})
+    # time.sleep(3)
+    # controller.move_to_multi_angle_pos(2000, {"base": 90, "shoulder": 90, "elbow":90})
+    # time.sleep(2)
+    # controller.move_to_multi_angle_pos(2000, {"base": 0, "shoulder": 30, "elbow":40})
 
     # print("Angle")
     # pos = controller.read_pos_multi_angle([
