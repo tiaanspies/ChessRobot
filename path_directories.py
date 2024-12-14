@@ -9,6 +9,6 @@ RUN_PATH = Path("/home", "tpie", "mnt", "gdrive", "Run Path")
 PATH_WIN_CAL_TRACKING_DATA = Path('G:\My Drive\Programming\RPiCLone\Arm Cal Tracking Data')
 PATH_WIN_PLANNED_PATHS = Path('G:\My Drive\Programming\RPiCLone\Planned Paths')
 PATH_WIN_H_MATRIX_PATH = Path('G:\My Drive\Programming\RPiCLone',"Transformation Matrices")
-PATH_WIN_RUN_PATH = Path('G:\My Drive\Programming\RPiCLone\Run Path')
+PATH_WIN_RUN_PATH = Path('G:\My Drive\Programming\RPiCLone\Ru n Path')
 
-YAML_CONFIG_PATH = Path("config.yml")
+CONFIG_PATH_KINEMATICS = Path("config", "kinematics.yml")

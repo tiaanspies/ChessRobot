@@ -8,13 +8,13 @@ from IK_Solvers.NLinkArm3d import NLinkArm
 from IK_Solvers.quintic_polynomials_planner import QuinticPolynomial
 from Data_analytics.correction_transform import project_points_quad
 import yaml
-from path_directories import YAML_CONFIG_PATH
+from path_directories import CONFIG_PATH_KINEMATICS
 from Data_analytics import correction_transform
 import logging
 
 class MotionPlanner():
     def __init__(self, ):
-        config = yaml.safe_load(open(YAML_CONFIG_PATH))['IK_CONFIG']
+        config = yaml.safe_load(open(CONFIG_PATH_KINEMATICS))['IK_CONFIG']
         self.LIFT = config['lift'] # distance to clear the other pieces in mm
         self.SQUARE_WIDTH = config['chess_square_width'] # width of one board square in mm
         self.BASE_DIST = config['base_dist'] # distance from edge of the board to the robot base in mm
