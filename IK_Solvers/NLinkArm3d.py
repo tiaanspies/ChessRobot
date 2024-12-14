@@ -6,6 +6,7 @@ Edited by Noah Jones for this specific use case
 import numpy as np
 import math
 from mpl_toolkits.mplot3d import Axes3D
+from scipy.optimize import minimize
 import matplotlib.pyplot as plt
 
 
@@ -41,81 +42,50 @@ class Link:
             (np.cross(z_axis_prev, ee_pos - pos_prev), z_axis_prev))
         return basic_jacobian
 
+
 class NLinkArm:
     def __init__(self, dh_params_list):
-        self.link_list = []
-        for i in range(len(dh_params_list)):
-            self.link_list.append(Link(dh_params_list[i]))
+        self.link_list = [Link(dh_params) for dh_params in dh_params_list]
 
     def transformation_matrix(self):
         trans = np.identity(4)
-        for i in range(len(self.link_list)):
-            trans = np.dot(trans, self.link_list[i].transformation_matrix())
+        for link in self.link_list:
+            trans = np.dot(trans, link.transformation_matrix())
         return trans
 
-    def forward_kinematics(self, plot=False):
-        trans = self.transformation_matrix()
+    def forward_kinematics(self, trans, plot=False):
+        
 
         x = trans[0, 3]
         y = trans[1, 3]
         z = trans[2, 3]
-        alpha, beta, gamma = self.euler_angle()
+        alpha, beta, gamma = self.euler_angle(trans)
 
         if plot:
-            self.fig = plt.figure()
-            self.ax = Axes3D(self.fig, auto_add_to_figure=False)
-            self.fig.add_axes(self.ax)
-
-            x_list = []
-            y_list = []
-            z_list = []
-
-            trans = np.identity(4)
-
-            x_list.append(trans[0, 3])
-            y_list.append(trans[1, 3])
-            z_list.append(trans[2, 3])
-            for i in range(len(self.link_list)):
-                trans = np.dot(trans, self.link_list[i].transformation_matrix())
-                x_list.append(trans[0, 3])
-                y_list.append(trans[1, 3])
-                z_list.append(trans[2, 3])
-
-            self.ax.plot(x_list, y_list, z_list, "o-", color="#00aa00", ms=4,
-                         mew=0.5)
-            self.ax.plot([0], [0], [0], "o")
-
-            self.ax.set_xlabel("x")
-            self.ax.set_ylabel("y")
-            self.ax.set_zlabel("z")
-            
-            self.ax.set_xlim(-200, 200)
-            self.ax.set_ylim(0,500)
-            self.ax.set_zlim(0, 300)
-
-            plt.show()
+            self.plot_arm()
 
         return [x, y, z, alpha, beta, gamma]
 
-    def basic_jacobian(self):
-        ee_pos = self.forward_kinematics()[0:3]
+    def basic_jacobian(self, trans):
+        ee_pos = self.forward_kinematics(trans)[0:3]
         basic_jacobian_mat = []
 
         trans = np.identity(4)
-        for i in range(len(self.link_list)):
-            basic_jacobian_mat.append(
-                self.link_list[i].basic_jacobian(trans, ee_pos))
-            trans = np.dot(trans, self.link_list[i].transformation_matrix())
+        for link in self.link_list:
+            basic_jacobian_mat.append(link.basic_jacobian(trans, ee_pos))
+            trans = np.dot(trans, link.transformation_matrix())
 
         return np.array(basic_jacobian_mat).T
 
     def inverse_kinematics(self, ref_ee_pose, plot=False):
-        for cnt in range(500):
-            ee_pose = self.forward_kinematics()
-            diff_pose = np.array(ref_ee_pose) - ee_pose
+        for it in range(501):
+            trans = self.transformation_matrix()
+            ee_pose = self.forward_kinematics(trans)
+            diff_pose = ref_ee_pose - ee_pose
 
-            basic_jacobian_mat = self.basic_jacobian()
-            alpha, beta, gamma = self.euler_angle()
+            basic_jacobian_mat = self.basic_jacobian(trans)                
+            
+            alpha, beta, gamma = self.euler_angle(trans)
 
             K_zyz = np.array(
                 [[0, -math.sin(alpha), math.cos(alpha) * math.sin(beta)],
@@ -129,45 +99,32 @@ class NLinkArm:
                 np.array(diff_pose))
             self.update_joint_angles(theta_dot / 100.)
 
+            # if (it) % 10 == 0:
+            #     print(f"ITERATION {it}:{np.linalg.norm(diff_pose)}")
+
         if plot:
-            self.fig = plt.figure()
-            self.ax = Axes3D(self.fig)
+            self.plot_arm(ref_ee_pose)
 
-            x_list = []
-            y_list = []
-            z_list = []
-
-            trans = np.identity(4)
-
-            x_list.append(trans[0, 3])
-            y_list.append(trans[1, 3])
-            z_list.append(trans[2, 3])
-            for i in range(len(self.link_list)):
-                trans = np.dot(trans, self.link_list[i].transformation_matrix())
-                x_list.append(trans[0, 3])
-                y_list.append(trans[1, 3])
-                z_list.append(trans[2, 3])
-
-            self.ax.plot(x_list, y_list, z_list, "o-", color="#00aa00", ms=4,
-                         mew=0.5)
-            self.ax.plot([0], [0], [0], "o")
-
-            self.ax.set_xlabel("x")
-            self.ax.set_ylabel("y")
-            self.ax.set_zlabel("z")
+        return self.get_joint_angles()
+    
+    def inverse_kinematics_grad_descent(self, ref_ee_pose, plot=False):
+        def objective(joint_angles):
+            self.set_joint_angles(joint_angles)
+            trans = self.transformation_matrix()
+            ee_pos = self.forward_kinematics(trans)[0:3]
             
-            self.ax.set_xlim(-200, 200)
-            self.ax.set_ylim(0,500)
-            self.ax.set_zlim(0, 300)
+            return np.linalg.norm(ref_ee_pose - np.array(ee_pos))
 
-            self.ax.plot([ref_ee_pose[0]], [ref_ee_pose[1]], [ref_ee_pose[2]],
-                         "o")
-            plt.show()
+        initial_guess = self.get_joint_angles()
+        result = minimize(objective, initial_guess, method='BFGS', options={'gtol': 0.1})
+        self.set_joint_angles(result.x)
+        
+        if plot:
+            self.plot_arm(ref_ee_pose)
 
         return self.get_joint_angles()
 
-    def euler_angle(self):
-        trans = self.transformation_matrix()
+    def euler_angle(self, trans):
 
         alpha = math.atan2(trans[1][2], trans[0][2])
         if not (-math.pi / 2 <= alpha <= math.pi / 2):
@@ -184,35 +141,29 @@ class NLinkArm:
         return alpha, beta, gamma
 
     def set_joint_angles(self, joint_angle_list):
-        for i in range(len(self.link_list)):
-            self.link_list[i].dh_params_[0] = joint_angle_list[i]
+        for i, angle in enumerate(joint_angle_list):
+            self.link_list[i].dh_params_[0] = angle
 
     def update_joint_angles(self, diff_joint_angle_list):
-        for i in range(len(self.link_list)):
-            self.link_list[i].dh_params_[0] += diff_joint_angle_list[i]
+        for i, diff in enumerate(diff_joint_angle_list):
+            self.link_list[i].dh_params_[0] += diff
 
     def get_joint_angles(self):
-        self.joint_angles = []
-        for i in range(len(self.link_list)):
-            self.joint_angles.append(self.link_list[i].dh_params_[0])
-        return self.joint_angles
+        return [link.dh_params_[0] for link in self.link_list]
 
     def get_vertices(self):
-
-        self.link_num = len(self.link_list)
-        verts = np.zeros((3,self.link_num + 1))
-        
+        verts = np.zeros((3, len(self.link_list) + 1))
         trans = np.identity(4)
 
-        for i in range(self.link_num):
-            trans = np.dot(trans, self.link_list[i].transformation_matrix())
-            verts[:,i+1] = trans[:3, 3]
+        for i, link in enumerate(self.link_list):
+            trans = np.dot(trans, link.transformation_matrix())
+            verts[:, i + 1] = trans[:3, 3]
 
         return verts
-    
-    def plot(self):
-        self.fig = plt.figure()
-        self.ax = Axes3D(self.fig)
+
+    def plot_arm(self, ref_ee_pose=None):
+        fig = plt.figure()
+        ax = Axes3D(fig)
 
         x_list = []
         y_list = []
@@ -223,21 +174,24 @@ class NLinkArm:
         x_list.append(trans[0, 3])
         y_list.append(trans[1, 3])
         z_list.append(trans[2, 3])
-        for i in range(len(self.link_list)):
-            trans = np.dot(trans, self.link_list[i].transformation_matrix())
+        for link in self.link_list:
+            trans = np.dot(trans, link.transformation_matrix())
             x_list.append(trans[0, 3])
             y_list.append(trans[1, 3])
             z_list.append(trans[2, 3])
 
-        self.ax.plot(x_list, y_list, z_list, "o-", color="#00aa00", ms=4,
-                     mew=0.5)
-        self.ax.plot([0], [0], [0], "o")
+        ax.plot(x_list, y_list, z_list, "o-", color="#00aa00", ms=4, mew=0.5)
+        ax.plot([0], [0], [0], "o")
 
-        self.ax.set_xlabel("x")
-        self.ax.set_ylabel("y")
-        self.ax.set_zlabel("z")
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        ax.set_zlabel("z")
 
-        self.ax.set_xlim(-200, 200)
-        self.ax.set_ylim(0,500)
-        self.ax.set_zlim(0, 300)
+        ax.set_xlim(-200, 200)
+        ax.set_ylim(0, 500)
+        ax.set_zlim(0, 300)
+
+        if ref_ee_pose:
+            ax.plot([ref_ee_pose[0]], [ref_ee_pose[1]], [ref_ee_pose[2]], "o")
+
         plt.show()

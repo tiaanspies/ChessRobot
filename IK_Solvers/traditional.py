@@ -20,8 +20,12 @@ class MotionPlanner():
         self.BASE_DIST = config['base_dist'] # distance from edge of the board to the robot base in mm
         self.BOARD_HEIGHT = config['board_height'] # height of the board off the ground in mm
         self.GRIP_HEIGHT = config['grip_height'] # how high off the board to grip the pieces in mm
-        self.L1 = config['L1'] # length of the first link in mm
-        self.L2 = config['L2'] # length of the second link in mm
+        
+        self.l1_params = config['l1_params']
+        self.l2_params = config['l2_params']
+        self.l3_params = config['l3_params']
+        self.l4_params = config['l4_params']
+
         self.BOARD_WIDTH = 8 * self.SQUARE_WIDTH # total width of the board
 
         # offset between camera and hinge point that IK solver uses
@@ -47,11 +51,15 @@ class MotionPlanner():
         self.generate_coords()
         self.initialize_arm()
 
-        h_list_paths = config['position_compensation_matrices']
+        try:
+            h_list_paths = config['position_compensation_matrices']
 
-        self.h_list = []
-        for path in h_list_paths:
-            self.h_list.append(np.loadtxt(path, delimiter=','))
+            self.h_list = []
+            for path in h_list_paths:
+                self.h_list.append(np.loadtxt(path, delimiter=','))
+
+        except FileNotFoundError:
+            print("Could not find position compensation matrices. Skipping...")
 
 
 
@@ -81,11 +89,7 @@ class MotionPlanner():
     def initialize_arm(self, param_list=None):
         """initialize inthetasstance of NLinkArm with Denavit-Hartenberg parameters of chess arm"""
         if param_list is None:
-            l1_params = [np.pi/4, np.pi/2, 0, 83.35]
-            l2_params = [np.pi/2, 0, 296, 0]
-            l3_params = [3*np.pi/2, 0, 284.76, 0]
-            l4_params = [np.pi,0,90,0]
-            self.param_list = [l1_params, l2_params, l3_params, l4_params]
+            self.param_list = [self.l1_params, self.l2_params, self.l3_params, self.l4_params]
         else:
             self.param_list = param_list
         self.chess_arm = NLinkArm(self.param_list)
@@ -163,9 +167,15 @@ class MotionPlanner():
         # execute IK on each point in the path
         num_waypoints = np.size(path,1)
         theta_path = np.zeros((4,num_waypoints))
-        for waypoint_idx in range(num_waypoints):
-            waypoint = list(np.hstack((path[:,waypoint_idx],0,0,0)))
-            theta_path[:,waypoint_idx] = self.chess_arm.inverse_kinematics(waypoint)
+
+        # get the first point
+        waypoint = np.hstack((path[:,0],0,0,0))
+        theta_path[:, 0] = self.chess_arm.inverse_kinematics(waypoint)
+
+        # calculate the rest with gradient descent
+        for waypoint_idx in range(1, num_waypoints):
+            waypoint = np.hstack((path[:,waypoint_idx]))
+            theta_path[:,waypoint_idx] = self.chess_arm.inverse_kinematics_grad_descent(waypoint)
         return theta_path
 
     def forward_kinematics(self, thetas):
