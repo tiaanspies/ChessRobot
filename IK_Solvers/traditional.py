@@ -55,8 +55,9 @@ class MotionPlanner():
             h_list_paths = config['position_compensation_matrices']
 
             self.h_list = []
-            for path in h_list_paths:
-                self.h_list.append(np.loadtxt(path, delimiter=','))
+            if h_list_paths is not None:
+                for path in h_list_paths:
+                    self.h_list.append(np.loadtxt(path, delimiter=','))
 
         except FileNotFoundError:
             print("Could not find position compensation matrices. Skipping...")
@@ -171,11 +172,14 @@ class MotionPlanner():
         # get the first point
         waypoint = np.hstack((path[:,0],0,0,0))
         theta_path[:, 0] = self.chess_arm.inverse_kinematics(waypoint)
+        print("Initial waypoint complete.")
 
         # calculate the rest with gradient descent
         for waypoint_idx in range(1, num_waypoints):
             waypoint = np.hstack((path[:,waypoint_idx]))
             theta_path[:,waypoint_idx] = self.chess_arm.inverse_kinematics_grad_descent(waypoint)
+            if waypoint_idx % 10 == 0:
+                print(f"Waypoint {waypoint_idx}/{num_waypoints} complete.")
         return theta_path
 
     def forward_kinematics(self, thetas):
