@@ -13,17 +13,17 @@ IK_CONFIG:
   l1_params: [0.78539816339, 1.57079632679, 0, 92.5]
   l2_params: [1.57079632679, 0, 322, 0]
   l3_params: [4.71238898038, 0, 312, 0]
-  l4_params: [3.14159265359, 0, 90, 0]
+  l4_params: [3.14159265359, 0, 0, 0]
 
   camera_to_control_pt_offset: 
-    x: -7
+    x: 0
     y: 2
-    z: 45
+    z: 63
 
   rcs_to_ccs_offset: 
-    x: 221
-    y: -62
-    z: 55
+    x: 215
+    y: -60
+    z: 20
 
   home_position:
     x: 0
@@ -31,5 +31,3 @@ IK_CONFIG:
     z: 350
 
   position_compensation_matrices:
-    - "/home/tpie/mnt/gdrive/Transformation Matrices/20240528_193309_H_matrix.csv"
-    - "/home/tpie/mnt/gdrive/Transformation Matrices/20240528_212338_H_matrix.csv"
