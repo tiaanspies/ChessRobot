@@ -239,7 +239,6 @@ class MotorCommandsSerial:
                     'shoulder': angle[1],
                     'elbow': angle[2]
                 }
-                print(pos_dict)
                 self.motor.move_to_multi_angle_pos(200, pos_dict)
                 # sleep(0.2)
 
@@ -269,7 +268,7 @@ class MotorCommandsSerial:
 
         self.plan_start_offset = angles.shape[1] - plan_points.shape[1]
 
-    def run_once(self):
+    def run_once(self, move_time=2000):
         """
         Move one step in the path that is saved. Load new paths with load_path
         """
@@ -285,11 +284,15 @@ class MotorCommandsSerial:
             self.path_progress += 1
             return True, self.angles[:, self.path_progress]
         
-        logging.debug(f"moving to {self.angles[:, self.path_progress]}")
-        self.base.angle = self.angles[0, self.path_progress]
-        self.shoulder.angle = self.angles[1, self.path_progress] 
-        self.elbow.angle = self.angles[2, self.path_progress]
-        self.grip.angle = self.angles[3, self.path_progress]
+        # logging.debug(f"moving to {self.angles[:, self.path_progress]}")
+
+        pos_dict = {
+            'base': self.angles[0, self.path_progress],
+            'shoulder': self.angles[1, self.path_progress],
+            'elbow': self.angles[2, self.path_progress]
+        }
+        
+        self.motor.move_to_multi_angle_pos(move_time, pos_dict)
         
         if self.path_progress >= self.plan_start_offset:
             plan_points = self.plan_points[:, self.path_progress - self.plan_start_offset].reshape(3,1)
