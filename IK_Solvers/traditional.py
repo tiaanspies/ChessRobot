@@ -9,7 +9,9 @@ from IK_Solvers.quintic_polynomials_planner import QuinticPolynomial
 from Data_analytics.correction_transform import project_points_quad
 import yaml
 from path_directories import CONFIG_PATH_KINEMATICS
+from path_directories import H_MATRIX_PATH
 from Data_analytics import correction_transform
+from pathlib import Path
 import logging
 
 class MotionPlanner():
@@ -57,7 +59,8 @@ class MotionPlanner():
             self.h_list = []
             if h_list_paths is not None:
                 for path in h_list_paths:
-                    self.h_list.append(np.loadtxt(path, delimiter=','))
+                    full_path = Path(H_MATRIX_PATH, path)
+                    self.h_list.append(np.loadtxt(full_path, delimiter=','))
 
         except FileNotFoundError:
             print("Could not find position compensation matrices. Skipping...")
@@ -83,9 +86,11 @@ class MotionPlanner():
         self.board_coords[:2,:,:] = np.array(np.meshgrid(self.file_coords,self.rank_coords))
     
         # define array for coords of captured pieces
-        self.storage_coords = list(np.vstack((np.linspace(-self.BOARD_WIDTH/2,self.BOARD_WIDTH/2,15,endpoint=True),
-                                np.ones(15)*(self.BASE_DIST - 40),
-                                np.zeros(15))).T)
+        self.storage_coords = list(np.vstack((
+            np.ones(15)*(-self.BOARD_WIDTH/2 - 45),
+            np.linspace(self.BASE_DIST,self.BOARD_WIDTH,15,endpoint=True),
+            np.ones(15)*self.GRIP_HEIGHT)
+        ).T)
 
     def initialize_arm(self, param_list=None):
         """initialize inthetasstance of NLinkArm with Denavit-Hartenberg parameters of chess arm"""
@@ -98,6 +103,8 @@ class MotionPlanner():
     def coords_to_joint_angles(self, path, apply_compensation=False):
         """Inputs path and returns joint_angles, gripp commands"""
         logging.info("solving inverse kinematics...")
+
+        raise NotImplementedError("This function is not implemented anymore. Gripper commands are now returned by quintic path")
         thetas = self.inverse_kinematics(path, apply_compensation) # convert to joint angles
         grip_commands = self.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
         
@@ -111,7 +118,8 @@ class MotionPlanner():
 
     def generate_path(self, start, goal, cap_sq, step=10):
         """creates a 3xN array of waypoints to and from home, handling captures and lifting over pieces"""
-        lift_vector = np.array([0,0,self.LIFT])
+        lift_vector = np.array([0, 0, self.LIFT])
+        lift_vector_storage = np.array([0, 0, self.LIFT + self.BOARD_HEIGHT])
         if cap_sq is not None:
             storage = np.array(self.storage_coords.pop(0))
             first_moves = np.hstack((self.line(self.HOME, cap_sq, step),
@@ -134,30 +142,63 @@ class MotionPlanner():
 
         return np.hstack((first_moves, second_moves))
 
-    def generate_quintic_path(self, start, goal, cap_sq=None, step=5):
+    def generate_quintic_path(self, start, goal, cap_sq=None, step=20):
         """creates a 3xN array of waypoints to and from home, handling captures and lifting over pieces"""
+
         lift_vector = np.array([0,0,self.LIFT])
+        lift_vector_storage = np.array([0, 0, self.LIFT + self.BOARD_HEIGHT])
         if cap_sq is not None:
             storage = np.array(self.storage_coords.pop(0))
-            first_moves = np.hstack((self.quintic_line(self.HOME, cap_sq, step),
-                                    np.ones((3,10)) * cap_sq.reshape((3,1)),
-                                    self.quintic_line(cap_sq, cap_sq + lift_vector, step),
-                                    self.quintic_line(cap_sq + lift_vector, storage + lift_vector, step),
-                                    self.quintic_line(storage + lift_vector, storage, step),
-                                    storage.reshape((3,1)),
-                                    self.quintic_line(storage, storage + lift_vector, step),
-                                    self.quintic_line(storage + lift_vector, start, step)))
-        else:
-            first_moves = self.quintic_line(self.HOME, start, step)
-        
-        second_moves = np.hstack((np.ones((3,10)) * start.reshape((3,1)),
-                                self.quintic_line(start, start + lift_vector, step),
-                                self.quintic_line(start + lift_vector, goal + lift_vector, step),
-                                self.quintic_line(goal + lift_vector, goal, step),
-                                np.ones((3,10)) * goal.reshape((3,1)),
-                                self.quintic_line(goal, self.HOME, step)))
+            move1 = self.quintic_line(self.HOME, cap_sq+lift_vector, step)
+            move2 = self.quintic_line(cap_sq+lift_vector, cap_sq, step/2)
+            # Close Gripper
+            move3 = self.quintic_line(cap_sq, cap_sq + lift_vector, step/2)
+            move4 = self.quintic_line(cap_sq + lift_vector, storage + lift_vector_storage, step)
+            move5 = self.quintic_line(storage + lift_vector_storage, storage, step)
+            #Open Gripper
+            move6 = self.quintic_line(storage, storage + lift_vector_storage, step)
+            move7 = self.quintic_line(storage + lift_vector_storage, start + lift_vector, step)
+            move8 = self.quintic_line(start + lift_vector, start, step/2)
 
-        return np.hstack((first_moves, second_moves))
+            first_moves = np.hstack((move1, move2, move3, move4, move5, move6, move7, move8))
+
+            # set zeros for all moves where there is no gripper command
+            # then a 1 to close gripper and 2 to open
+            gripper_open =  np.size(move1, 1) + np.size(move2, 1)
+            gripper_close = np.size(move3, 1) + np.size(move4, 1) + np.size(move5, 1)
+            gripper_open2 = np.size(move6, 1) + np.size(move7, 1) + np.size(move8, 1)
+
+            gripper_commands_move1 = np.zeros((1, gripper_open + gripper_close + gripper_open2))
+            gripper_commands_move1[0, gripper_open] = 1
+            gripper_commands_move1[0, gripper_open + gripper_close] = 2
+
+        else:
+            move1 = self.quintic_line(self.HOME, start+lift_vector, step)
+            move2 = self.quintic_line(start+lift_vector, start, step)
+
+            first_moves = np.hstack((move1, move2))
+
+            gripper_commands_move1 = np.zeros((1, np.size(move1, 1) + np.size(move2, 1)))
+        
+        #Close Gripper
+        move1 = self.quintic_line(start, start+lift_vector, step/2)
+        move2 = self.quintic_line(start+lift_vector, goal+lift_vector, step)
+        move3 = self.quintic_line(goal+lift_vector, goal, step/2)
+        #Open Gripper
+        move4 = self.quintic_line(goal, goal+lift_vector, step/2)
+        move5 = self.quintic_line(goal+lift_vector, self.HOME, step)
+        second_moves = np.hstack((move1, move2, move3, move4, move5))
+
+        gripper_close = np.size(move1, 1) + np.size(move2, 1) + np.size(move3, 1)
+        gripper_open = np.size(move4, 1) + np.size(move5, 1)
+
+        gripper_commands_move2 = np.zeros((1, gripper_close + gripper_open))
+        gripper_commands_move2[0, 0] = 1
+        gripper_commands_move2[0, gripper_close] = 2
+
+        gripper_commands = np.hstack((gripper_commands_move1, gripper_commands_move2))
+
+        return np.hstack((first_moves, second_moves)), gripper_commands
 
     def inverse_kinematics(self, path, apply_compensation):
         """generates a 4xN list of joint angles from a 3xN list of waypoints"""

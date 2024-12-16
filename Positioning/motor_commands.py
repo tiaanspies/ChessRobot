@@ -187,6 +187,7 @@ class MotorCommandsSerial:
     def __init__(self):
         try:
             self.motor = hw.SerialServoCtrl()
+            self.gripper = gripper_elec.GripperMotor()
         except NameError as e:
             logging.error(f"error creating MotorCommands Object in __init__ in motor_commands.py: {e}")
 
@@ -225,26 +226,31 @@ class MotorCommandsSerial:
         # np.save(Path(path_directories.RUN_PATH, prefix + "_measured.npy"), thetas)
         
         if angletype == 'rad':
-            angles = np.rad2deg(thetas)
+            angles = np.rad2deg(thetas[:3, :])
+            angles = np.vstack((angles, thetas[3, :]))
         elif angletype == 'deg':
             angles = thetas
         else:
             raise ValueError("angletype argument must be either 'rad' or 'deg'")
         
-        try:
-            self.go_to(angles[:,0], 'deg')
-            for angle in angles.T:
-                pos_dict = {
-                    'base': angle[0],
-                    'shoulder': angle[1],
-                    'elbow': angle[2]
-                }
-                self.motor.move_to_multi_angle_pos(200, pos_dict)
-                # sleep(0.2)
+        self.go_to(angles[:,0], 'deg')
+        for angle in angles.T:
+            pos_dict = {
+                'base': angle[0],
+                'shoulder': angle[1],
+                'elbow': angle[2]
+            }
 
-        except KeyboardInterrupt:
-            # self.grip.angle = np.rad2deg(self.OPEN)
-            pass # TODO: make sure this means gripper is open
+            gripper_command = angle[3]
+
+            if gripper_command == 1:
+                self.gripper.close_gripper_force()
+            elif gripper_command == 2:
+                self.gripper.open_gripper()
+
+            self.motor.move_to_multi_angle_pos(200, pos_dict)
+            # sleep(0.2)
+
 
     def load_path(self, thetas, plan_points = None, angletype='rad'):
         """
@@ -291,6 +297,13 @@ class MotorCommandsSerial:
             'shoulder': self.angles[1, self.path_progress],
             'elbow': self.angles[2, self.path_progress]
         }
+
+        gripper_command = self.angles[3, self.path_progress]
+
+        if gripper_command == 1:
+            self.gripper.close_gripper_force()
+        elif gripper_command == 0:
+            self.gripper.open_gripper()
         
         self.motor.move_to_multi_angle_pos(move_time, pos_dict)
         
@@ -329,13 +342,13 @@ class MotorCommandsSerial:
         thetas[0,:] = ((np.pi - thetas[0,:]) - np.pi/4) * 2 # fix the base angle by switching rot direction, shifting to the front slice, then handling the gear ratio
         thetas[1,:] = thetas[1,:] # make any necessary changes to the shoulder angles
         thetas[2,:] = 2*np.pi - thetas[2,:] # make any necessary changes to the elbow angles
-        thetas =  thetas % (2 * np.pi)
+        # thetas =  thetas % (2 * np.pi)
 
-        exceeds_pi = np.any(thetas > np.pi, axis=0)
-        # if any(thetas.ravel() > np.pi):
-        #     raveled = thetas.ravel()
-        #     logging.error(f'Thetas greater than pi: {raveled[raveled > np.pi]}')
-        #     raise ValueError(f'IK solution requires angles greater than the 180-degree limits of motors\n'\
-        #         f'thetas: {thetas}')
-        
+        exceeds_pi = np.any(thetas > 210/180*np.pi, axis=0)
+        exceeds_neg_30 = np.any(thetas < -30/180*np.pi, axis=0)
+        out_of_limits = exceeds_pi | exceeds_neg_30
+
+        if np.any(out_of_limits):
+            raise ValueError(f'IK solution requires angles greater than the 180-degree limits of motors\n'\
+                f'thetas: {thetas[:, out_of_limits]}')        
         return thetas, exceeds_pi

@@ -60,8 +60,6 @@ def objective_function_quad(X:np.array, pts_ideal:np.array, pts_real:np.array):
     A = X.reshape((3,10))
 
     # Remove columns where z values are larger than 210
-    mask = pts_real[2, :] <= 210
-    pts_real = pts_real[:, mask]
 
     pts_quad = np.square(pts_real)
     # project points
@@ -70,7 +68,7 @@ def objective_function_quad(X:np.array, pts_ideal:np.array, pts_real:np.array):
     yz = pts_real[1, :] * pts_real[2, :]
     pts_transformed = A @ np.vstack([pts_quad[:3, :], xy, xz, yz, pts_real])
 
-    diff = pts_ideal[:,mask] - pts_transformed
+    diff = pts_ideal - pts_transformed
 
     # score using l2 norm
     # dist = np.linalg.norm(diff, axis=1)

@@ -35,7 +35,7 @@ import matplotlib.pyplot as plt
 from Camera import Camera_Manager
 from Chessboard_detection import Chess_Vision
 from IK_Solvers.traditional import MotionPlanner
-from Positioning.motor_commands import MotorCommands
+from Positioning.motor_commands import MotorCommandsSerial
 import logging
 ### INITIALIZE ###
 
@@ -54,7 +54,7 @@ def initializeCamera():
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
     relPath = "/Chessboard_detection/TestImages/Temp"
-    cam = Camera_Manager.RPiCamera(CAMERA_RESOLUTION, dirPath + relPath) # Change .FakeCamera to .PhoneCamera
+    cam = Camera_Manager.RPiCamera(dirPath + relPath, CAMERA_RESOLUTION, False, False) # Change .FakeCamera to .PhoneCamera
 
     if not cam.isOpened():
         raise("Cannot open camera.")
@@ -398,14 +398,12 @@ def robotsPhysicalMove(robot_move, capture_square):
     start = motion_planner.get_coords(robot_move[:2])
     goal = motion_planner.get_coords(robot_move[2:])
     if capture_square is not None:
-        capture_square = motion_planner.getCoords(capture_square)
+        capture_square = motion_planner.get_coords(capture_square)
 
     logging.debug(f"Start: {start}, Goal: {goal}, Capture: {capture_square}")
-    path = motion_planner.generate_quintic_path(start, goal, capture_square) # generate waypoints
-    
-    joint_angles, gripp_commands = motion_planner.coords_to_joint_angles(path, True)
-
-    motor_driver.filter_run(joint_angles, gripp_commands)
+    path, gripper_commands = motion_planner.generate_quintic_path(start, goal, capture_square) # generate waypoints
+    joint_angles = motion_planner.inverse_kinematics(path, True) # convert waypoints to joint angles
+    motor_driver.filter_run(joint_angles, gripper_commands)
     
     # simulate
     # motion_planner.plot_robot(thetas, path)
@@ -419,20 +417,19 @@ stockfish = Stockfish(r"/home/tpie/ChessRobot/Stockfish/Stockfish-sf_15/src/stoc
 motion_planner = MotionPlanner() # this class takes all the board and robot measurements as optional args
 
 # create an instance of the MotorCommands class, which is used to communicate with the raspberry pi
-motor_driver = MotorCommands()
+motor_driver = MotorCommandsSerial()
 
-# # turn on the robot
-# turn_on_robot()
-
-# # create an instance of the cam and board classes for converting input from the camera
+# create an instance of the cam and board classes for converting input from the camera
 # cam, board = initializeCamera()
 
-# # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
-# starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*-1))
-# pyboard = chess.Board()
-# # cboard, storage_list, home = defBoardCoords()
+# Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
+starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*-1))
+pyboard = chess.Board()
+# cboard, storage_list, home = defBoardCoords()
 
 def main():
+
+    turn_on_robot()
     
     # determine who is playing which side and run k-means to set color centroids
     global HUMAN, ROBOT 

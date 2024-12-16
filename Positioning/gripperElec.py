@@ -73,6 +73,26 @@ class GripperMotor:
 
         self.gripper_servo.angle = angle
 
+        #check that gripper is within threshold of open
+        count = 0
+        while abs(self.gripperEncoder.readAngle() - self.gripper_config["angle_init"]) > self.gripper_config["angle_threshold"]:
+            time.sleep(0.1)
+            count += 1
+
+            if count > 10:
+                print("Gripper did not reach desired angle.")
+                break
+
+    def open_gripper(self):
+        """Open gripper."""
+        self.set_controller_mode("ANGLE")
+        self.set_angle(self.gripper_config["angle_init"])
+
+    def close_gripper_force(self):
+        """ CLose gripper with force control."""
+        self.set_controller_mode("FORCE")
+        self.set_force(self.gripper_config["pickup_force"])
+
     def save_config(self):
         config = yaml.safe_load(open("config/servo_config.yml", 'r'))
         config["gripper"] = self.gripper_config
@@ -111,3 +131,14 @@ class GripperMotor:
             current_force = self.gripper_servo.angle - current_angle
 
             print(f"Force: {current_force:.2f}, Angle: {current_angle:.2f}, Motor angle: {self.gripper_servo.angle:.2f}")
+
+def main():
+    gripper = GripperMotor()
+    gripper.open_gripper()
+    gripper.set_controller_mode("FORCE")
+    gripper.set_force(40)
+    time.sleep(2)
+    gripper.set_force(0)
+
+if __name__ == "__main__":
+    main()
