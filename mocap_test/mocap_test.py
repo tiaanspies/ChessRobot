@@ -1,5 +1,5 @@
 from IK_Solvers.traditional import MotionPlanner
-from Positioning.motor_commands import MotorCommands
+from Positioning.motor_commands import MotorCommandsSerial
 import numpy as np
 import matplotlib.pyplot as plt
 from Data_analytics import correction_transform
@@ -14,6 +14,7 @@ from Data_analytics import analyze_transform
 import platform
 import logging
 import sys
+import time
 
 try:
     import plotly.graph_objects as go
@@ -21,7 +22,7 @@ except ModuleNotFoundError:
     print("analyze_transform: Did not load plotly, will not plot")
 
 cm = MotionPlanner()
-mc = MotorCommands()
+mc = MotorCommandsSerial()
 
 def user_menu():
     """
@@ -79,7 +80,7 @@ def draw_flat_cube(z, x_neg, x_pos, y_neg, y_pos):
 
 def draw_cube(v, slice_num):
     logging.info("Generating ideal pattern: Cube")
-    logging.info(f"Vertices: {vertices}")
+    logging.info(f"Vertices: {slice_num}")
     top_left = np.array([v["left"],v["close"],v["top"]])
     bottom_left = np.array([v["left"],v["close"],v["bottom"]])
     top_right = np.array([v["right"],v["close"],v["top"]])
@@ -199,20 +200,24 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     # Initialize tracking variables
     measured_cartesian = np.full(plan_cartesian.shape, np.nan)
 
+    # move to init position
+
+    mc.go_to(plan_ja[:, 0])
+
     # step through
     run_cal = True 
     while run_cal:
 
         # Move to next position
-        run_cal, plan_points = mc.run_once()
-        sleep(2)
+        run_cal, plan_points = mc.run_once(400)
+        sleep(1)
         
         # attempt twice to take photo
         iter = 0
         ccs_current_pos = tracker.take_photo_and_estimate_pose(cam)
         while iter < 2 and contains_nan(ccs_current_pos):
             logging.debug("Failed to take photo, trying again.")
-            sleep(2)
+            sleep(1)
             ccs_current_pos = tracker.take_photo_and_estimate_pose(cam)
             sleep(1)
             iter += 1
@@ -223,7 +228,7 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
         measured_cartesian[:, [moves_current]] = rcs_control_pt_pos
             
         logging.debug(f"Position: {ccs_current_pos.reshape(1,3)}")
-        sleep(1)
+        sleep(0.2)
 
         moves_current += 1
         print(f"Progress: {moves_current/moves_total*100:.2f}%")
@@ -253,11 +258,11 @@ def generate_ideal_pattern():
     Generate an ideal calibration pattern
     """
     vertices = {
-    "top" : 200,
-    "bottom" : 100,
+    "top" : 260,
+    "bottom" : 180,
     "right" : 160,
     "left" : -160,
-    "close" : 110,
+    "close" : 150,
     "far" : 420}
 
     print("Did you update the code to make the new shape? (Y/N)")
@@ -276,7 +281,11 @@ def generate_ideal_pattern():
     name_joint_angles = name+"_ja_ideal"
 
     logging.info("solving for joint angles (Inverse Kinematics).")
-    thetas = cm.inverse_kinematics(path) # convert to joint angles
+    start_time = time.time()
+    thetas = cm.inverse_kinematics(path, apply_compensation=False) # convert to joint angles
+    end_time = time.time()
+
+    logging.info(f"Time taken: {end_time - start_time:.2f} seconds")
 
     logging.info("Adding gripper commands")
     grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead

@@ -1,19 +1,19 @@
 base:
   angle_180: 180
   angle_max_overtravel: 240
-  angle_min_overtravel: 10
+  angle_min_overtravel: 28
   angle_zero: 0
-  reverse: true
+  reverse: false
   serial_pos_max: 1000
   serial_pos_min: 0
   servo_id: 6
   servo_range_max: 240
   servo_range_min: 0
-  zero_offset: 226
+  zero_offset: 53
 elbow:
   angle_180: 180
-  angle_max_overtravel: 216
-  angle_min_overtravel: 49
+  angle_max_overtravel: 213
+  angle_min_overtravel: 39
   angle_zero: 0
   reverse: false
   serial_pos_max: 1000
@@ -21,20 +21,23 @@ elbow:
   servo_id: 7
   servo_range_max: 240
   servo_range_min: 0
-  zero_offset: 57
+  zero_offset: 51
 gripper:
-  angle_init: 25
-  angle_max_enc: 316.23046875
+  angle_init: 10
+  angle_max_enc: 316.40625
   angle_max_motor: 175
-  angle_min_enc: 231.767578125
+  angle_min_enc: 232.294921875
   angle_min_motor: 5
   force_max: 50
   force_step_dist: 10
   force_threshold: 5
-  force_time_step: 0.025
-  offset_enc_to_motor: -217.654296875
+  force_time_step: 0.05
+  offset_enc_to_motor: -219.9736328125
+  angle_threshold: 5
   reverse: false
   servo_id: -1
+  pickup_force: 40
+  angle_medium_open: 35
 shoulder:
   angle_180: 180
   angle_max_overtravel: 212
@@ -46,4 +49,4 @@ shoulder:
   servo_id: 5
   servo_range_max: 240
   servo_range_min: 0
-  zero_offset: 40
+  zero_offset: 37

@@ -1,10 +1,10 @@
 IK_CONFIG:
   apply_compensation: True
-  lift: 50
+  lift: 120
   chess_square_width: 40
   base_dist: 150
   board_height: 25
-  grip_height: 60
+  grip_height: 110
   # l1_params: [0.78539816339, 1.57079632679, 0, 83.35]
   # l2_params: [1.57079632679, 0, 296, 0]
   # l3_params: [4.71238898038, 0, 284.76, 0]
@@ -13,23 +13,22 @@ IK_CONFIG:
   l1_params: [0.78539816339, 1.57079632679, 0, 92.5]
   l2_params: [1.57079632679, 0, 322, 0]
   l3_params: [4.71238898038, 0, 312, 0]
-  l4_params: [3.14159265359, 0, 90, 0]
+  l4_params: [3.14159265359, 0, 0, 0]
 
   camera_to_control_pt_offset: 
-    x: -7
+    x: 0
     y: 2
-    z: 45
+    z: 63
 
   rcs_to_ccs_offset: 
-    x: 221
-    y: -62
-    z: 55
+    x: 215
+    y: -60
+    z: 20
 
   home_position:
     x: 0
-    y: 150
-    z: 350
+    y: 260
+    z: 500
 
   position_compensation_matrices:
-    - "/home/tpie/mnt/gdrive/Transformation Matrices/20240528_193309_H_matrix.csv"
-    - "/home/tpie/mnt/gdrive/Transformation Matrices/20240528_212338_H_matrix.csv"
+  - 20241214_225031_H_matrix.csv

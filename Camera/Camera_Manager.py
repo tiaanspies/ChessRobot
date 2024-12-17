@@ -129,6 +129,9 @@ class RPiCamera:
 
         sleep(2)
 
+    def __del__(self):
+        self.camera.close()
+
     def readCalibMatrix(self):
         """
         Return the calibration matrix that was saved to cameraProperties.out
@@ -155,14 +158,6 @@ class RPiCamera:
 
             self.frame = cv.resize(self.frame, self.cameraRes)
         elif self.stateNum > 0:
-            # self.camera.start_preview()
-            # sleep(2)
-            # output = np.empty((self.cameraRes[1], self.cameraRes[0], 3), dtype=np.uint8)
-            # self.camera.capture(output, 'rgb')
-            # self.camera.stop_preview()
-            # # self.camera.close()
-            # self.frame = output.copy()
-
             # Read Stream Method
             output = np.empty((self.cameraRes[1], self.cameraRes[0], 3), dtype=np.uint8)
             self.camera.capture(output, 'rgb', use_video_port=True)

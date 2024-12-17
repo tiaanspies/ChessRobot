@@ -35,7 +35,7 @@ import matplotlib.pyplot as plt
 from Camera import Camera_Manager
 from Chessboard_detection import Chess_Vision
 from IK_Solvers.traditional import MotionPlanner
-from Positioning.motor_commands import MotorCommands
+from Positioning.motor_commands import MotorCommandsSerial
 import logging
 ### INITIALIZE ###
 
@@ -54,7 +54,7 @@ def initializeCamera():
     # cam = cv.VideoCapture(0)
     dirPath = os.path.dirname(os.path.realpath(__file__))
     relPath = "/Chessboard_detection/TestImages/Temp"
-    cam = Camera_Manager.RPiCamera(CAMERA_RESOLUTION, dirPath + relPath) # Change .FakeCamera to .PhoneCamera
+    cam = Camera_Manager.RPiCamera(dirPath + relPath, CAMERA_RESOLUTION, True, False) # Change .FakeCamera to .PhoneCamera
 
     if not cam.isOpened():
         raise("Cannot open camera.")
@@ -72,7 +72,7 @@ def initializeCamera():
 
     return cam, board
 
-def identifyColors():
+def identifyColors(cam, board):
     """Runs k-means to set color centroids, then uses this to determine who's playing which color"""
     # NB --- Board is setup in starting setup.
     # Runs kmeans clustering to group piece and board colours
@@ -154,12 +154,11 @@ def play_again():
         play_again()
 
 def turn_on_robot():
-    sim_thetas = motion_planner.inverse_kinematics(motion_planner.HOME.reshape((3,1)))
-    thetas = motor_driver.sort_commands(sim_thetas, motor_driver.OPEN)
-    motor_driver.go_to(thetas)    
+    thetas = motion_planner.inverse_kinematics(motion_planner.HOME.reshape((3,1)), True)
+    motor_driver.filter_run(thetas, np.array([motor_driver.GRIPPER_OPEN]))
 
 # functions for handling visboard (the -1, 0, 1 representation)
-def seeBoardReal():
+def seeBoardReal(cam, board):
     """Uses CV to determine which squares are occupied, returns -1, 0, 1 representation"""
     s, img = cam.read()  # read in image from camera
     positions = board.getCurrentPositions(img) # turn it into -1, 0, 1 representation
@@ -264,15 +263,15 @@ def compareVisBoards(current, previous):
     print(f"Percieved move was: {human_move}") # for debugging
     return human_move
 
-def perceiveHumanMove(previous_visboard):
+def perceiveHumanMove(previous_visboard, cam, board):
     """take image and return the move that was made"""
     # seen_visboard = seeBoardFiller(current_visboard.copy())   
-    new_visboard = seeBoardReal() # Tiaan's vision function to find occupied squares
+    new_visboard = seeBoardReal(cam, board) # Tiaan's vision function to find occupied squares
     human_move = compareVisBoards(new_visboard, previous_visboard) # Compare boards to figure out what piece moved
     
     # if move was not successfully detected, start over
     if human_move is None:
-        return perceiveHumanMove(previous_visboard)
+        return perceiveHumanMove(previous_visboard, cam, board)
     
     # if move was a promotion, find out which piece they chose
     if chess.Move.from_uci(human_move + "q") in board.legal_moves:
@@ -398,14 +397,12 @@ def robotsPhysicalMove(robot_move, capture_square):
     start = motion_planner.get_coords(robot_move[:2])
     goal = motion_planner.get_coords(robot_move[2:])
     if capture_square is not None:
-        capture_square = motion_planner.getCoords(capture_square)
+        capture_square = motion_planner.get_coords(capture_square)
 
     logging.debug(f"Start: {start}, Goal: {goal}, Capture: {capture_square}")
-    path = motion_planner.generate_quintic_path(start, goal, capture_square) # generate waypoints
-    
-    joint_angles, gripp_commands = motion_planner.coords_to_joint_angles(path, True)
-
-    motor_driver.filter_run(joint_angles, gripp_commands)
+    path, gripper_commands = motion_planner.generate_quintic_path(start, goal, capture_square) # generate waypoints
+    joint_angles = motion_planner.inverse_kinematics(path, True) # convert waypoints to joint angles
+    motor_driver.filter_run(joint_angles, gripper_commands)
     
     # simulate
     # motion_planner.plot_robot(thetas, path)
@@ -419,24 +416,24 @@ stockfish = Stockfish(r"/home/tpie/ChessRobot/Stockfish/Stockfish-sf_15/src/stoc
 motion_planner = MotionPlanner() # this class takes all the board and robot measurements as optional args
 
 # create an instance of the MotorCommands class, which is used to communicate with the raspberry pi
-motor_driver = MotorCommands()
+motor_driver = MotorCommandsSerial()
 
-# # turn on the robot
-# turn_on_robot()
-
-# # create an instance of the cam and board classes for converting input from the camera
-# cam, board = initializeCamera()
-
-# # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
-# starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*-1))
-# pyboard = chess.Board()
-# # cboard, storage_list, home = defBoardCoords()
+# Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
+starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*-1))
+pyboard = chess.Board()
+# cboard, storage_list, home = defBoardCoords()
 
 def main():
+
+    # move robot to starting position
+    turn_on_robot()
+
+    # create an instance of the cam and board classes for converting input from the camera
+    cam, board = initializeCamera()
     
     # determine who is playing which side and run k-means to set color centroids
     global HUMAN, ROBOT 
-    HUMAN, ROBOT = identifyColors()
+    HUMAN, ROBOT = identifyColors(cam, board)
 
     if ROBOT == chess.WHITE: # if robot is playing white, have it go first
         print("My turn first")
@@ -451,7 +448,7 @@ def main():
         
         ### HUMAN'S TURN ###
         # figure out what their move was
-        seen_visboard, human_move = perceiveHumanMove(current_visboard)
+        seen_visboard, human_move = perceiveHumanMove(current_visboard, cam, board)
         
         # if move is illegal make human try again
         if chess.Move.from_uci(human_move) not in pyboard.legal_moves:
@@ -481,8 +478,6 @@ def main():
         # end the game if the robot won
         if gameOver():
             break
-
-    cam.release()
 
 # TODO: make a better display of who won. The chess object output doesn't make sense - think I fixed this, will need to test
 # TODO: handle promotions - done for human, not for robot
