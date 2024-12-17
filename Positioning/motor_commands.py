@@ -198,6 +198,11 @@ class MotorCommandsSerial:
         self.angles = None
         self.path_progress = 0
         self.plan_points = None
+        
+        self.GRIPPER_CLOSE = 1
+        self.GRIPPER_MED = 2
+        self.GRIPPER_OPEN = 3
+
 
     def go_to(self, theta, angletype='rad'):
         """moves directly to provided theta configuration"""
@@ -246,6 +251,8 @@ class MotorCommandsSerial:
             if gripper_command == 1:
                 self.gripper.close_gripper_force()
             elif gripper_command == 2:
+                self.gripper.gripper_medium_open()
+            elif gripper_command == 3:
                 self.gripper.open_gripper()
 
             self.motor.move_to_multi_angle_pos(200, pos_dict)

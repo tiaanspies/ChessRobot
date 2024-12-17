@@ -88,6 +88,11 @@ class GripperMotor:
         self.set_controller_mode("ANGLE")
         self.set_angle(self.gripper_config["angle_init"])
 
+    def gripper_medium_open(self):
+        """Open gripper to medium position."""
+        self.set_controller_mode("ANGLE")
+        self.set_angle(self.gripper_config["angle_medium_open"])
+
     def close_gripper_force(self):
         """ CLose gripper with force control."""
         self.set_controller_mode("FORCE")

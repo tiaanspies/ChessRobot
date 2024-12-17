@@ -150,6 +150,7 @@ class MotionPlanner():
         if cap_sq is not None:
             storage = np.array(self.storage_coords.pop(0))
             move1 = self.quintic_line(self.HOME, cap_sq+lift_vector, step)
+            # Gripper medium open
             move2 = self.quintic_line(cap_sq+lift_vector, cap_sq, step/2)
             # Close Gripper
             move3 = self.quintic_line(cap_sq, cap_sq + lift_vector, step/2)
@@ -158,19 +159,25 @@ class MotionPlanner():
             #Open Gripper
             move6 = self.quintic_line(storage, storage + lift_vector_storage, step)
             move7 = self.quintic_line(storage + lift_vector_storage, start + lift_vector, step)
+            # Gripper medium open
             move8 = self.quintic_line(start + lift_vector, start, step/2)
 
             first_moves = np.hstack((move1, move2, move3, move4, move5, move6, move7, move8))
 
             # set zeros for all moves where there is no gripper command
             # then a 1 to close gripper and 2 to open
-            gripper_open =  np.size(move1, 1) + np.size(move2, 1)
-            gripper_close = np.size(move3, 1) + np.size(move4, 1) + np.size(move5, 1)
-            gripper_open2 = np.size(move6, 1) + np.size(move7, 1) + np.size(move8, 1)
+            gripper_medium =  np.size(move1, 1)
+            gripper_close = gripper_medium + np.size(move2, 1)
+            gripper_open = gripper_close + np.size(move3, 1) + np.size(move4, 1) + np.size(move5, 1)
+            gripper_medium2 = gripper_open + np.size(move6, 1) + np.size(move7, 1)
 
-            gripper_commands_move1 = np.zeros((1, gripper_open + gripper_close + gripper_open2))
-            gripper_commands_move1[0, gripper_open] = 1
-            gripper_commands_move1[0, gripper_open + gripper_close] = 2
+            total_moves = gripper_medium2 + np.size(move8, 1)
+
+            gripper_commands_move1 = np.zeros((1, total_moves))
+            gripper_commands_move1[0, gripper_medium] = 2 # medium open
+            gripper_commands_move1[0, gripper_close] = 1 # close gripper
+            gripper_commands_move1[0, gripper_open] = 3 # open gripper
+            gripper_commands_move1[0, gripper_medium2] = 2 # medium open
 
         else:
             move1 = self.quintic_line(self.HOME, start+lift_vector, step)
@@ -189,12 +196,13 @@ class MotionPlanner():
         move5 = self.quintic_line(goal+lift_vector, self.HOME, step)
         second_moves = np.hstack((move1, move2, move3, move4, move5))
 
-        gripper_close = np.size(move1, 1) + np.size(move2, 1) + np.size(move3, 1)
-        gripper_open = np.size(move4, 1) + np.size(move5, 1)
+        gripper_close = 0
+        gripper_open = np.size(move1, 1) + np.size(move2, 1) + np.size(move3, 1)
+        total_moves = gripper_open + np.size(move4, 1) + np.size(move5, 1)
 
         gripper_commands_move2 = np.zeros((1, gripper_close + gripper_open))
-        gripper_commands_move2[0, 0] = 1
-        gripper_commands_move2[0, gripper_close] = 2
+        gripper_commands_move2[0, gripper_close] = 1
+        gripper_commands_move2[0, gripper_open] = 3
 
         gripper_commands = np.hstack((gripper_commands_move1, gripper_commands_move2))
 
