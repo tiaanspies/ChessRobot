@@ -27,8 +27,8 @@ IK_CONFIG:
 
   home_position:
     x: 0
-    y: 150
-    z: 350
+    y: 260
+    z: 500
 
   position_compensation_matrices:
   - 20241214_225031_H_matrix.csv
