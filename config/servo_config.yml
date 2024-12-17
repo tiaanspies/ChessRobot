@@ -23,7 +23,7 @@ elbow:
   servo_range_min: 0
   zero_offset: 51
 gripper:
-  angle_init: 35
+  angle_init: 10
   angle_max_enc: 316.40625
   angle_max_motor: 175
   angle_min_enc: 232.294921875
@@ -37,6 +37,7 @@ gripper:
   reverse: false
   servo_id: -1
   pickup_force: 40
+  angle_medium_open: 35
 shoulder:
   angle_180: 180
   angle_max_overtravel: 212
