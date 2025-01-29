@@ -67,33 +67,42 @@ def find_home_position():
     cam = Camera_Manager.RPiCamera(loadSavedFirst=False, storeImgHist=False)
 
     # Go to initial home position
-    home_pos = cm.HOME.reshape((3,1))
+    home_pos = cm.HOME.reshape((3,1)).astype(float)
     thetas = cm.inverse_kinematics(home_pos, True)
+    print(f"Thetas: \n{thetas}, Home: \n{home_pos}")
+    input("continue?")
     mc.filter_go_to(thetas, np.array([mc.GRIPPER_OPEN]))
+
+    time.sleep(2)
 
     # get position in RCS
     ccs_current_pos = aruco_tracker.take_photo_and_estimate_pose(cam)
     ccs_control_pt_pos = cm.camera_to_control_pt_pos(ccs_current_pos)
     rcs_control_pt_pos = cm.ccs_to_rcs(ccs_control_pt_pos)
     
-    error = cm.HOME - rcs_control_pt_pos
+    error = cm.HOME.reshape((3,1)) - rcs_control_pt_pos
+    print(f"RCS Control Point: \n{rcs_control_pt_pos}")
     error_norm = np.linalg.norm(error)
 
-    print(f"Error: {error}; Error norm: {error_norm}")
+    print(f"Error: \n{error}; Error norm: {error_norm}")
     while error_norm > 5:
         # get position in RCS
-        home_pos += error * 0.6
+        print(f"Thetas: {thetas}, Home: {home_pos}, Error: {error}")
+        input("continue?")
+        home_pos = home_pos + error * 0.6
 
         # move to new home position
         thetas = cm.inverse_kinematics(home_pos, True)
         mc.filter_go_to(thetas, np.array([mc.GRIPPER_OPEN]))
+
+        time.sleep(2)
 
         # measure new position
         ccs_current_pos = aruco_tracker.take_photo_and_estimate_pose(cam)
         ccs_control_pt_pos = cm.camera_to_control_pt_pos(ccs_current_pos)
         rcs_control_pt_pos = cm.ccs_to_rcs(ccs_control_pt_pos)
 
-        error = cm.HOME - rcs_control_pt_pos
+        error = cm.HOME.reshape((3,1)) - rcs_control_pt_pos
         error_norm = np.linalg.norm(error)
 
         print(f"Error: {error}; Error norm: {error_norm}")

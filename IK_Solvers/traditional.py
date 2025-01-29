@@ -353,5 +353,3 @@ class MotionPlanner():
         rcs_coords = ccs_coords - self.rcs_to_ccs_offset
 
         return rcs_coords
-    
-    def ccs
