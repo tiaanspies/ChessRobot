@@ -29,6 +29,10 @@ IK_CONFIG:
     x: 0
     y: 260
     z: 500
+  home_position_joint_angles:
+    base: 0
+    shoulder: 0
+    elbow: 0
 
   position_compensation_matrices:
   - 20241214_225031_H_matrix.csv
