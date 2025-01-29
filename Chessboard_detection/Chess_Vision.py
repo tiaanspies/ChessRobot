@@ -62,9 +62,6 @@ class ChessBoard:
         """
         Initializes board object and finds position of empty board
         """
-        # CAMERA OBJECT PROPERTIES
-        self.initialImage = np.zeros(CAMERA_RESOLUTION)
-
         # BOARD SIZE PROPERTIES
         # KERN STD is the standard deviation of the gaussian kernal used for 
         # weighting the piece prediction. 
@@ -265,6 +262,12 @@ class ChessBoard:
 
         # find chessboard corners, If its too slow add the fast stop param
         didFind, intCorners = cv.findChessboardCorners(dilate, self.BOARD_SIZE_INT)
+        print(didFind)
+
+        # Plot the image after dilation
+        cv.imshow('Dilated Image', dilate)
+        cv.waitKey(0)
+        cv.destroyAllWindows()
 
         return didFind, intCorners
 
@@ -272,23 +275,48 @@ class ChessBoard:
         grayBlur = self.findGrayBlur(img, blursize)
         ret, corners = self.threshHoldAndFindBoard(grayBlur, threshold, erodeSize)
         return ret, corners
+    
+    def homomorphic_filter(self, img, d0=30, rh=2, rl=0.5, c=1):
+        img_log = np.log1p(np.array(img, dtype="float") / 255)
+        rows, cols = img.shape
+        M, N = 2 * rows + 1, 2 * cols + 1
+        H = np.zeros((M, N), dtype=np.float32)
+        for u in range(M):
+            for v in range(N):
+                Duv = np.sqrt((u - M / 2) ** 2 + (v - N / 2) ** 2)
+                H[u, v] = (rh - rl) * (1 - np.exp(-c * (Duv ** 2 / d0 ** 2))) + rl
+
+        H = np.fft.ifftshift(H)
+        img_fft = np.fft.fft2(img_log, (M, N))
+        img_fft_filt = H * img_fft
+        img_filt = np.fft.ifft2(img_fft_filt)
+        img_filt = np.real(img_filt)
+        img_filt = img_filt[:rows, :cols]
+        img_exp = np.expm1(img_filt)
+        img_exp = (img_exp - np.min(img_exp)) / (np.max(img_exp) - np.min(img_exp))
+        img_exp = np.array(255 * img_exp, dtype="uint8")
+        return img_exp
 
     def findOptimalThreshold(self, img, blurSize=3, erodeSize=3, onlyFindOne=False):
         print("Finding Threshold")
         stepSize = 10
 
         #Find gray blurry img
-        grayBlur = self.findGrayBlur(img, blurSize)
+        # grayBlur = self.findGrayBlur(img, blurSize)
 
         #do a first rough pass by checking all values with step size
         # There is no point in checking 0 and 255
         result_array = [0]*(math.ceil(255/stepSize)-2)
         for i in range(1, math.floor(255/stepSize)):
-            result_array[i-1], _ = self.threshHoldAndFindBoard(grayBlur, i*stepSize, erodeSize)
+            filtered = self.homomorphic_filter(img, d0=30, rh=2, rl=0.1, c=1)
+            grayBlur = blur = cv.medianBlur(filtered, blurSize)
+            result_array[i-1], _ = self.threshHoldAndFindBoard(filtered, i*stepSize, erodeSize)
 
             # stop at first success if flag to find one is true
             if onlyFindOne and result_array[i-1] == True:
                 return i*stepSize
+            
+
 
         #Find min and max threshold bound
         respMin, minBound = minPos(result_array)
