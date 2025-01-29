@@ -7,14 +7,10 @@ from time import sleep
 from pathlib import Path
 from Camera import Camera_Manager
 from Chessboard_detection import Aruco
-import datetime
-import cv2.aruco as aruco
 import path_directories as dirs
-from Data_analytics import analyze_transform
-import platform
 import logging
-import sys
-import time
+import sys, time, datetime
+import yaml
 
 try:
     import plotly.graph_objects as go
@@ -35,8 +31,8 @@ def user_menu():
     print("\n1. Run calibration")
     print("2. Generate ideal calibration pattern")
     print("3. Generate transformed calibration pattern")
-    print('4. Calculate Transformation Matrix (Planned)')
-    print('5. Calculate Transformation Matrix (Ideal)')
+    print('4. Calculate Transformation Matrix')
+    print("5. Find Home Position")
     print("0. Exit")
 
     choice = input("Select an option: ")
@@ -52,14 +48,58 @@ def user_menu():
         generate_transformed_pattern()
     elif choice == '4':
         print('Calculate Transformation Matrix')
-        calculate_H_matrix_planned()
-    elif choice == '5':
-        calculate_H_matrix_ideal()
+        calculate_H_matrix()
+    elif choice == "5":
+        print("\nFinding Home Position\n")
+        find_home_position()
     elif choice == "0":
         print("Exiting")
         exit()
     else:
         print("Invalid option")
+
+def find_home_position():
+    """Use camera to find calibrated home position"""
+
+    aruco_tracker = create_tracker()
+
+    # create camera object
+    cam = Camera_Manager.RPiCamera(loadSavedFirst=False, storeImgHist=False)
+
+    # Go to initial home position
+    home_pos = cm.HOME.reshape((3,1))
+    thetas = cm.inverse_kinematics(home_pos, True)
+    mc.filter_go_to(thetas, np.array([mc.GRIPPER_OPEN]))
+
+    # get position in RCS
+    ccs_current_pos = aruco_tracker.take_photo_and_estimate_pose(cam)
+    ccs_control_pt_pos = cm.camera_to_control_pt_pos(ccs_current_pos)
+    rcs_control_pt_pos = cm.ccs_to_rcs(ccs_control_pt_pos)
+    
+    error = cm.HOME - rcs_control_pt_pos
+    error_norm = np.linalg.norm(error)
+
+    print(f"Error: {error}; Error norm: {error_norm}")
+    while error_norm > 5:
+        # get position in RCS
+        home_pos += error * 0.6
+
+        # move to new home position
+        thetas = cm.inverse_kinematics(home_pos, True)
+        mc.filter_go_to(thetas, np.array([mc.GRIPPER_OPEN]))
+
+        # measure new position
+        ccs_current_pos = aruco_tracker.take_photo_and_estimate_pose(cam)
+        ccs_control_pt_pos = cm.camera_to_control_pt_pos(ccs_current_pos)
+        rcs_control_pt_pos = cm.ccs_to_rcs(ccs_control_pt_pos)
+
+        error = cm.HOME - rcs_control_pt_pos
+        error_norm = np.linalg.norm(error)
+
+        print(f"Error: {error}; Error norm: {error_norm}")
+
+    print("Home position found")
+    print(f"Thetas: {thetas}")
 
 def fake_inverse_kinematics(path):
     return np.vstack((path,np.zeros_like(path[0,:])))
@@ -174,19 +214,25 @@ def user_file_select_multiple(search_path:Path, message:str="Select a file: ", i
 
     return selected_file_prefixes, selected_file_suffixes
 
+
 def contains_nan(arr):
     return np.isnan(arr).any()
 
 
 def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
+    """
+    Main function for moving to all the calibration points and tracking them.
+    """
     # load path
     dimensions, transform_type = user_file_select(dirs.PLANNED_PATHS)
 
+    # look for all files that match the selected file.
     plan_cartesian = [f for f in dirs.PLANNED_PATHS.glob(f"{dimensions}_path_{transform_type}.npy")]
     plan_ja = [f for f in dirs.PLANNED_PATHS.glob(f"{dimensions}_ja_{transform_type}.npy")]
 
     assert len(plan_cartesian) == 1 and len(plan_ja) == 1, "Multiple or no matching files found. \n Have Tiaan fix his code"
 
+    # Should only be one file, load it
     plan_cartesian = np.load(plan_cartesian[0])
     plan_ja = np.load(plan_ja[0])
    
@@ -209,7 +255,7 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     while run_cal:
 
         # Move to next position
-        run_cal, plan_points = mc.run_once(400)
+        run_cal, _ = mc.run_once(move_time=400)
         sleep(1)
         
         # attempt twice to take photo
@@ -247,7 +293,7 @@ def run_calibration():
     # load aruco obj things
     aruco_obj = create_tracker()
 
-    # # create camera object
+    # create camera object
     cam = Camera_Manager.RPiCamera(loadSavedFirst=False, storeImgHist=False)
 
     # calibration path
@@ -300,63 +346,24 @@ def generate_ideal_pattern():
     logging.info(f"Saving joing angles as '{name_joint_angles}'")
     np.save(Path(dirs.PLANNED_PATHS, name_joint_angles), joint_angles)
 
-def go_to(pos):
-    """Take an input position, find the joint angles and go to that position"""
+def H_matrix_validity_range(pts_ideal):
+    """Finds the min and max values for each axis of points used in H matrix calculation"""
 
-    if pos.shape == np.array((3,)).shape:
-        pos = pos.reshape(3,1)
+    #TODO: Make work with multiple H matrices, currently it will return incorrect result with cascaded H matrices
+    min_x, max_x = np.min(pts_ideal[0]), np.max(pts_ideal[0])
+    min_y, max_y = np.min(pts_ideal[1]), np.max(pts_ideal[1])
+    min_z, max_z = np.min(pts_ideal[2]), np.max(pts_ideal[2])
 
-    thetas = cm.inverse_kinematics(pos)
-    grip_commands = cm.get_gripper_commands2(pos)
-    joint_angles, _ = mc.sort_commands(thetas, grip_commands)
-    mc.run(joint_angles)
+    range_dict = {"min_x": min_x, "max_x": max_x, "min_y": min_y, "max_y": max_y, "min_z": min_z, "max_z": max_z}
+    return range_dict
 
-def calculate_H_matrix_ideal():
-    """Calculates H from ideal points, some work is dont to map ideal to real since not all ideal points are measured."""
+def save_H_matrix_validity_range(range_dict, file_path):
+    """Saves the transformation matrix validity range as a yaml file."""
 
-    print("Not in use")
+    with open(file_path, 'w') as file:
+        yaml.dump(range_dict, file)
 
-    return
-    # As user which file is ideal
-    message = "Select full version of planned path"
-    file_prefix, suffix = user_file_select(dirs.PLANNED_PATHS, message, '*_path_*')
-    
-    #Load ideal points
-    name_planned_full = file_prefix+"_path_"+suffix+'.npy'
-    file_planned_full = Path(dirs.PLANNED_PATHS, name_planned_full)
-    pts_planned_full = np.load(file_planned_full)
-
-    message = "Select ideal path"
-    file_prefix, suffix = user_file_select(dirs.PLANNED_PATHS, message, '*_path_*')
-    
-    #Load ideal points
-    name_ideal = file_prefix+"_path_"+suffix+'.npy'
-    file_ideal = Path(dirs.PLANNED_PATHS, name_ideal)
-    pts_ideal = np.load(file_ideal)
-
-    # Ask user which file to use for real points
-    message = "Select measured files to calculate compensation for:"
-    file_prefix, suffix = user_file_select(dirs.CAL_TRACKING_DATA_PATH, message, '*_measured*')
-    
-    # load real and planned points
-    name_real = file_prefix+"_measured.npy"
-    file_real = Path(dirs.CAL_TRACKING_DATA_PATH, name_real)
-    pts_real = np.load(file_real)
-
-    name_planned = file_prefix+"_planned_path.npy"
-    file_planned = Path(dirs.CAL_TRACKING_DATA_PATH, name_planned)
-    pts_planned = np.load(file_planned)
-    
-    # filter out the between planned 
-    pts_ideal = analyze_transform.filter_unused_ideal_pts(pts_ideal, pts_planned, pts_planned_full)
-
-    H = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
-    print(f"Saving as {file_prefix}_H_matrix{suffix}")
-
-    H_path = Path(dirs.H_MATRIX_PATH, file_prefix+"_H_matrix"+suffix+'.csv')
-    correction_transform.save_transformation_matrix(H_path, H)
-
-def calculate_H_matrix_planned():
+def calculate_H_matrix():
     """Calculates H between measured and ideal points"""
     
     message = "Select ideal path"
@@ -381,22 +388,30 @@ def calculate_H_matrix_planned():
     pts_ideal = pts_ideal[:, mask]
     pts_real = pts_real[:, mask]
     
+    # Calculate transformation matrix
     H = correction_transform.attempt_minimize_quad(pts_ideal, pts_real)
     print(f"Saving as {file_prefix}_H_matrix{suffix}")
 
+    # Save transformation matrix
     H_path = Path(dirs.H_MATRIX_PATH, file_prefix+"_H_matrix"+suffix+'.csv')
     correction_transform.save_transformation_matrix(H_path, H)
+    
+    # Save the validity range of the transformation matrix
+    range_path = Path(dirs.H_MATRIX_PATH, file_prefix+"_H_matrix"+suffix+'_valid_range.yaml')
+    range_dict = H_matrix_validity_range(pts_ideal)
+    save_H_matrix_validity_range(range_dict, range_path)
     
 def generate_transformed_pattern():
     """
     Generate a transformed calibration pattern
     """
+    # Get transformation matrix
     message = "Select transformation Matrix"
     file_prefixes, suffixes = user_file_select_multiple(dirs.H_MATRIX_PATH, message, '*_H_matrix*')
     paths = [Path(dirs.H_MATRIX_PATH, f"{p}_H_matrix{s}.csv") for p, s in zip(file_prefixes, suffixes)]
     H_list = correction_transform.load_transformation_matrix_multiple(paths)
 
-    # change between coordinate systems
+    # Get ideal path
     message="\nWhich base path would you like to transform?"
     ideal_prefix, ideal_suffix = user_file_select(dirs.PLANNED_PATHS, message,"*_path_ideal*")
     pts_ideal = np.load(Path(dirs.PLANNED_PATHS, f"{ideal_prefix}_path_ideal{ideal_suffix}.npy"))
@@ -411,9 +426,8 @@ def generate_transformed_pattern():
 
     # solve inverse kinematics
     logging.info("solving inverse kinematics...")
-    thetas = cm.inverse_kinematics(compensated_points, False) # convert to joint angles
-    grip_commands = cm.get_gripper_commands2(compensated_points) # remove unnecessary wrist commands, add gripper open close instead
-    joint_angles, exceeds_lim = mc.sort_commands(thetas, grip_commands)
+    thetas = cm.inverse_kinematics(compensated_points, True) # convert waypoints to joint angles
+    joint_angles, exceeds_lim = mc.sort_commands(thetas, None)
 
     logging.info("Correcting joint angles")
     joint_angles, compensated_points = mc.correct_limits(joint_angles, compensated_points, exceeds_lim)
