@@ -301,34 +301,6 @@ class MotionPlanner():
             path[:,step] = [xqnt.calc_point(step), yqnt.calc_point(step), zqnt.calc_point(step)]
         
         return path
-
-    def get_gripper_commands(self, waypoints):
-        """replaces the sim's wrist angles with a list that commands the gripper to open and close"""
-        commands = [np.pi/4, 3*np.pi/4] # angles needed for open and closed (in radians)
-        shifted = np.hstack((np.zeros((3,1)),waypoints[:,:-1]))
-        no_change = waypoints-shifted
-        idxs = np.where(~no_change.any(axis=0))[0] # finds the indices of all columns where all values are zero
-        
-        grip_commands = np.ones_like(waypoints[0,:]) * commands[0]
-        for i in range(len(idxs)-1):
-            i_com = (i+1)%2
-            grip_commands[idxs[i]:idxs[i+1]] = commands[i_com]
-        return grip_commands
-    
-    def get_gripper_commands2(self, waypoints):
-        """2nd attempt: replaces the sim's wrist angles with a list that commands the gripper to open and close"""
-        commands = [np.pi/4, 3*np.pi/4] # angles needed for open and closed (in radians)
-        shifted = np.hstack((np.zeros((3,1)),waypoints[:,:-1]))
-        no_change = waypoints-shifted
-        idxs = np.where(~no_change.any(axis=0))[0] # finds the indices of all columns where all values are zero
-        idxs_shifted = np.hstack((0,idxs[:-1]))
-        idxs = idxs[np.abs(idxs-idxs_shifted) != 1]
-
-        grip_commands = np.ones_like(waypoints[0,:]) * commands[0]
-        for i in range(len(idxs)-1):
-            i_com = (i+1)%2
-            grip_commands[idxs[i]:idxs[i+1]] = commands[i_com]
-        return grip_commands
     
     @staticmethod
     def line(start, goal, step):
@@ -381,3 +353,5 @@ class MotionPlanner():
         rcs_coords = ccs_coords - self.rcs_to_ccs_offset
 
         return rcs_coords
+    
+    def ccs
