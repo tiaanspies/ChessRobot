@@ -342,13 +342,29 @@ class MotorCommandsSerial:
         
         self.run(joint_angles)
 
+    def filter_go_to(self, thetas, gripp_commands):
+        """Sort commands -> correct_lims -> run"""
+        joint_angles, exceeds_lim = self.sort_commands(thetas, gripp_commands)
+
+        logging.info("Correcting joint angles")
+        joint_angles, _ = self.correct_limits(joint_angles, None, exceeds_lim)
+        
+        self.go_to(joint_angles[:, 0])
+
     
     def sort_commands(self, thetas, grip_commands):
-        thetas[3,:] = grip_commands
+        """Add the gripper commands and adjust joint angle to be in correct range.
+        Pass None to grip_commands to give default open gripper command."""
+        
         thetas = thetas % (2 * np.pi)
         thetas[0,:] = ((np.pi - thetas[0,:]) - np.pi/4) * 2 # fix the base angle by switching rot direction, shifting to the front slice, then handling the gear ratio
         thetas[1,:] = thetas[1,:] # make any necessary changes to the shoulder angles
         thetas[2,:] = 2*np.pi - thetas[2,:] # make any necessary changes to the elbow angles
+
+        if grip_commands == None:
+            thetas[3,:] = self.GRIPPER_OPEN
+        else:
+            thetas[3,:] = grip_commands
         # thetas =  thetas % (2 * np.pi)
 
         exceeds_pi = np.any(thetas > 210/180*np.pi, axis=0)
