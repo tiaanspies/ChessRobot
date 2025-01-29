@@ -47,6 +47,28 @@ def objective_function_quad(X:np.array, pts_ideal:np.array, pts_real:np.array):
 
     return total
 
+def apply_compensation(pts_ideal:np.array, H_list:np.array, range_dict:dict):
+    """Apply transformation matrix to points"""
+    pts_transformed = project_points_quad(pts_ideal, H_list)
+
+    min_x = range_dict["min_x"]
+    max_x = range_dict["max_x"]
+    min_y = range_dict["min_y"]
+    max_y = range_dict["max_y"]
+    min_z = range_dict["min_z"]
+    max_z = range_dict["max_z"]
+
+    # Create mask for points that are within the range
+    mask_within_range =  (pts_transformed[0, :] > min_x) & (pts_transformed[0, :] < max_x) & \
+            (pts_transformed[1, :] > min_y) & (pts_transformed[1, :] < max_y) & \
+            (pts_transformed[2, :] > min_z) & (pts_transformed[2, :] < max_z)
+    
+    # pts_compensated are pts_transformed where pts_ideal is within range and pts_ideal when pts_ideal is outside range
+    pts_compensated = np.copy(pts_ideal)
+    pts_compensated[:, mask_within_range] = pts_transformed[:, mask_within_range]
+
+    return pts_compensated
+
 def project_points_quad_multiple(pts:np.array, transformation_matrices:list[np.array]):
     """Apply multiple transformations in series to points"""
     for transformation_matrix in transformation_matrices:
