@@ -154,7 +154,7 @@ def play_again():
         play_again()
 
 def turn_on_robot():
-    thetas = motion_planner.inverse_kinematics(motion_planner.HOME.reshape((3,1)), True)
+    thetas = motion_planner.inverse_kinematics(motion_planner.HOME, True)
     motor_driver.filter_run(thetas, np.array([motor_driver.GRIPPER_OPEN]))
 
 # functions for handling visboard (the -1, 0, 1 representation)

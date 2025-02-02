@@ -3,7 +3,7 @@ import logging
 import sys
 import numpy as np
 import path_directories as dirs
-from mocap_test import mocap_test as mt
+from Positioning import calibrate_position_compensation as pos_cal
 
 def manual_control_menu():
     print('Please select an option:')
@@ -29,7 +29,7 @@ def pt2pt_move():
     chess_man.robotsPhysicalMove(start_pos+end_pos, None)
 
 def run_previous():
-    prefix, suffix = mt.user_file_select(dirs.RUN_PATH, identifier="*_measured*")
+    prefix, suffix = pos_cal.user_file_select(dirs.RUN_PATH, identifier="*_measured*")
     plan_ja = [f for f in dirs.RUN_PATH.glob(f"*{prefix}_measured{suffix}.npy")]
     
     assert len(plan_ja) == 1, "Multiple or no matching files found. \n Have Tiaan fix his code"
@@ -37,15 +37,6 @@ def run_previous():
     plan_ja = np.load(plan_ja[0])
 
     chess_man.motor_driver.run(plan_ja)
-
-def move_to_home():
-    """Move to the home position"""
-    home_coords = chess_man.motion_planner.HOME
-    ja, grip_commands = chess_man.motion_planner.coords_to_joint_angles(home_coords, False)
-
-    chess_man.motor_driver.filter_run(ja, grip_commands)
-
-    logging.info("Moved to home position")
 
 if __name__ == '__main__':
 

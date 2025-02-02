@@ -1,4 +1,4 @@
-from mocap_test import mocap_test
+from Positioning import calibrate_position_compensation
 from Data_analytics import analyze_transform
 
 analyze_transform.main()
