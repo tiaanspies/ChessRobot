@@ -66,6 +66,7 @@ def find_home_position():
     robot.move_to_single(home_pos_comp, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
 
     # get position in RCS using camera and aruco board
+    sleep(1)
     rcs_control_pt_pos = robot.get_rcs_pos_aruco()
     
     error = robot.motion_planner.HOME - rcs_control_pt_pos
@@ -80,6 +81,7 @@ def find_home_position():
         robot.move_to_single(home_pos_comp, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
 
         # measure new position
+        sleep(1)
         rcs_control_pt_pos = robot.get_rcs_pos_aruco()
 
         error = robot.motion_planner.HOME - rcs_control_pt_pos
