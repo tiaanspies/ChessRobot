@@ -377,15 +377,16 @@ def robotsVirtualMove(visboard, human_move=None):
 
 def robotsPhysicalMove(robot_move, capture_square):
     """creates and executes the robot's physical move"""
-    start = motion_planner.get_coords(robot_move[:2])
-    goal = motion_planner.get_coords(robot_move[2:])
+    start = robot.motion_planner.get_coords(robot_move[:2])
+    goal = robot.motion_planner.get_coords(robot_move[2:])
+
     if capture_square is not None:
-        capture_square = motion_planner.get_coords(capture_square)
+        capture_square = robot.motion_planner.get_coords(capture_square)
 
     logging.debug(f"Start: {start}, Goal: {goal}, Capture: {capture_square}")
-    path, gripper_commands = motion_planner.generate_quintic_path(start, goal, capture_square) # generate waypoints
-    joint_angles = motion_planner.inverse_kinematics(path, True) # convert waypoints to joint angles
-    motor_driver.filter_run(joint_angles, gripper_commands)
+    path, gripper_commands = robot.motion_planner.generate_quintic_path(start, goal, capture_square) # generate waypoints
+    
+    robot.move_to_path(path, gripper_commands, True) # move the robot
     
     # simulate
     # motion_planner.plot_robot(thetas, path)

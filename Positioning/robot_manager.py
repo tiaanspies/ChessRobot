@@ -72,6 +72,18 @@ class Robot:
         thetas = self.motion_planner.inverse_kinematics(pos_xyz, apply_compensation)
         self.motor_commands.filter_go_to(thetas, np.array([gripper_state]))
 
+    def move_to_path(self, path_xyz, gripper_commands, apply_compensation):
+        """
+        Move robot along a path in robot coordinate system.
+
+        Parameters:
+        path_xyz (np.array): path to move along in robot coordinate system [Nx3] shape
+        gripper_commands: defined in motor commands
+        apply_compensation (bool): whether to apply position compensation
+        """
+        joint_angles = self.motion_planner.inverse_kinematics(path_xyz, apply_compensation) # convert waypoints to joint angles
+        self.motor_commands.filter_run(joint_angles, gripper_commands)
+    
     def move_home(self):
         """
         Move robot to home position.

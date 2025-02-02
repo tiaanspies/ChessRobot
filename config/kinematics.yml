@@ -1,13 +1,13 @@
 IK_CONFIG:
   apply_compensation: true
   base_dist: 150
-  board_height: 25
+  board_height: 8
   camera_to_control_pt_offset:
     x: 0
     y: 2
     z: 57
   chess_square_width: 40
-  grip_height: 110
+  grip_height: 130
   home_position:
     x: 0
     y: 260
@@ -38,7 +38,7 @@ IK_CONFIG:
   - 0
   lift: 120
   position_compensation_matrices:
-  - 20250202_163054_H_matrix.csv.csv
+  - 20250202_163054_H_matrix.csv
   rcs_to_ccs_offset:
     x: 215
     y: -60

@@ -62,6 +62,7 @@ class MotionPlanner():
             if h_list_paths is not None:
                 for path in h_list_paths:
                     full_path = Path(H_MATRIX_PATH, path)
+                    print(f"Loading position compensation matrix from {full_path}")
                     self.h_list.append(np.loadtxt(full_path, delimiter=','))
 
         except FileNotFoundError:
@@ -106,7 +107,7 @@ class MotionPlanner():
         """gives real-world coordinates in mm based on algebraic move notation (e.g. 'e2e4')"""
         i_file = FILE_NAMES.index(name[0])
         i_rank = RANK_NAMES[::-1].index(name[1])
-        return self.board_coords[:,i_rank,i_file]
+        return self.board_coords[:,i_rank,i_file].reshape(3,1)
 
     def generate_path(self, start, goal, cap_sq, step=10):
         """creates a 3xN array of waypoints to and from home, handling captures and lifting over pieces"""
@@ -137,10 +138,12 @@ class MotionPlanner():
     def generate_quintic_path(self, start, goal, cap_sq=None, step=20):
         """creates a 3xN array of waypoints to and from home, handling captures and lifting over pieces"""
 
-        lift_vector = np.array([0,0,self.LIFT])
-        lift_vector_storage = np.array([0, 0, self.LIFT + self.BOARD_HEIGHT])
+        lift_vector = np.array([[0],[0],[self.LIFT]])
+        lift_vector_storage = np.array([[0], [0], [self.LIFT + self.BOARD_HEIGHT]])
         if cap_sq is not None:
             storage = np.array(self.storage_coords.pop(0))
+            print(f"Storage: {storage}")
+            input("is storage OK?")
             move1 = self.quintic_line(self.HOME, cap_sq+lift_vector, step)
             # Gripper medium open
             move2 = self.quintic_line(cap_sq+lift_vector, cap_sq, step/2)
@@ -192,7 +195,7 @@ class MotionPlanner():
         gripper_open = np.size(move1, 1) + np.size(move2, 1) + np.size(move3, 1)
         total_moves = gripper_open + np.size(move4, 1) + np.size(move5, 1)
 
-        gripper_commands_move2 = np.zeros((1, gripper_close + gripper_open))
+        gripper_commands_move2 = np.zeros((1, total_moves))
         gripper_commands_move2[0, gripper_close] = 1
         gripper_commands_move2[0, gripper_open] = 3
 
