@@ -111,16 +111,13 @@ class ArucoTracker:
         for pos in range(self.marker_positions.__len__()):
             self.marker_positions[pos] = np.array(self.marker_positions[pos])
 
-    def estimate_camera_pose(self, cam: Camera_Manager.RPiCamera)-> tuple[np.ndarray, np.ndarray]:
+    def estimate_camera_pose(self, image)-> tuple[np.ndarray, np.ndarray]:
         """
         Gets image from camera and estimates the pose of the camera.
 
         Returns nan col if no markers are found.
         Returns the camera position in aruco co-ordinate system.
         """
-
-        # Load the image
-        _, image = cam.read()
 
         corners, ids = detect_markers(self.aruco_dict, image)
 
