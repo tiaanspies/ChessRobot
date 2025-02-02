@@ -11,6 +11,7 @@ class Robot:
         self.init_aruco_tracker()
         self.init_camera()
         self.init_motion_planner()
+        self.init_motor_commands()
 
     def init_aruco_tracker(self):
         """
@@ -39,8 +40,10 @@ class Robot:
         Camera is used to locate position.
         """
         _, image = self.cam.read()
+        camera_matrix, dist_matrix = self.cam.camera_matrix, self.cam.dist_matrix
 
-        ccs_current_pos = self.aruco_tracker.estimate_camera_pose(image)
+        ccs_current_pos = self.aruco_tracker.estimate_camera_pose(image, camera_matrix, dist_matrix)
+        print("ccs_current_pos: ", ccs_current_pos)
         ccs_control_pt_pos = self.motion_planner.camera_to_control_pt_pos(ccs_current_pos)
         rcs_control_pt_pos = self.motion_planner.ccs_to_rcs(ccs_control_pt_pos)
 
