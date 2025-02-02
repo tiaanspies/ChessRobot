@@ -34,8 +34,7 @@ import chess
 import matplotlib.pyplot as plt
 from Camera import Camera_Manager
 from Chessboard_detection import Chess_Vision
-from IK_Solvers.traditional import MotionPlanner
-from Positioning.motor_commands import MotorCommandsSerial
+from Positioning.robot_manager import Robot
 import logging
 ### INITIALIZE ###
 
@@ -45,45 +44,33 @@ ROBOT_SCORE = 0
 GAME_COUNTER = 0
 
 # functions for gameplay
-def initializeCamera():
-    """Sets up the camera, needs to calibrate on both empty and starting board. returns cam and board instances"""
-    # CAMERA_RESOLUTION = (640, 480)
-    CAMERA_RESOLUTION = (480, 640)
-
-    # Open Video camera
-    # cam = cv.VideoCapture(0)
-    dirPath = os.path.dirname(os.path.realpath(__file__))
-    relPath = "/Chessboard_detection/TestImages/Temp"
-    cam = Camera_Manager.RPiCamera(dirPath + relPath, CAMERA_RESOLUTION, True, False) # Change .FakeCamera to .PhoneCamera
-
-    if not cam.isOpened():
-        raise("Cannot open camera.")
+def setup_board_vision(cam):
 
     # Initialize ChessBoard object and select optimal thresh
     # Board must be empty when this is called
-    ans = input("Is the empty board in view? (y/n): ").strip().lower()
-    if ans == 'y':
-        _, img = cam.read()
+    while True:
+        ans = input("Is the empty board in view? (y/n): ").strip().lower()
+        if ans == 'y':
+            _, img = cam.read()
 
-        board = Chess_Vision.ChessBoard(img)
-    else:
-        print("Please put the empty board is in view")
-        initializeCamera()
+            return Chess_Vision.ChessBoard(img)
+        else:
+            print("Please put the empty board is in view.")
 
-    return cam, board
 
 def identifyColors(cam, board):
     """Runs k-means to set color centroids, then uses this to determine who's playing which color"""
     # NB --- Board is setup in starting setup.
     # Runs kmeans clustering to group piece and board colours
-    ans = input("Are all the pieces placed now? (y/n): ").strip().lower()
-    if ans== 'y':
-        _, img = cam.read()
-        HUMAN, ROBOT = board.initBoardWithStartPos(img)
-    else:
-        print("Please set up the board")
-        identifyColors()
-    return HUMAN, ROBOT
+    while True:
+        ans = input("Are all the pieces placed now? (y/n): ").strip().lower()
+        if ans== 'y':
+            _, img = cam.read()
+            HUMAN, ROBOT = board.initBoardWithStartPos(img)
+            return HUMAN, ROBOT
+        else:
+            print("Please set up the board.")
+        
 
 def whichColor():
     """OBSOLETE. Human decides which color to play. Black is -1, White is 1"""
@@ -152,10 +139,6 @@ def play_again():
         return False
     else:
         play_again()
-
-def turn_on_robot():
-    thetas = motion_planner.inverse_kinematics(motion_planner.HOME, True)
-    motor_driver.filter_run(thetas, np.array([motor_driver.GRIPPER_OPEN]))
 
 # functions for handling visboard (the -1, 0, 1 representation)
 def seeBoardReal(cam, board):
@@ -412,31 +395,28 @@ def robotsPhysicalMove(robot_move, capture_square):
 #stockfish = Stockfish(r"C:\Users\HP\Documents\Chess Robot\stockfish\stockfish_15_win_x64_popcnt\stockfish_15_x64_popcnt.exe", depth=15, parameters={"UCI_Elo":500})
 stockfish = Stockfish(r"/home/tpie/ChessRobot/Stockfish/Stockfish-sf_15/src/stockfish", depth=15, parameters={"UCI_Elo":500})
 
-# create an instance of the MotionPlanner class, which holds all functions for converting a algebraic notation move to a theta trajectory
-motion_planner = MotionPlanner() # this class takes all the board and robot measurements as optional args
-
-# create an instance of the MotorCommands class, which is used to communicate with the raspberry pi
-motor_driver = MotorCommandsSerial()
-
 # Define the -1, 0, 1 (visboard), python-chess (pyboard), and coordinate (cboard) representations of the game
 starting_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*-1))
 pyboard = chess.Board()
 # cboard, storage_list, home = defBoardCoords()
 
+#Initialize the robot manager
+robot = Robot()
+
 def main():
 
     # move robot to starting position
-    turn_on_robot()
+    robot.move_home()
 
     # create an instance of the cam and board classes for converting input from the camera
-    cam, board = initializeCamera()
+    board = setup_board_vision(robot.cam)
     
     # determine who is playing which side and run k-means to set color centroids
     global HUMAN, ROBOT 
-    HUMAN, ROBOT = identifyColors(cam, board)
+    HUMAN, ROBOT = identifyColors(robot.cam, board)
 
     if ROBOT == chess.WHITE: # if robot is playing white, have it go first
-        print("My turn first")
+        print("Sweet! Since I am white, my turn first")
         robot_move, current_visboard, capture_square = robotsVirtualMove(starting_visboard) # make the move virtually
         robotsPhysicalMove(robot_move, capture_square) # make the move physically
     else:
