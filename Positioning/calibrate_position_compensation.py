@@ -62,7 +62,7 @@ def find_home_position():
     robot = robot_manager.Robot()
 
     # Go to initial home position
-    home_pos_comp = robot.motion_planner.HOME
+    home_pos_comp = robot.motion_planner.HOME.astype(float)
     robot.move_to_single(home_pos_comp, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
 
     # get position in RCS using camera and aruco board
@@ -73,9 +73,11 @@ def find_home_position():
     error_norm = np.linalg.norm(error)
 
     print(f"Error: \n{error}; Error norm: {error_norm}")
-    while error_norm > 5:
+    iter = 0
+    while error_norm > 3 and iter < 10:
         # get position in RCS
         home_pos_comp += error * 0.6
+        iter += 1
 
         # move to new home position
         robot.move_to_single(home_pos_comp, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
@@ -91,7 +93,18 @@ def find_home_position():
 
     joint_angles = robot.motion_planner.inverse_kinematics(home_pos_comp, apply_compensation=False)
     print("Home position found")
-    print(f"Thetas: {joint_angles}")
+    print(f"ja: {joint_angles}")
+
+    # Save home calibration
+    config = yaml.safe_load(open("config/kinematics.yml", 'r'))
+    ja = config["IK_CONFIG"]["home_position_joint_angles"]
+    ja["base"] = float(joint_angles[0,0])
+    ja["shoulder"] = float(joint_angles[1,0])
+    ja["elbow"] = float(joint_angles[2,0])
+    config["IK_CONFIG"]["home_position_joint_angles"] = ja
+
+    with open("config/kinematics.yml", 'w') as file:
+        yaml.dump(config, file)
 
 def fake_inverse_kinematics(path):
     return np.vstack((path,np.zeros_like(path[0,:])))
