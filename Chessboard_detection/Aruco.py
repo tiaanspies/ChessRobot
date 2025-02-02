@@ -111,12 +111,12 @@ class ArucoTracker:
         for pos in range(self.marker_positions.__len__()):
             self.marker_positions[pos] = np.array(self.marker_positions[pos])
 
-    def take_photo_and_estimate_pose(self, cam: Camera_Manager.RPiCamera)-> tuple[np.ndarray, np.ndarray]:
+    def estimate_camera_pose(self, cam: Camera_Manager.RPiCamera)-> tuple[np.ndarray, np.ndarray]:
         """
         Gets image from camera and estimates the pose of the camera.
 
         Returns nan col if no markers are found.
-        Returns the camera position
+        Returns the camera position in aruco co-ordinate system.
         """
 
         # Load the image
@@ -133,19 +133,10 @@ class ArucoTracker:
             logging.debug("Not enough markers found.")
             return np.array([[np.nan], [np.nan], [np.nan]])
         
-        rvecs, tvec = estimate_pose(corners, ids, cam.camera_matrix, cam.dist_matrix, self.marker_positions, self.max_id)
+        # Get position of the board with camera as origin
+        rvecs, tvec = estimate_board_pose(corners, ids, cam.camera_matrix, cam.dist_matrix, self.marker_positions, self.max_id)
         
-        if rvecs is not None:
-            # Draw the detected markers and axes on the image
-            # for id in ids:
-            #     cv2.aruco.drawDetectedMarkers(image, corners)
-                # cv2.aruco.drawAxis(image, cam.camera_matrix, cam.dist_matrix, rvecs[i], tvecs[i], marker_size * 0.5)
-
-            # Draw the origin on the board
-            cv2.drawFrameAxes(image, cam.camera_matrix, cam.dist_matrix, rvecs, tvec, 100, 1)
-            label_markers(image, ids, corners)
-            pi_debugging.saveTempImg(image, "Aruco_markers_w_axes.png")
-
+        # Calculate the camera position with the board as origin
         r_mat = cv2.Rodrigues(rvecs)[0]
 
         big_mat = np.block([[r_mat, tvec], [0,0,0,1]])
@@ -287,7 +278,7 @@ def detect_markers(aruco_dict: cv2.aruco_Dictionary, image: np.ndarray)-> tuple[
 
     return corners, ids
 
-def estimate_pose(corners, ids, camera_matrix, dist_matrix, marker_positions, max_id: int
+def estimate_board_pose(corners, ids, camera_matrix, dist_matrix, marker_positions, max_id: int
                   ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     
     if ids is None:
