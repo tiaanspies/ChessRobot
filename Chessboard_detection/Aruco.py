@@ -111,7 +111,7 @@ class ArucoTracker:
         for pos in range(self.marker_positions.__len__()):
             self.marker_positions[pos] = np.array(self.marker_positions[pos])
 
-    def estimate_camera_pose(self, image)-> tuple[np.ndarray, np.ndarray]:
+    def estimate_camera_pose(self, image, camera_matrix, dist_matrix)-> tuple[np.ndarray, np.ndarray]:
         """
         Gets image from camera and estimates the pose of the camera.
 
@@ -131,7 +131,7 @@ class ArucoTracker:
             return np.array([[np.nan], [np.nan], [np.nan]])
         
         # Get position of the board with camera as origin
-        rvecs, tvec = estimate_board_pose(corners, ids, cam.camera_matrix, cam.dist_matrix, self.marker_positions, self.max_id)
+        rvecs, tvec = estimate_board_pose(corners, ids, camera_matrix, dist_matrix, self.marker_positions, self.max_id)
         
         # Calculate the camera position with the board as origin
         r_mat = cv2.Rodrigues(rvecs)[0]
