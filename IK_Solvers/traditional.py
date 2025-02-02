@@ -6,13 +6,11 @@ except ModuleNotFoundError:
     print("Could not install 'chess' module")
 from IK_Solvers.NLinkArm3d import NLinkArm
 from IK_Solvers.quintic_polynomials_planner import QuinticPolynomial
-from Data_analytics.correction_transform import project_points_quad
 import yaml
 from path_directories import CONFIG_PATH_KINEMATICS
 from path_directories import H_MATRIX_PATH
 from Data_analytics import correction_transform
 from pathlib import Path
-import logging
 
 class MotionPlanner():
     def __init__(self, ):
@@ -48,7 +46,11 @@ class MotionPlanner():
 
         #home position that robot waits at and takes pics of board
         home = config['home_position']
-        self.HOME = np.array([home['x'],home['y'],home['z']])
+        self.HOME = np.array([
+            [home['x']],
+            [home['y']],
+            [home['z']]
+        ])
 
         self.generate_coords()
         self.initialize_arm()
@@ -99,16 +101,6 @@ class MotionPlanner():
         else:
             self.param_list = param_list
         self.chess_arm = NLinkArm(self.param_list)
-
-    def coords_to_joint_angles(self, path, apply_compensation=False):
-        """Inputs path and returns joint_angles, gripp commands"""
-        logging.info("solving inverse kinematics...")
-
-        raise NotImplementedError("This function is not implemented anymore. Gripper commands are now returned by quintic path")
-        thetas = self.inverse_kinematics(path, apply_compensation) # convert to joint angles
-        grip_commands = self.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
-        
-        return thetas, grip_commands
     
     def get_coords(self, name):
         """gives real-world coordinates in mm based on algebraic move notation (e.g. 'e2e4')"""
@@ -354,4 +346,3 @@ class MotionPlanner():
 
         return rcs_coords
     
-    def ccs
