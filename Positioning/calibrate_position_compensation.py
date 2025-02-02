@@ -1,22 +1,12 @@
-from IK_Solvers.traditional import MotionPlanner
-from Positioning.motor_commands import MotorCommandsSerial
 import numpy as np
-import matplotlib.pyplot as plt
-from IK_Solvers.traditional import MotionPlanner
-from Positioning.motor_commands import MotorCommandsSerial
 from time import sleep
 from pathlib import Path
 from Camera import Camera_Manager
 from Chessboard_detection import Aruco
 import path_directories as dirs
-import logging
-import sys, time, datetime
-import yaml
+import sys, time, datetime, yaml, logging
 import Positioning.robot_manager as robot_manager
-try:
-    import plotly.graph_objects as go
-except ModuleNotFoundError:
-    print("analyze_transform: Did not load plotly, will not plot")
+import Data_analytics.correction_transform as correction_transform
 
 def user_menu():
     """
@@ -37,7 +27,7 @@ def user_menu():
 
     if choice == "1":
         print("\nRunning calibration\n")
-        run_calibration()
+        run_and_track(dirs.CAL_TRACKING_DATA_PATH)
     elif choice == "2":
         print("\nGenerating ideal calibration pattern\n")
         generate_ideal_pattern()
@@ -63,6 +53,10 @@ def find_home_position():
 
     # Go to initial home position
     home_pos_comp = robot.motion_planner.HOME.astype(float)
+    home_pos_offset = home_pos_comp - np.array([[0], [100], [100]])
+
+    # move to offset position before actual to overcome static friction.
+    robot.move_to_single(home_pos_offset, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
     robot.move_to_single(home_pos_comp, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
 
     # get position in RCS using camera and aruco board
@@ -80,6 +74,7 @@ def find_home_position():
         iter += 1
 
         # move to new home position
+        robot.move_to_single(home_pos_offset, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
         robot.move_to_single(home_pos_comp, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
 
         # measure new position
@@ -108,50 +103,6 @@ def find_home_position():
 
 def fake_inverse_kinematics(path):
     return np.vstack((path,np.zeros_like(path[0,:])))
-
-def draw_flat_cube(z, x_neg, x_pos, y_neg, y_pos):
-    """Draws a flat cube"""
-    step = 10
-    path = np.hstack([
-        cm.quintic_line(cm.HOME, np.array([x_neg, y_neg, z]), step),
-        cm.quintic_line(np.array([x_neg, y_neg, z]), np.array([x_pos, y_neg, z]), step),
-        cm.quintic_line(np.array([x_pos, y_neg, z]), np.array([x_pos, y_pos, z]), step),
-        cm.quintic_line(np.array([x_pos, y_pos, z]), np.array([x_neg, y_pos, z]), step),
-        cm.quintic_line(np.array([x_neg, y_pos, z]), np.array([x_neg, y_neg, z]), step),
-        cm.quintic_line(np.array([x_neg, y_neg, z]), cm.HOME, step)
-    ])
-
-    return path
-
-def draw_cube(v, slice_num):
-    logging.info("Generating ideal pattern: Cube")
-    logging.info(f"Vertices: {slice_num}")
-    top_left = np.array([v["left"],v["close"],v["top"]])
-    bottom_left = np.array([v["left"],v["close"],v["bottom"]])
-    top_right = np.array([v["right"],v["close"],v["top"]])
-    bottom_right = np.array([v["right"],v["close"],v["bottom"]])
-    step = 10
-    path = cm.quintic_line(cm.HOME, top_left, step)
-    
-    slice_width = (v["far"] - v["close"]) / slice_num
-    slice_step = np.array([0.0, slice_width, 0.0], dtype=int)
-
-    for i in range(slice_num):
-        path = np.hstack((path, 
-                          cm.quintic_line(top_left, bottom_right, step), 
-                          cm.quintic_line(bottom_right, bottom_left, step), 
-                          cm.quintic_line(bottom_left, top_right, step), 
-                          cm.quintic_line(top_right, top_left, step)))
-        if i < (slice_num)-1: # - 1):
-            path = np.hstack((path, cm.quintic_line(top_left, top_left + slice_step, step)))
-            top_left += slice_step
-            top_right += slice_step
-            bottom_left += slice_step
-            bottom_right += slice_step
-        
-    path = np.hstack((path, cm.quintic_line(top_left, cm.HOME, step)))  
-
-    return path
 
 def create_tracker():
     # create aruco tracker object
@@ -223,11 +174,11 @@ def user_file_select_multiple(search_path:Path, message:str="Select a file: ", i
 def contains_nan(arr):
     return np.isnan(arr).any()
 
-
-def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
+def run_and_track(cal_path: Path):
     """
     Main function for moving to all the calibration points and tracking them.
     """
+    robot = robot_manager.Robot()
     # load path
     dimensions, transform_type = user_file_select(dirs.PLANNED_PATHS)
 
@@ -242,7 +193,7 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     plan_ja = np.load(plan_ja[0])
    
     # Load path into motion controller
-    mc.load_path(plan_ja, plan_cartesian)
+    robot.motor_commands.load_path(plan_ja, plan_cartesian)
 
     # init counters
     moves_total = plan_ja.shape[1]
@@ -253,32 +204,29 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
 
     # move to init position
 
-    mc.go_to(plan_ja[:, 0])
+    robot.motor_commands.go_to(plan_ja[:, 0])
 
     # step through
     run_cal = True 
     while run_cal:
 
         # Move to next position
-        run_cal, _ = mc.run_once(move_time=400)
+        run_cal, _ = robot.motor_commands.run_once(move_time=400)
         sleep(1)
         
         # attempt twice to take photo
         iter = 0
-        ccs_current_pos = tracker.take_photo_and_estimate_pose(cam)
-        while iter < 2 and contains_nan(ccs_current_pos):
+        rcs_control_pt_pos = robot.get_rcs_pos_aruco()
+        while iter < 2 and contains_nan(rcs_control_pt_pos):
             logging.debug("Failed to take photo, trying again.")
             sleep(1)
-            ccs_current_pos = tracker.take_photo_and_estimate_pose(cam)
+            rcs_control_pt_pos = robot.get_rcs_pos_aruco()
             sleep(1)
             iter += 1
-
-        ccs_control_pt_pos = cm.camera_to_control_pt_pos(ccs_current_pos)
-        rcs_control_pt_pos = cm.ccs_to_rcs(ccs_control_pt_pos)
         
         measured_cartesian[:, [moves_current]] = rcs_control_pt_pos
             
-        logging.debug(f"Position: {ccs_current_pos.reshape(1,3)}")
+        logging.debug(f"Position: {rcs_control_pt_pos.reshape(1,3)}")
         sleep(0.2)
 
         moves_current += 1
@@ -291,38 +239,28 @@ def run_and_track(tracker: Aruco.ArucoTracker, cam, cal_path: Path):
     np.save(Path(cal_path, prefix + "_measured.npy"), measured_cartesian)
     np.save(Path(cal_path, prefix + "_planned_path.npy"), plan_cartesian)
 
-def run_calibration():
-    """
-    Run the calibration process
-    """
-    # load aruco obj things
-    aruco_obj = create_tracker()
-
-    # create camera object
-    cam = Camera_Manager.RPiCamera(loadSavedFirst=False, storeImgHist=False)
-
-    # calibration path
-    run_and_track(aruco_obj, cam, dirs.CAL_TRACKING_DATA_PATH)
-
 def generate_ideal_pattern():
     """
     Generate an ideal calibration pattern
     """
+
+    robot = robot_manager.Robot()
     vertices = {
-    "top" : 260,
-    "bottom" : 180,
-    "right" : 160,
-    "left" : -160,
-    "close" : 150,
-    "far" : 420}
+        "top" : 260,
+        "bottom" : 180,
+        "right" : 160,
+        "left" : -160,
+        "close" : 150,
+        "far" : 420
+    }
 
     print("Did you update the code to make the new shape? (Y/N)")
-    if input() != "Y":
+    if input().upper() != "Y":
         print("Please update the code to make the new shape.")
         return
 
     # generate waypoints
-    path = draw_cube(vertices, 4) 
+    path = robot.motion_planner.draw_cube(vertices, 4)
     # path = draw_flat_cube(125, -90, 90, 150, 350)
 
     # # create name
@@ -333,17 +271,16 @@ def generate_ideal_pattern():
 
     logging.info("solving for joint angles (Inverse Kinematics).")
     start_time = time.time()
-    thetas = cm.inverse_kinematics(path, apply_compensation=False) # convert to joint angles
+    thetas = robot.motion_planner.inverse_kinematics(path, apply_compensation=False) # convert to joint angles
     end_time = time.time()
 
     logging.info(f"Time taken: {end_time - start_time:.2f} seconds")
 
     logging.info("Adding gripper commands")
-    grip_commands = cm.get_gripper_commands2(path) # remove unnecessary wrist commands, add gripper open close instead
-    joint_angles, exceeds_lim = mc.sort_commands(thetas, grip_commands)
+    joint_angles, exceeds_lim = robot.motor_commands.sort_commands(thetas, None)
 
     logging.info("Correcting joint angles")
-    joint_angles, path = mc.correct_limits(joint_angles, path, exceeds_lim)
+    joint_angles, path = robot.motor_commands.correct_limits(joint_angles, path, exceeds_lim)
     
     logging.info(f"Saving path as '{name_path}'")
     np.save(Path(dirs.PLANNED_PATHS, name_path), path)
@@ -410,6 +347,7 @@ def generate_transformed_pattern():
     """
     Generate a transformed calibration pattern
     """
+    robot = robot_manager.Robot()
     # Get transformation matrix
     message = "Select transformation Matrix"
     file_prefixes, suffixes = user_file_select_multiple(dirs.H_MATRIX_PATH, message, '*_H_matrix*')
@@ -431,11 +369,11 @@ def generate_transformed_pattern():
 
     # solve inverse kinematics
     logging.info("solving inverse kinematics...")
-    thetas = cm.inverse_kinematics(compensated_points, True) # convert waypoints to joint angles
-    joint_angles, exceeds_lim = mc.sort_commands(thetas, None)
+    thetas = robot.motion_planner.inverse_kinematics(compensated_points, True) # convert waypoints to joint angles
+    joint_angles, exceeds_lim = robot.motor_commands.sort_commands(thetas, None)
 
     logging.info("Correcting joint angles")
-    joint_angles, compensated_points = mc.correct_limits(joint_angles, compensated_points, exceeds_lim)
+    joint_angles, compensated_points = robot.motor_commands.correct_limits(joint_angles, compensated_points, exceeds_lim)
     logging.info("Solved inverse kinetatics. Saving...")
 
     # if platform.system() == "Windows":

@@ -13,9 +13,9 @@ IK_CONFIG:
     y: 260
     z: 500
   home_position_joint_angles:
-    base: 1.5814054249492726
-    elbow: 4.918431594290509
-    shoulder: 1.6910196950072138
+    base: 1.584865062153729
+    elbow: 4.916008491893882
+    shoulder: 1.689474819631991
   l1_params:
   - 0.78539816339
   - 1.57079632679
@@ -38,7 +38,7 @@ IK_CONFIG:
   - 0
   lift: 120
   position_compensation_matrices:
-  - 20241214_225031_H_matrix.csv
+  - 20250202_163054_H_matrix.csv.csv
   rcs_to_ccs_offset:
     x: 215
     y: -60
