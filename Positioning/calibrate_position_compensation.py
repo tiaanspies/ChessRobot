@@ -71,7 +71,7 @@ def find_home_position():
     error = robot.motion_planner.HOME - rcs_control_pt_pos
     error_norm = np.linalg.norm(error)
 
-    print(f"Error: {error}; Error norm: {error_norm}")
+    print(f"Error: \n{error}; Error norm: {error_norm}")
     while error_norm > 5:
         # get position in RCS
         home_pos_comp += error * 0.6
