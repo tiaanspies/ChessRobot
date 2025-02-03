@@ -27,12 +27,9 @@ loop: when the human makes their turn (hits the timer)
         exit
 """
 
-import os
 from stockfish import Stockfish
 import numpy as np
 import chess
-import matplotlib.pyplot as plt
-from Camera import Camera_Manager
 from Chessboard_detection import Chess_Vision
 from Positioning.robot_manager import Robot
 import logging
