@@ -62,6 +62,7 @@ class MotionPlanner():
             if h_list_paths is not None:
                 for path in h_list_paths:
                     full_path = Path(H_MATRIX_PATH, path)
+                    print(f"Loading position compensation matrix from {full_path}")
                     self.h_list.append(np.loadtxt(full_path, delimiter=','))
 
         except FileNotFoundError:
@@ -97,7 +98,7 @@ class MotionPlanner():
     def initialize_arm(self, param_list=None):
         """initialize inthetasstance of NLinkArm with Denavit-Hartenberg parameters of chess arm"""
         if param_list is None:
-            self.param_list = [self.l1_params, self.l2_params, self.l3_params, self.l4_params]
+            self.param_list = [self.l1_params, self.l2_params, self.l3_params]
         else:
             self.param_list = param_list
         self.chess_arm = NLinkArm(self.param_list)
@@ -106,7 +107,7 @@ class MotionPlanner():
         """gives real-world coordinates in mm based on algebraic move notation (e.g. 'e2e4')"""
         i_file = FILE_NAMES.index(name[0])
         i_rank = RANK_NAMES[::-1].index(name[1])
-        return self.board_coords[:,i_rank,i_file]
+        return self.board_coords[:,i_rank,i_file].reshape(3,1)
 
     def generate_path(self, start, goal, cap_sq, step=10):
         """creates a 3xN array of waypoints to and from home, handling captures and lifting over pieces"""
@@ -137,10 +138,12 @@ class MotionPlanner():
     def generate_quintic_path(self, start, goal, cap_sq=None, step=20):
         """creates a 3xN array of waypoints to and from home, handling captures and lifting over pieces"""
 
-        lift_vector = np.array([0,0,self.LIFT])
-        lift_vector_storage = np.array([0, 0, self.LIFT + self.BOARD_HEIGHT])
+        lift_vector = np.array([[0],[0],[self.LIFT]])
+        lift_vector_storage = np.array([[0], [0], [self.LIFT + self.BOARD_HEIGHT]])
         if cap_sq is not None:
             storage = np.array(self.storage_coords.pop(0))
+            print(f"Storage: {storage}")
+            input("is storage OK?")
             move1 = self.quintic_line(self.HOME, cap_sq+lift_vector, step)
             # Gripper medium open
             move2 = self.quintic_line(cap_sq+lift_vector, cap_sq, step/2)
@@ -192,13 +195,55 @@ class MotionPlanner():
         gripper_open = np.size(move1, 1) + np.size(move2, 1) + np.size(move3, 1)
         total_moves = gripper_open + np.size(move4, 1) + np.size(move5, 1)
 
-        gripper_commands_move2 = np.zeros((1, gripper_close + gripper_open))
+        gripper_commands_move2 = np.zeros((1, total_moves))
         gripper_commands_move2[0, gripper_close] = 1
         gripper_commands_move2[0, gripper_open] = 3
 
         gripper_commands = np.hstack((gripper_commands_move1, gripper_commands_move2))
 
         return np.hstack((first_moves, second_moves)), gripper_commands
+
+    def draw_flat_cube(self, z, x_neg, x_pos, y_neg, y_pos):
+        """Draws a flat cube"""
+        step = 10
+        path = np.hstack([
+            self.quintic_line(self.HOME, np.array([x_neg, y_neg, z]), step),
+            self.quintic_line(np.array([x_neg, y_neg, z]), np.array([x_pos, y_neg, z]), step),
+            self.quintic_line(np.array([x_pos, y_neg, z]), np.array([x_pos, y_pos, z]), step),
+            self.quintic_line(np.array([x_pos, y_pos, z]), np.array([x_neg, y_pos, z]), step),
+            self.quintic_line(np.array([x_neg, y_pos, z]), np.array([x_neg, y_neg, z]), step),
+            self.quintic_line(np.array([x_neg, y_neg, z]), self.HOME, step)
+        ])
+
+        return path
+
+    def draw_cube(self, v, slice_num):
+        top_left = np.array([v["left"],v["close"],v["top"]]).reshape(3, 1)
+        bottom_left = np.array([v["left"],v["close"],v["bottom"]]).reshape(3, 1)
+        top_right = np.array([v["right"],v["close"],v["top"]]).reshape(3, 1)
+        bottom_right = np.array([v["right"],v["close"],v["bottom"]]).reshape(3, 1)
+        step = 10
+        path = self.quintic_line(self.HOME, top_left, step)
+        
+        slice_width = (v["far"] - v["close"]) / slice_num
+        slice_step = np.array([[0.0], [slice_width],[0.0]], dtype=int)
+
+        for i in range(slice_num):
+            path = np.hstack((path, 
+                            self.quintic_line(top_left, bottom_right, step), 
+                            self.quintic_line(bottom_right, bottom_left, step), 
+                            self.quintic_line(bottom_left, top_right, step), 
+                            self.quintic_line(top_right, top_left, step)))
+            if i < (slice_num)-1: # - 1):
+                path = np.hstack((path, self.quintic_line(top_left, top_left + slice_step, step)))
+                top_left += slice_step
+                top_right += slice_step
+                bottom_left += slice_step
+                bottom_right += slice_step
+            
+        path = np.hstack((path, self.quintic_line(top_left, self.HOME, step)))  
+
+        return path
 
     def inverse_kinematics(self, path, apply_compensation):
         """generates a 4xN list of joint angles from a 3xN list of waypoints"""
@@ -208,12 +253,11 @@ class MotionPlanner():
  
         # execute IK on each point in the path
         num_waypoints = np.size(path,1)
-        theta_path = np.zeros((4,num_waypoints))
+        theta_path = np.zeros((3,num_waypoints))
 
         # get the first point
         waypoint = np.hstack((path[:,0],0,0,0))
         theta_path[:, 0] = self.chess_arm.inverse_kinematics(waypoint)
-        print("Initial waypoint complete.")
 
         # calculate the rest with gradient descent
         for waypoint_idx in range(1, num_waypoints):
@@ -284,9 +328,9 @@ class MotionPlanner():
         
         dist = np.linalg.norm(goal - start)
         n_steps = int(dist // avg_step)
-        xqnt = QuinticPolynomial(start[0],goal[0],n_steps)
-        yqnt = QuinticPolynomial(start[1],goal[1],n_steps)
-        zqnt = QuinticPolynomial(start[2],goal[2],n_steps)
+        xqnt = QuinticPolynomial(start[0, 0],goal[0, 0],n_steps)
+        yqnt = QuinticPolynomial(start[1, 0],goal[1, 0],n_steps)
+        zqnt = QuinticPolynomial(start[2, 0],goal[2, 0],n_steps)
 
         path = np.zeros((3,n_steps))
         for step in range(n_steps):

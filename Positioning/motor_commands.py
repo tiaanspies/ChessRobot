@@ -191,17 +191,19 @@ class MotorCommandsSerial:
         thetas[1,:] = thetas[1,:] # make any necessary changes to the shoulder angles
         thetas[2,:] = 2*np.pi - thetas[2,:] # make any necessary changes to the elbow angles
 
-        if grip_commands == None:
-            thetas[3,:] = self.GRIPPER_OPEN
-        else:
-            thetas[3,:] = grip_commands
-        # thetas =  thetas % (2 * np.pi)
-
         exceeds_210 = np.any(thetas > 210/180*np.pi, axis=0)
         exceeds_neg_30 = np.any(thetas < -30/180*np.pi, axis=0)
         out_of_limits = exceeds_210 | exceeds_neg_30
 
+        if grip_commands is None:
+            grip_commands = np.full((1, thetas.shape[1]), self.GRIPPER_OPEN)
+        else:
+            grip_commands = np.array(grip_commands).reshape(1, -1)
+        
+        thetas = np.vstack((thetas, grip_commands))
+
         if np.any(out_of_limits):
             raise ValueError(f'IK solution requires angles greater than the 180-degree limits of motors\n'\
-                f'thetas: {thetas[:, out_of_limits]}')        
-        return thetas, exceeds_210
+                f'thetas: {thetas[:, out_of_limits]}')    
+            
+        return thetas, out_of_limits
