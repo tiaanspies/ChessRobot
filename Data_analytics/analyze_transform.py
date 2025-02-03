@@ -103,12 +103,6 @@ def recorded_with_transformation():
     # Show the plot
     fig.show()
 
-    # Remove points with large z values
-    mask = pts_real[2, :] <= 150
-    pts_real = pts_real[:, mask]
-    pts_ideal = pts_ideal[:, mask]
-    pts_planned = pts_planned[:, mask]
-
     # print transformation matrix and translation
     # correction_transform.print_transform(H, T, pts_real_mean, pts_ideal_mean)
     # print(f"Transformation matrix:\n{H}")
