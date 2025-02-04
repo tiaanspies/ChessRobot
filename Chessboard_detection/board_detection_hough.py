@@ -3,20 +3,6 @@ import numpy as np
 from pathlib import Path
 from matplotlib import pyplot as plt
 
-def show_img(*imgs):
-    if len(imgs) == 0 or len(imgs) > 6:
-        raise ValueError("Number of images should be between 1 and 6")
-
-    fig, axes = plt.subplots(1, len(imgs), figsize=(15, 5))
-    if len(imgs) == 1:
-        axes = [axes]
-    
-    for ax, img in zip(axes, imgs):
-        ax.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-        ax.axis('off')
-    
-    plt.show()
-
 def detect_lines(img, threshold_angle=15):
     # Apply Canny edge detector
     edges = cv2.Canny(img, 75, 150)
@@ -138,31 +124,6 @@ def draw_lines(img, lines, color):
 
 def sort_lines(lines):
     return sorted(lines, key=lambda x: x[0])
-
-img_path = Path("Chessboard_detection", "TestImages", "Temp", "manual_saved.jpg")
-img_path_str = str(img_path)
-img = cv2.imread(img_path_str, cv2.IMREAD_GRAYSCALE)
-image_height, image_width  = img.shape
-
-vertical_lines, horizontal_lines, edges = detect_lines(img)
-
-# Group lines that are within 10 pixels of each other
-grouped_vertical_lines = group_lines(vertical_lines, image_width, image_height)
-grouped_horizontal_lines = group_lines(horizontal_lines, image_width, image_height)
-
-# Create a copy of the original image to draw lines on
-img_with_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-
-# Draw vertical and horizontal lines
-draw_lines(img_with_lines, vertical_lines, (0, 255, 0))  # Green for vertical lines
-draw_lines(img_with_lines, horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
-
-# Create a copy of the original image to draw lines on
-img_with_grouped_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-
-# Draw vertical and horizontal lines
-draw_lines(img_with_grouped_lines, grouped_vertical_lines, (0, 255, 0))  # Green for vertical lines
-draw_lines(img_with_grouped_lines, grouped_horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
 
 def find_closest_distances(lines):
     distances = []
@@ -304,65 +265,112 @@ def expand_board_pts(int_points, vertical_lines, horizontal_lines):
     return expanded_points
 
 
-# Find closest distances for vertical and horizontal lines
-vertical_distances = find_closest_distances(grouped_vertical_lines)
-horizontal_distances = find_closest_distances(grouped_horizontal_lines)
+def find_board_corners(img):
+    image_height, image_width  = img.shape
 
-# Discard outliers
-filtered_vertical_lines = discard_outliers(grouped_vertical_lines, vertical_distances)
-filtered_horizontal_lines = discard_outliers(grouped_horizontal_lines, horizontal_distances)
+    vertical_lines, horizontal_lines, edges = detect_lines(img)
 
-# Create a copy of the original image to draw filtered lines on
-img_with_filtered_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    # Group lines that are within 10 pixels of each other
+    grouped_vertical_lines = group_lines(vertical_lines, image_width, image_height)
+    grouped_horizontal_lines = group_lines(horizontal_lines, image_width, image_height)
 
-# Draw filtered vertical and horizontal lines
-draw_lines(img_with_filtered_lines, filtered_vertical_lines, (0, 255, 0))  # Green for vertical lines
-draw_lines(img_with_filtered_lines, filtered_horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
+    # Find closest distances for vertical and horizontal lines
+    vertical_distances = find_closest_distances(grouped_vertical_lines)
+    horizontal_distances = find_closest_distances(grouped_horizontal_lines)
 
-# sort lines
-sorted_vertical_lines = sort_lines(filtered_vertical_lines)
-sorted_horizontal_lines = sort_lines(filtered_horizontal_lines)
+    # Discard outliers based on the closest distances
+    filtered_vertical_lines = discard_outliers(grouped_vertical_lines, vertical_distances)
+    filtered_horizontal_lines = discard_outliers(grouped_horizontal_lines, horizontal_distances)
 
-intersection_points = find_all_intersections(sorted_vertical_lines, sorted_horizontal_lines).reshape(7, 7, 2)
+    assert len(filtered_vertical_lines) == 7 and len(filtered_horizontal_lines) == 7 # Ensure we have 7 lines of each
 
-# expand points to 9x9 grid
-expanded_points = expand_board_pts(intersection_points, sorted_vertical_lines, sorted_horizontal_lines)
+    # sort lines
+    sorted_vertical_lines = sort_lines(filtered_vertical_lines)
+    sorted_horizontal_lines = sort_lines(filtered_horizontal_lines)
 
-# Display the results
-plt.figure(figsize=(15, 10))
+    intersection_points = find_all_intersections(sorted_vertical_lines, sorted_horizontal_lines).reshape(7, 7, 2)
 
-plt.subplot(2, 4, 1)
-plt.title('Original Image')
-plt.imshow(img, cmap='gray')
+    # expand points to 9x9 grid
+    expanded_points = expand_board_pts(intersection_points, sorted_vertical_lines, sorted_horizontal_lines)
 
-plt.subplot(2, 4, 2)
-plt.title('Canny Edges')
-plt.imshow(edges, cmap='gray')
+    
+    if False:
+        draw_pipeline_plots(
+            img, vertical_lines, horizontal_lines, grouped_vertical_lines, grouped_horizontal_lines,
+            filtered_vertical_lines, filtered_horizontal_lines, intersection_points, expanded_points, edges
+        )
 
-plt.subplot(2, 4, 3)
-plt.title('Detected Vert and Hor Lines')
-plt.imshow(cv2.cvtColor(img_with_lines, cv2.COLOR_BGR2RGB))
+    return expanded_points
 
-plt.subplot(2, 4, 4)
-plt.title('Grouped Lines')
-plt.imshow(cv2.cvtColor(img_with_grouped_lines, cv2.COLOR_BGR2RGB))
+def draw_pipeline_plots(img, vertical_lines, horizontal_lines, grouped_vertical_lines, grouped_horizontal_lines, 
+                        filtered_vertical_lines, filtered_horizontal_lines, intersection_points, expanded_points, edges):
+    # Create a copy of the original image to draw lines on
+    img_with_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
-plt.subplot(2, 4, 5)
-plt.title('Discard Outliers')
-plt.imshow(cv2.cvtColor(img_with_filtered_lines, cv2.COLOR_BGR2RGB))
+    # Draw vertical and horizontal lines
+    draw_lines(img_with_lines, vertical_lines, (0, 255, 0))  # Green for vertical lines
+    draw_lines(img_with_lines, horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
 
-plt.subplot(2, 4, 6)
-plt.title('Intersection points')
-plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-# Plot intersection points
-for (x, y) in intersection_points.reshape(-1, 2):
-    plt.plot(x, y, 'r.')  # Red dots for intersection points
+    # Create a copy of the original image to draw lines on
+    img_with_grouped_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
-plt.subplot(2, 4, 7)
-plt.title('Expanded points')
-plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-# Plot expanded points
-for (x, y) in expanded_points.reshape(-1, 2):
-    plt.plot(x, y, 'r.')  # Red dots for expanded points
+    # Draw vertical and horizontal lines
+    draw_lines(img_with_grouped_lines, grouped_vertical_lines, (0, 255, 0))  # Green for vertical lines
+    draw_lines(img_with_grouped_lines, grouped_horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
 
-plt.show()
+
+    # Create a copy of the original image to draw filtered lines on
+    img_with_filtered_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+    # Draw filtered vertical and horizontal lines
+    draw_lines(img_with_filtered_lines, filtered_vertical_lines, (0, 255, 0))  # Green for vertical lines
+    draw_lines(img_with_filtered_lines, filtered_horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
+
+    # Display the results
+    plt.figure(figsize=(15, 10))
+
+    plt.subplot(2, 4, 1)
+    plt.title('Original Image')
+    plt.imshow(img, cmap='gray')
+
+    plt.subplot(2, 4, 2)
+    plt.title('Canny Edges')
+    plt.imshow(edges, cmap='gray')
+
+    plt.subplot(2, 4, 3)
+    plt.title('Detected Vert and Hor Lines')
+    plt.imshow(cv2.cvtColor(img_with_lines, cv2.COLOR_BGR2RGB))
+
+    plt.subplot(2, 4, 4)
+    plt.title('Grouped Lines')
+    plt.imshow(cv2.cvtColor(img_with_grouped_lines, cv2.COLOR_BGR2RGB))
+
+    plt.subplot(2, 4, 5)
+    plt.title('Discard Outliers')
+    plt.imshow(cv2.cvtColor(img_with_filtered_lines, cv2.COLOR_BGR2RGB))
+
+    plt.subplot(2, 4, 6)
+    plt.title('Intersection points')
+    plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    # Plot intersection points
+    for (x, y) in intersection_points.reshape(-1, 2):
+        plt.plot(x, y, 'r.')  # Red dots for intersection points
+
+    plt.subplot(2, 4, 7)
+    plt.title('Expanded points')
+    plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    # Plot expanded points
+    for (x, y) in expanded_points.reshape(-1, 2):
+        plt.plot(x, y, 'r.')  # Red dots for expanded points
+
+    plt.show()
+
+def main():
+    img_path = Path("Chessboard_detection", "TestImages", "Temp", "manual_saved.jpg")
+    img_path_str = str(img_path)
+    img = cv2.imread(img_path_str, cv2.IMREAD_GRAYSCALE)
+
+    find_board_corners(img)
+
+if __name__ == "__main__":
+    main()
