@@ -168,6 +168,9 @@ class RPiCamera:
 
         self.stateNum += 1
 
+        if ret:
+            self.frame = cv.undistort(self.frame, self.camera_matrix, self.dist_matrix)
+
         if self.storeImgHist:
             self.imgHistDB.saveDBImage(self.frame)
 
