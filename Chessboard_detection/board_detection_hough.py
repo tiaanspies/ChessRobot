@@ -60,63 +60,66 @@ def intersection(line1, line2):
 def in_range(x, y, x_min, x_max, y_min, y_max):
     return x_min <= x <= x_max and y_min <= y <= y_max
 
-def group_lines(lines):
+
+def group_lines(lines, image_width, image_height):
     if not lines:
         return []
 
     grouped_lines = []
-    group_id = [0] * len(lines)
-    current_group_id = 0
-    groups = {}
-    for i, line1 in enumerate(lines[:-1]):
-        for j, line2 in enumerate(lines[i+1:]):
-            
-            x, y = intersection(line1, line2)
+    group_id = [0] * len(lines)  # Initialize group IDs for each line
+    current_group_id = 0  # Initialize current group ID
+    groups = {}  # Dictionary to store groups of lines
 
-            # Check if the intersection point is within the image bounds
-            if x is not None and in_range(x, y, -100, 600, -100, 800):
-                if group_id[i] == 0 and group_id[j+i+1] == 0:
-                    #Neither line is in a group
-                    
-                    current_group_id += 1
-                    group_id[i] = current_group_id
-                    group_id[j+i+1] = current_group_id
+    int_width_min = 0 - image_width*0.2
+    int_width_max = image_width*1.2
+    int_height_min = 0 - image_height*0.2
+    int_height_max = image_height*1.2
 
-                    groups[current_group_id] = [line1, line2]
+    def add_to_group(i, j):
+        nonlocal current_group_id
+        if group_id[i] == 0 and group_id[j] == 0:
+            # If both lines are not in any group, create a new group
+            current_group_id += 1
+            group_id[i] = current_group_id
+            group_id[j] = current_group_id
+            groups[current_group_id] = [lines[i], lines[j]]
+        elif group_id[i] != 0 and group_id[j] == 0:
+            # If line i is in a group and line j is not, add line j to the group of line i
+            group_id[j] = group_id[i]
+            groups[group_id[i]].append(lines[j])
+        elif group_id[i] == 0 and group_id[j] != 0:
+            # If line j is in a group and line i is not, add line i to the group of line j
+            group_id[i] = group_id[j]
+            groups[group_id[j]].append(lines[i])
+        elif group_id[i] != 0 and group_id[j] != 0 and group_id[i] != group_id[j]:
+            # If both lines are in different groups, merge the groups
+            merge_groups(group_id[i], group_id[j])
 
-                elif group_id[i] != 0 and group_id[j+i+1] == 0:
-                    #First line is in a group, second line is not
-                    group_id[j+i+1] = group_id[i]
+    def merge_groups(id1, id2):
+        # Merge two groups into one
+        group1 = groups[id1]
+        group2 = groups[id2]
+        groups[id1] = group1 + group2
+        for line in group2:
+            group_id[lines.index(line)] = id1
+        del groups[id2]
 
-                    groups[group_id[i]].append(line2)
-                elif group_id[i] == 0 and group_id[j+i+1] != 0:
-                    #First line is not in a group, second line is
-                    group_id[i] = group_id[j+i+1]
-
-                    groups[group_id[j+i+1]].append(line1)
-
-                elif group_id[i] != 0 and group_id[j+i+1] != 0:
-                    #Both lines are in a group
-                    if group_id[i] != group_id[j+i+1]:
-                        #Merge groups
-                        group1 = groups[group_id[i]]
-                        group2 = groups[group_id[j+i+1]]
-
-                        groups[group_id[i]] = group1 + group2
-
-                        for line in group2:
-                            group_id[lines.index(line)] = group_id[i]
-
-                        del groups[group_id[j+i+1]]
+    for i in range(len(lines) - 1):
+        for j in range(i + 1, len(lines)):
+            x, y = intersection(lines[i], lines[j])
+            if not (x is None or y is None) and in_range(x, y, int_width_min, int_width_max, int_height_min, int_height_max):
+                # If the lines intersect within the specified range, add them to a group
+                add_to_group(i, j)
 
     for group in groups.values():
+        # Calculate the average rho and theta for each group
         rho = np.mean([line[0] for line in group])
         theta = np.mean([line[1] for line in group])
         grouped_lines.append((rho, theta))
 
-    # Append lines that are not in any group
     for i, line in enumerate(lines):
         if group_id[i] == 0:
+            # If a line is not in any group, add it as a separate line
             grouped_lines.append(line)
 
     return grouped_lines
@@ -133,17 +136,19 @@ def draw_lines(img, lines, color):
         y2 = int(y0 - 1000 * (a))
         cv2.line(img, (x1, y1), (x2, y2), color, 2)
 
-
+def sort_lines(lines):
+    return sorted(lines, key=lambda x: x[0])
 
 img_path = Path("Chessboard_detection", "TestImages", "Temp", "manual_saved.jpg")
 img_path_str = str(img_path)
 img = cv2.imread(img_path_str, cv2.IMREAD_GRAYSCALE)
+image_height, image_width  = img.shape
 
 vertical_lines, horizontal_lines, edges = detect_lines(img)
 
 # Group lines that are within 10 pixels of each other
-grouped_vertical_lines = group_lines(vertical_lines)
-grouped_horizontal_lines = group_lines(horizontal_lines)
+grouped_vertical_lines = group_lines(vertical_lines, image_width, image_height)
+grouped_horizontal_lines = group_lines(horizontal_lines, image_width, image_height)
 
 # Create a copy of the original image to draw lines on
 img_with_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
@@ -179,6 +184,126 @@ def discard_outliers(lines, distances, threshold=3):
     filtered_lines = [line for line, score in zip(lines, modified_z_scores) if score < threshold]
     return filtered_lines
 
+def find_all_intersections(lines_vertical, lines_horizontal):
+    """
+    Find all intersections between lines
+    :param lines_vertical: List of vertical lines in the format (rho, theta)
+    :param lines_horizontal: List of horizontal lines in the format (rho, theta)
+    :return: List of intersection points in the format (x, y)
+    """
+    intersection_points = []
+    for line1 in lines_horizontal:
+        for line2 in lines_vertical:
+            x, y = intersection(line1, line2)
+            if x is not None and y is not None:
+                intersection_points.append((x, y))
+
+    # Reshape intersection points to be 7x7x2
+    intersection_points = np.array(intersection_points)
+
+    return intersection_points
+
+def calculate_rho_theta(point1, point2):
+    """
+    Calculate rho and theta for a line passing through two points
+    :param point1: First point (x1, y1)
+    :param point2: Second point (x2, y2)
+    :return: (rho, theta) for the line passing through the points
+    """
+    x1, y1 = point1
+    x2, y2 = point2
+
+    if x1 == x2:  # Vertical line
+        theta = np.pi / 2
+        rho = x1
+    else:
+        # Calculate the slope and intercept of the line
+        slope = (y2 - y1) / (x2 - x1)
+        intercept = y1 - slope * x1
+
+        # Calculate theta
+        theta = np.arctan(-1 / slope)
+        if theta < 0:
+            theta += np.pi
+
+        # Calculate rho
+        rho = intercept * np.sin(theta)
+
+    return rho, theta
+
+def expand_board_pts(int_points, vertical_lines, horizontal_lines):
+    """
+    Expand the intersection points to a 9x9 grid
+    :param int_points: List of intersection points in the shape (7, 7, 2) format (x, y)
+    :param vertical_lines: List of vertical lines in the format (rho, theta)
+    :param horizontal_lines: List of horizontal lines in the format (rho, theta)
+    :return: List of expanded points in the shape (9, 9, 2) format (x, y)
+    """
+
+    assert int_points.shape == (7, 7, 2)
+
+    expanded_points = np.zeros((9, 9, 2), dtype=int)
+
+    # Copy the original 7x7 points to the center of the 9x9 grid
+    expanded_points[1:8, 1:8] = int_points
+    
+    # Plot diffs on a scatter plot and fit a best fit line
+    anti_diag_diffs = np.array([int_points[i + 1, 5 - i] - int_points[i, 6 - i] for i in range(6)])
+
+    def fit_line_and_get_offsets(diffs, start_idx, end_idx):
+        x = np.arange(len(diffs))
+        y_x_diffs = diffs[:, 0]  # x-differences
+        m_x, b_x = np.polyfit(x, y_x_diffs, 1)
+        x_diff_start = m_x * start_idx + b_x
+        x_diff_end = m_x * end_idx + b_x
+
+        y_y_diffs = diffs[:, 1]  # y-differences
+        m_y, b_y = np.polyfit(x, y_y_diffs, 1)
+        y_diff_start = m_y * start_idx + b_y
+        y_diff_end = m_y * end_idx + b_y
+
+        return np.array([x_diff_start, y_diff_start]), np.array([x_diff_end, y_diff_end])
+
+    # Fit lines and get offsets for anti-diagonal
+    top_right_offset, bot_left_offset = fit_line_and_get_offsets(anti_diag_diffs, -1, 6)
+
+    # Calculate mean differences for diagonals
+    diag_diffs = np.array([int_points[i + 1, i + 1] - int_points[i, i] for i in range(6)])
+
+    # Fit lines and get offsets for diagonal
+    top_left_offset, bot_right_offset = fit_line_and_get_offsets(diag_diffs, -1, 6)
+
+    # Expand corners
+    expanded_points[0, 0] = expanded_points[1, 1] - top_left_offset
+    expanded_points[8, 8] = expanded_points[7, 7] + bot_right_offset
+    expanded_points[0, 8] = expanded_points[1, 7] - top_right_offset
+    expanded_points[8, 0] = expanded_points[7, 1] + bot_left_offset
+
+    # Calculate rho and theta for the border lines passing through the outer corners
+    top_left = expanded_points[0, 0]
+    top_right = expanded_points[0, 8]
+    bottom_left = expanded_points[8, 0]
+    bottom_right = expanded_points[8, 8]
+
+    top_border = calculate_rho_theta(top_left, top_right)
+    bottom_border = calculate_rho_theta(bottom_left, bottom_right)
+    left_border = calculate_rho_theta(top_left, bottom_left)
+    right_border = calculate_rho_theta(top_right, bottom_right)
+
+    left_points = find_all_intersections([left_border], horizontal_lines)
+    right_points = find_all_intersections([right_border], horizontal_lines)
+    top_points = find_all_intersections([top_border], vertical_lines)
+    bottom_points = find_all_intersections([bottom_border], vertical_lines)
+
+    # Expand the border points to the 9x9 grid
+    expanded_points[0, 1:8] = top_points
+    expanded_points[8, 1:8] = bottom_points
+    expanded_points[1:8, 0] = left_points
+    expanded_points[1:8, 8] = right_points
+
+    return expanded_points
+
+
 # Find closest distances for vertical and horizontal lines
 vertical_distances = find_closest_distances(grouped_vertical_lines)
 horizontal_distances = find_closest_distances(grouped_horizontal_lines)
@@ -193,6 +318,15 @@ img_with_filtered_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 # Draw filtered vertical and horizontal lines
 draw_lines(img_with_filtered_lines, filtered_vertical_lines, (0, 255, 0))  # Green for vertical lines
 draw_lines(img_with_filtered_lines, filtered_horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
+
+# sort lines
+sorted_vertical_lines = sort_lines(filtered_vertical_lines)
+sorted_horizontal_lines = sort_lines(filtered_horizontal_lines)
+
+intersection_points = find_all_intersections(sorted_vertical_lines, sorted_horizontal_lines).reshape(7, 7, 2)
+
+# expand points to 9x9 grid
+expanded_points = expand_board_pts(intersection_points, sorted_vertical_lines, sorted_horizontal_lines)
 
 # Display the results
 plt.figure(figsize=(15, 10))
@@ -216,5 +350,19 @@ plt.imshow(cv2.cvtColor(img_with_grouped_lines, cv2.COLOR_BGR2RGB))
 plt.subplot(2, 4, 5)
 plt.title('Discard Outliers')
 plt.imshow(cv2.cvtColor(img_with_filtered_lines, cv2.COLOR_BGR2RGB))
+
+plt.subplot(2, 4, 6)
+plt.title('Intersection points')
+plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+# Plot intersection points
+for (x, y) in intersection_points.reshape(-1, 2):
+    plt.plot(x, y, 'r.')  # Red dots for intersection points
+
+plt.subplot(2, 4, 7)
+plt.title('Expanded points')
+plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+# Plot expanded points
+for (x, y) in expanded_points.reshape(-1, 2):
+    plt.plot(x, y, 'r.')  # Red dots for expanded points
 
 plt.show()
