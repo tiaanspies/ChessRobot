@@ -330,6 +330,7 @@ def find_board_corners(img):
                                     Sorted that the first array element is the top left corner.
     
     """
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     image_height, image_width  = img.shape
 
     vertical_lines, horizontal_lines, edges = detect_lines(img)
@@ -346,54 +347,6 @@ def find_board_corners(img):
     filtered_vertical_lines = discard_outliers(grouped_vertical_lines, vertical_distances)
     filtered_horizontal_lines = discard_outliers(grouped_horizontal_lines, horizontal_distances)
 
-    print(f"V:{len(filtered_vertical_lines)}, h{len(filtered_horizontal_lines)}")
-        # Create a copy of the original image to draw lines on
-    img_with_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-
-    # Draw vertical and horizontal lines
-    draw_lines(img_with_lines, vertical_lines, (0, 255, 0))  # Green for vertical lines
-    draw_lines(img_with_lines, horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
-
-    # Create a copy of the original image to draw lines on
-    img_with_grouped_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-
-    # Draw vertical and horizontal lines
-    draw_lines(img_with_grouped_lines, grouped_vertical_lines, (0, 255, 0))  # Green for vertical lines
-    draw_lines(img_with_grouped_lines, grouped_horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
-
-
-    # Create a copy of the original image to draw filtered lines on
-    img_with_filtered_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-
-    # Draw filtered vertical and horizontal lines
-    draw_lines(img_with_filtered_lines, filtered_vertical_lines, (0, 255, 0))  # Green for vertical lines
-    draw_lines(img_with_filtered_lines, filtered_horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
-
-
-    plt.figure(figsize=(15, 10))
-
-    plt.subplot(2, 4, 1)
-    plt.title('Original Image')
-    plt.imshow(img, cmap='gray')
-
-    plt.subplot(2, 4, 2)
-    plt.title('Canny Edges')
-    plt.imshow(edges, cmap='gray')
-
-    plt.subplot(2, 4, 3)
-    plt.title('Detected Vert and Hor Lines')
-    plt.imshow(cv2.cvtColor(img_with_lines, cv2.COLOR_BGR2RGB))
-
-    plt.subplot(2, 4, 4)
-    plt.title('Grouped Lines')
-    plt.imshow(cv2.cvtColor(img_with_grouped_lines, cv2.COLOR_BGR2RGB))
-
-    plt.subplot(2, 4, 5)
-    plt.title('Discard Outliers')
-    plt.imshow(cv2.cvtColor(img_with_filtered_lines, cv2.COLOR_BGR2RGB))
-
-    plt.show()
-
     assert len(filtered_vertical_lines) == 7 and len(filtered_horizontal_lines) == 7 # Ensure we have 7 lines of each
 
     # sort lines
@@ -406,7 +359,7 @@ def find_board_corners(img):
     expanded_points = expand_board_pts(intersection_points, sorted_vertical_lines, sorted_horizontal_lines)
 
     expanded_points = []
-    if True:
+    if False:
         draw_pipeline_plots(
             img, vertical_lines, horizontal_lines, grouped_vertical_lines, grouped_horizontal_lines,
             filtered_vertical_lines, filtered_horizontal_lines, intersection_points, expanded_points, edges
