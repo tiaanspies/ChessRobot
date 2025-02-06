@@ -182,12 +182,18 @@ def find_closest_distances(lines):
         distances.append(min_distance)
     return distances
 
-def discard_outliers(lines, distances, threshold=3):
-    median = np.median(distances)
-    diff = np.abs(distances - median)
-    mad = np.median(diff)
-    modified_z_scores = np.abs(0.6745 * diff / mad)
-    filtered_lines = [line for line, score in zip(lines, modified_z_scores) if score < threshold]
+def discard_outliers(lines, distances, num_keep=7):
+    mean = np.mean(distances)
+    std = np.std(distances)
+    z_scores = np.abs((distances - mean) / std)
+    
+    # Sort lines by their z-scores
+    sorted_indices = np.argsort(z_scores)
+    
+    # Keep the 7 lines with the lowest z-scores
+    best_indices = sorted_indices[:num_keep]
+    filtered_lines = [lines[i] for i in best_indices]
+    
     return filtered_lines
 
 def find_all_intersections(lines_vertical, lines_horizontal):
@@ -340,6 +346,54 @@ def find_board_corners(img):
     filtered_vertical_lines = discard_outliers(grouped_vertical_lines, vertical_distances)
     filtered_horizontal_lines = discard_outliers(grouped_horizontal_lines, horizontal_distances)
 
+    print(f"V:{len(filtered_vertical_lines)}, h{len(filtered_horizontal_lines)}")
+        # Create a copy of the original image to draw lines on
+    img_with_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+    # Draw vertical and horizontal lines
+    draw_lines(img_with_lines, vertical_lines, (0, 255, 0))  # Green for vertical lines
+    draw_lines(img_with_lines, horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
+
+    # Create a copy of the original image to draw lines on
+    img_with_grouped_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+    # Draw vertical and horizontal lines
+    draw_lines(img_with_grouped_lines, grouped_vertical_lines, (0, 255, 0))  # Green for vertical lines
+    draw_lines(img_with_grouped_lines, grouped_horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
+
+
+    # Create a copy of the original image to draw filtered lines on
+    img_with_filtered_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+    # Draw filtered vertical and horizontal lines
+    draw_lines(img_with_filtered_lines, filtered_vertical_lines, (0, 255, 0))  # Green for vertical lines
+    draw_lines(img_with_filtered_lines, filtered_horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
+
+
+    plt.figure(figsize=(15, 10))
+
+    plt.subplot(2, 4, 1)
+    plt.title('Original Image')
+    plt.imshow(img, cmap='gray')
+
+    plt.subplot(2, 4, 2)
+    plt.title('Canny Edges')
+    plt.imshow(edges, cmap='gray')
+
+    plt.subplot(2, 4, 3)
+    plt.title('Detected Vert and Hor Lines')
+    plt.imshow(cv2.cvtColor(img_with_lines, cv2.COLOR_BGR2RGB))
+
+    plt.subplot(2, 4, 4)
+    plt.title('Grouped Lines')
+    plt.imshow(cv2.cvtColor(img_with_grouped_lines, cv2.COLOR_BGR2RGB))
+
+    plt.subplot(2, 4, 5)
+    plt.title('Discard Outliers')
+    plt.imshow(cv2.cvtColor(img_with_filtered_lines, cv2.COLOR_BGR2RGB))
+
+    plt.show()
+
     assert len(filtered_vertical_lines) == 7 and len(filtered_horizontal_lines) == 7 # Ensure we have 7 lines of each
 
     # sort lines
@@ -351,7 +405,7 @@ def find_board_corners(img):
     # expand points to 9x9 grid
     expanded_points = expand_board_pts(intersection_points, sorted_vertical_lines, sorted_horizontal_lines)
 
-    
+    expanded_points = []
     if True:
         draw_pipeline_plots(
             img, vertical_lines, horizontal_lines, grouped_vertical_lines, grouped_horizontal_lines,
@@ -424,7 +478,7 @@ def draw_pipeline_plots(img, vertical_lines, horizontal_lines, grouped_vertical_
     plt.show()
 
 def main():
-    img_path = Path("Chessboard_detection", "TestImages", "Temp", "manual_saved.jpg")
+    img_path = Path("Chessboard_detection", "TestImages", "Temp", "1.jpg")
     img_path_str = str(img_path)
     img = cv2.imread(img_path_str, cv2.IMREAD_GRAYSCALE)
 
