@@ -4,6 +4,18 @@ from pathlib import Path
 from matplotlib import pyplot as plt
 
 def detect_lines(img, threshold_angle=15):
+    """
+    Detects vertical and horizontal lines in an image using the Hough Line Transform.
+    Parameters:
+    img (numpy.ndarray): The input image in which lines are to be detected.
+    threshold_angle (int, optional): The angle threshold to classify lines as vertical or horizontal. Defaults to 15.
+    Returns:
+    tuple: A tuple containing three elements:
+        - vertical_lines (list): A list of tuples representing the detected vertical lines (rho, theta).
+        - horizontal_lines (list): A list of tuples representing the detected horizontal lines (rho, theta).
+        - edges (numpy.ndarray): The edges detected in the input image using the Canny edge detector.
+    
+    """
     # Apply Canny edge detector
     edges = cv2.Canny(img, 75, 150)
 
@@ -28,6 +40,14 @@ def detect_lines(img, threshold_angle=15):
     return vertical_lines, horizontal_lines, edges
 
 def intersection(line1, line2):
+    """
+    Finds the intersection points between 2 lines.
+    Parameters:
+    line1 (tuple): A tuple representing the first line in the format (rho, theta).
+    line2 (tuple): A tuple representing the second line in the format (rho, theta).
+    Returns:
+    tuple: A tuple representing the intersection point (x, y) between the two lines.
+    """
     rho1, theta1 = line1
     rho2, theta2 = line2
 
@@ -48,6 +68,19 @@ def in_range(x, y, x_min, x_max, y_min, y_max):
 
 
 def group_lines(lines, image_width, image_height):
+    """
+    Find whether 2 lines lie close to each other, if they do. Replace them with a line described by the average of the lines.
+
+    Meant to group duplicate lines together.
+
+    Parameters:
+    Lines (numpy.ndarray): Lines to check in the format [(rho, theta), (rho,theta)]
+    image_width (int): number of pixals accross image.
+    image_height (int): number of pixels for image height.
+
+    returns:
+    grouped lines (list (tuple)): List of lines, should have all overlapping lines removed.
+    """
     if not lines:
         return []
 
@@ -126,6 +159,18 @@ def sort_lines(lines):
     return sorted(lines, key=lambda x: x[0])
 
 def find_closest_distances(lines):
+    """
+    Find the closest line to each other line.
+
+    Room for optimization here. Dont use theta since lines should be roughly parallel.
+
+    Params:
+    Lines (numpy array): List of lines in the format [(rho, theta), (rho, theta)]
+
+    Returns:
+    distances (list): List of the closest distance to each corresponding point.
+    
+    """
     distances = []
     for i, (rho1, theta1) in enumerate(lines):
         min_distance = float('inf')
@@ -266,6 +311,19 @@ def expand_board_pts(int_points, vertical_lines, horizontal_lines):
 
 
 def find_board_corners(img):
+    """
+    Pipeline to find a 9x9 chessboard pattern that is roughly aligned vertically with the image. 
+
+    Should be able to handle glare and other lighting inconsistencies.
+
+    Params:
+    img (numpy array): image with chessboard in the image.
+
+    Returns:
+    expanded_points (numpy array): Array in shape (9x9x2). X, y coordinates for each point in the image.
+                                    Sorted that the first array element is the top left corner.
+    
+    """
     image_height, image_width  = img.shape
 
     vertical_lines, horizontal_lines, edges = detect_lines(img)
@@ -294,7 +352,7 @@ def find_board_corners(img):
     expanded_points = expand_board_pts(intersection_points, sorted_vertical_lines, sorted_horizontal_lines)
 
     
-    if False:
+    if True:
         draw_pipeline_plots(
             img, vertical_lines, horizontal_lines, grouped_vertical_lines, grouped_horizontal_lines,
             filtered_vertical_lines, filtered_horizontal_lines, intersection_points, expanded_points, edges
