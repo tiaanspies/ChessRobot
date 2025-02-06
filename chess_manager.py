@@ -55,7 +55,7 @@ def setup_board_vision(cam):
             print("Please put the empty board is in view.")
 
 
-def identifyColors(cam, board):
+def identifyColors(cam, board: Chess_Vision.ChessBoard):
     """Runs k-means to set color centroids, then uses this to determine who's playing which color"""
     # NB --- Board is setup in starting setup.
     # Runs kmeans clustering to group piece and board colours
@@ -412,6 +412,10 @@ def main():
     # determine who is playing which side and run k-means to set color centroids
     global HUMAN, ROBOT 
     HUMAN, ROBOT = identifyColors(robot.cam, board)
+
+    print(f"Robot: {ROBOT}, Human: {HUMAN}")
+    print(f"White: {chess.WHITE}")
+    input("WOWOWOWOW lets wait here")
 
     if ROBOT == chess.WHITE: # if robot is playing white, have it go first
         print("Sweet! Since I am white, my turn first")
