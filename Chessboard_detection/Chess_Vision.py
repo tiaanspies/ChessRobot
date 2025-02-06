@@ -6,6 +6,7 @@ from scipy import signal
 from sklearn.cluster import KMeans
 import cv2 as cv
 from collections import Counter
+import Chessboard_detection.board_detection_hough as board_detection_hough
 
 try:
     from Chessboard_detection import pi_debugging as debug
@@ -81,14 +82,16 @@ class ChessBoard:
 
         # see which blak and white threshold makes the board the easiest to find
         # Opt is estimated by middle of min and max
-        thresholdOpt = self.findOptimalThreshold(self.initialImage, onlyFindOne=False, erodeSize=3, blurSize=3)
+        # thresholdOpt = self.findOptimalThreshold(self.initialImage, onlyFindOne=False, erodeSize=3, blurSize=3)
 
-        _, cornersInt  = self.findBoardCorners(self.initialImage, thresholdOpt)
+        # _, cornersInt  = self.findBoardCorners(self.initialImage, thresholdOpt)
 
-        cornersIntReshaped = np.reshape(cornersInt, self.BOARD_SIZE_INT + (2,))
-        cornersIntReoriented = self.makeTopRowFirst(cornersIntReshaped)
+        # cornersIntReshaped = np.reshape(cornersInt, self.BOARD_SIZE_INT + (2,))
+        # cornersIntReoriented = self.makeTopRowFirst(cornersIntReshaped)
 
-        self.cornersExt = self.estimateExternalCorners(cornersIntReoriented)
+        # self.cornersExt = self.estimateExternalCorners(cornersIntReoriented)
+
+        self.cornersExt = board_detection_hough.find_board_corners(self.initialImage)
         self.flipBoard = False       
 
         
