@@ -7,6 +7,7 @@ import path_directories as dirs
 import sys, time, datetime, yaml, logging
 import Positioning.robot_manager as robot_manager
 import Data_analytics.correction_transform as correction_transform
+from path_directories import CONFIG_PATH_KINEMATICS
 
 def user_menu():
     """
@@ -39,66 +40,83 @@ def user_menu():
         calculate_H_matrix()
     elif choice == "5":
         print("\nFinding Home Position\n")
-        find_home_position()
+        find_overview_positions()
     elif choice == "0":
         print("Exiting")
         exit()
     else:
         print("Invalid option")
 
-def find_home_position():
-    """Use camera to find calibrated home position"""
+def find_overview_positions():
+    
+    position_names = ["home_position", "home_pos_forward", "home_pos_backward"]
+
+    for position_name in position_names:
+        print(f"Finding {position_name}")
+        find_target_position(position_name)
+
+def find_target_position(position_name):
+    """Use camera to find calibrated target position"""
     
     robot = robot_manager.Robot()
 
-    # Go to initial home position
-    home_pos_comp = robot.motion_planner.HOME.astype(float)
-    home_pos_offset = home_pos_comp - np.array([[0], [100], [100]])
+    # Load target position to calibrate
+    config = yaml.safe_load(open(CONFIG_PATH_KINEMATICS))['IK_CONFIG']
+    target_position = np.array([
+        [config[position_name]['x']],
+        [config[position_name]['y']],
+        [config[position_name]['z']]
+    ], dtype=np.float32)
+
+    # target pos offset is the position to move back and forth to.
+    # Moving away and back is meant to help overcome static friction.
+    target_pos_compensated = target_position
+    target_pos_offset = target_pos_compensated - np.array([[0], [100], [100]])
 
     # move to offset position before actual to overcome static friction.
-    robot.move_to_single(home_pos_offset, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
-    robot.move_to_single(home_pos_comp, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
+    robot.move_to_single(target_pos_offset, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
+    robot.move_to_single(target_pos_compensated, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
 
     # get position in RCS using camera and aruco board
     sleep(1)
     rcs_control_pt_pos = robot.get_rcs_pos_aruco()
     
-    error = robot.motion_planner.HOME - rcs_control_pt_pos
+    error = target_position - rcs_control_pt_pos
     error_norm = np.linalg.norm(error)
 
     print(f"Error: \n{error}; Error norm: {error_norm}")
     iter = 0
     while error_norm > 3 and iter < 10:
         # get position in RCS
-        home_pos_comp += error * 0.6
+        target_pos_compensated += error * 0.6
         iter += 1
 
-        # move to new home position
-        robot.move_to_single(home_pos_offset, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
-        robot.move_to_single(home_pos_comp, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
+        # move to new target position
+        robot.move_to_single(target_pos_offset, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
+        robot.move_to_single(target_pos_compensated, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
 
         # measure new position
         sleep(1)
         rcs_control_pt_pos = robot.get_rcs_pos_aruco()
 
-        error = robot.motion_planner.HOME - rcs_control_pt_pos
+        error = target_position - rcs_control_pt_pos
         error_norm = np.linalg.norm(error)
 
         print(f"Error: {error}; Error norm: {error_norm}")
 
-    joint_angles = robot.motion_planner.inverse_kinematics(home_pos_comp, apply_compensation=False)
-    print("Home position found")
+    joint_angles = robot.motion_planner.inverse_kinematics(target_pos_compensated, apply_compensation=False)
+    print("Target position found")
     print(f"ja: {joint_angles}")
 
-    # Save home calibration
-    config = yaml.safe_load(open("config/kinematics.yml", 'r'))
-    ja = config["IK_CONFIG"]["home_position_joint_angles"]
+    # Save target calibration
+    config = yaml.safe_load(open(CONFIG_PATH_KINEMATICS, 'r'))
+    ja = config["IK_CONFIG"][position_name+"_joint_angles"]
     ja["base"] = float(joint_angles[0,0])
     ja["shoulder"] = float(joint_angles[1,0])
     ja["elbow"] = float(joint_angles[2,0])
-    config["IK_CONFIG"]["home_position_joint_angles"] = ja
+    config["IK_CONFIG"][position_name+"_joint_angles"] = ja
 
-    with open("config/kinematics.yml", 'w') as file:
+    with open(CONFIG_PATH_KINEMATICS, 'w') as file:
         yaml.dump(config, file)
 
 def fake_inverse_kinematics(path):

@@ -16,6 +16,27 @@ IK_CONFIG:
     base: 1.5774677124633947
     elbow: 4.882091918541256
     shoulder: 1.7491862587994256
+
+  home_pos_forward:
+    x: 0
+    y: 280
+    z: 500
+
+  home_pos_forward_joint_angles:
+    base: 1.5774677124633947
+    elbow: 4.882091918541256
+    shoulder: 1.7491862587994256
+
+  home_pos_backward:
+    x: 0
+    y: 200
+    z: 500
+  
+  home_pos_backward_joint_angles:
+    base: 1.5774677124633947
+    elbow: 4.882091918541256
+    shoulder: 1.7491862587994256
+
   l1_params:
   - 0.78539816339
   - 1.57079632679
