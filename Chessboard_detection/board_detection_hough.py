@@ -153,7 +153,7 @@ def draw_lines(img, lines, color):
         y1 = int(y0 + 1000 * (a))
         x2 = int(x0 - 1000 * (-b))
         y2 = int(y0 - 1000 * (a))
-        cv2.line(img, (x1, y1), (x2, y2), color, 2)
+        cv2.line(img, (x1, y1), (x2, y2), color, 1)
 
 def sort_lines(lines):
     return sorted(lines, key=lambda x: x[0])
@@ -315,6 +315,20 @@ def expand_board_pts(int_points, vertical_lines, horizontal_lines):
 
     return expanded_points
 
+def shift_lines(lines, offset):
+    """
+    Shift the lines by a given offset
+    :param lines: list of lines in the format (rho, theta)
+    :param offset: integer to adjust the rho value by
+    :return: list of shifted lines
+    """
+
+    shifted_lines = []
+    for rho, theta in lines:
+        shifted_lines.append((rho + offset, theta))
+
+    return shifted_lines
+
 
 def find_board_corners(img):
     """
@@ -353,21 +367,27 @@ def find_board_corners(img):
     sorted_vertical_lines = sort_lines(filtered_vertical_lines)
     sorted_horizontal_lines = sort_lines(filtered_horizontal_lines)
 
-    intersection_points = find_all_intersections(sorted_vertical_lines, sorted_horizontal_lines).reshape(7, 7, 2)
+    # shift the lines by 2 pixels
+    shifted_vertical_lines = shift_lines(sorted_vertical_lines, 1)
+    shifted_horizontal_lines = shift_lines(sorted_horizontal_lines, 1)
+
+    intersection_points = find_all_intersections(shifted_vertical_lines, shifted_horizontal_lines).reshape(7, 7, 2)
 
     # expand points to 9x9 grid
-    expanded_points = expand_board_pts(intersection_points, sorted_vertical_lines, sorted_horizontal_lines)
+    expanded_points = expand_board_pts(intersection_points, shifted_vertical_lines, shifted_horizontal_lines)
 
-    if False:
+    if True:
         draw_pipeline_plots(
             img, vertical_lines, horizontal_lines, grouped_vertical_lines, grouped_horizontal_lines,
-            filtered_vertical_lines, filtered_horizontal_lines, intersection_points, expanded_points, edges
+            filtered_vertical_lines, filtered_horizontal_lines, intersection_points, expanded_points, edges,
+            shifted_vertical_lines, shifted_horizontal_lines
         )
 
     return expanded_points
 
 def draw_pipeline_plots(img, vertical_lines, horizontal_lines, grouped_vertical_lines, grouped_horizontal_lines, 
-                        filtered_vertical_lines, filtered_horizontal_lines, intersection_points, expanded_points, edges):
+                        filtered_vertical_lines, filtered_horizontal_lines, intersection_points, expanded_points, edges,
+                        shifted_vertical_lines, shifted_horizontal_lines):
     # Create a copy of the original image to draw lines on
     img_with_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
@@ -389,6 +409,12 @@ def draw_pipeline_plots(img, vertical_lines, horizontal_lines, grouped_vertical_
     # Draw filtered vertical and horizontal lines
     draw_lines(img_with_filtered_lines, filtered_vertical_lines, (0, 255, 0))  # Green for vertical lines
     draw_lines(img_with_filtered_lines, filtered_horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
+
+    img_with_shifted_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+    # Draw shifted vertical and horizontal lines
+    draw_lines(img_with_shifted_lines, shifted_vertical_lines, (0, 255, 0))  # Green for vertical lines
+    draw_lines(img_with_shifted_lines, shifted_horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
 
     # Display the results
     plt.figure(figsize=(15, 10))
@@ -414,13 +440,17 @@ def draw_pipeline_plots(img, vertical_lines, horizontal_lines, grouped_vertical_
     plt.imshow(cv2.cvtColor(img_with_filtered_lines, cv2.COLOR_BGR2RGB))
 
     plt.subplot(2, 4, 6)
+    plt.title('Shifted Lines')
+    plt.imshow(cv2.cvtColor(img_with_shifted_lines, cv2.COLOR_BGR2RGB))
+
+    plt.subplot(2, 4, 7)
     plt.title('Intersection points')
     plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
     # Plot intersection points
     for (x, y) in intersection_points.reshape(-1, 2):
         plt.plot(x, y, 'r.')  # Red dots for intersection points
 
-    plt.subplot(2, 4, 7)
+    plt.subplot(2, 4, 8)
     plt.title('Expanded points')
     plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
     # Plot expanded points
