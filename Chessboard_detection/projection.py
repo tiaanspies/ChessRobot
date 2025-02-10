@@ -6,6 +6,7 @@ from Chessboard_detection import board_detection_hough as bdh
 import numpy as np
 import heapq
 import matplotlib.pyplot as plt
+import chess
 
 """
 Manages image projection and perspective transformations so that the chessboard pattern standardized in the image.
@@ -35,20 +36,23 @@ def split_image_into_squares(img):
     """
     Inputs a topdown image of the chessboard pattern. Image must be cropped to only contain the board.
     
+    White has to be at the bottom row of the image.
+
     Returns 64 squares of the chessboard pattern. Each square is a 2D numpy array.
     """
     
     # split the image into 8x8 squares
-
-    width, height = img.shape[:2]
+    height, width = img.shape[:2]
     squares = []
+    square_height = height // 8
+    square_width = width // 8
     for i in range(8):
         for j in range(8):
-            x = j * width // 8
-            y = i * height // 8
-            square = img[y:y+height//8, x:x+width//8]
+            y = (7 - i) * square_height
+            x = j * square_width
+            square = img[y:y+square_height, x:x+square_width]
             squares.append(square)
-    
+
     return squares
  
 def showImg(img):
@@ -64,8 +68,7 @@ def showImg(img):
         sleep(0.1)
 
 def preprocess_square(square):
-    gray = cv2.cvtColor(square, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    blurred = cv2.GaussianBlur(square, (5, 5), 0)
     _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_OTSU)
     return thresh
 
@@ -206,52 +209,170 @@ def chessboard_detection_2_orb_transform(img1, img2):
 
     img2_warped_to_img1 = project_board_2_square(img2_warped_to_img1, all_corners)
 
-def chessboard_detection_3_hough(img1, img2):
+def display_squares(squares, contrast_squares, preprocessed_squares, has_pieces):
+    """
+    Display 3 rows of 8 squares each. Each square is displayed with the original, preprocessed and has_piece image.
+        
+    """
+    for i in range(8):
+        plt.figure(figsize=(17, 9))
+        for j in range(8):
+            plt.subplot(4, 8, 1 + j)
+            plt.title('Original Image')
+            plt.imshow(squares[i*8+j], cmap='gray')
+
+            plt.subplot(4, 8, 9 + j)
+            plt.title('Enhanced Contrast')
+            plt.imshow(contrast_squares[i*8+j], cmap='gray')
+
+            plt.subplot(4, 8, 17 + j)
+            plt.title('Histogram (Original)')
+            plt.hist(squares[i*8+j].ravel(), bins=256, range=[0, 256], color='black')
+
+            plt.subplot(4, 8, 25 + j)
+            plt.title('Histogram (Enhanced)')
+            plt.hist(contrast_squares[i*8+j].ravel(), bins=256, range=[0, 256], color='black')
+
+            # plt.subplot(4, 8, 17 + j)
+            # plt.title('Thresholded')
+            # plt.imshow(preprocessed_squares[i*8+j], cmap='gray')
+
+            # plt.subplot(4, 8, 25 + j)
+            # plt.title('Has piece: ' + str(has_pieces[j][0]))
+            # plt.imshow(has_pieces[i*8+j][1], cmap='gray')
+    
+        plt.show()
+
+def chessboard_detection_3_hough(img):
     """
     Directly find chessboard corners in img2 and warps it to square and crops it.
     """
-    corners = bdh.find_board_corners(img2)
+    corners = bdh.find_board_corners(img)
     # find offsets to overlay img 1 and 2 perfectly
-    cropped_image = project_board_2_square(img2, corners) 
-    showImg(cropped_image)
+    cropped_image = project_board_2_square(img, corners) 
+    
+    board_colors = board_background_labels()
+    # TODO: Pick up coding here 
 
     # split the board int
     squares = split_image_into_squares(cropped_image)
 
+    # shrink the squares to remove the border
+    squares = crop_squared_by_border_width(squares, border_width=1)
+
+    # enhance the contrast of the squares
+    gray_squares = [cv2.cvtColor(square, cv2.COLOR_BGR2GRAY) for square in squares]
+    contrast = [cv2.equalizeHist(square) for square in gray_squares]
+
     # preprocess the squares
-    preprocessed_squares = [preprocess_square(square) for square in squares]
+    preprocessed_squares = [preprocess_square(square) for square in contrast]
 
     # check if the square has a piece
     has_pieces = [has_piece(square) for square in preprocessed_squares]
 
     # Display the results
+    # display_squares(squares, contrast, preprocessed_squares, has_pieces)
 
-    for square, preprocessed_square, (present, contour) in zip(squares, preprocessed_squares, has_pieces):
-        plt.figure(figsize=(15, 10))
+    return [-1] * 64
 
-        plt.subplot(2, 4, 1)
-        plt.title('Original Image')
-        plt.imshow(square, cmap='gray')
+def convert_ids_to_words(labels):
+    """
+    Coverts IDS 1, 0, -1 to correspnding colors white, none and black.
 
-        plt.subplot(2, 4, 2)
-        plt.title('Canny Edges')
-        plt.imshow(preprocessed_square, cmap='gray')
+    Parameters:
+    labels: array[64] of ids.
+    Returns:
+    array[64] of strings.
+    """
 
-        plt.subplot(2, 4, 3)
-        plt.title('Has Piece: ' + str(present))
-        plt.imshow(contour, cmap='gray')
+    mapping = ["black", "none", "white"]
+    labels = [mapping[id+1] for id in labels]
+    
+    return labels
 
-        plt.show()
+def board_background_labels():
+    """
+    Returns the labels for the background of the chessboard.
+
+    returns:
+    array[64] of strings.
+    """
+
+    labels = []
+    for i in range(8):
+        for j in range(8):
+            if (i+j) % 2 == 0:
+                labels.append("black")
+            else:
+                labels.append("white")
+                
+    return labels
+    
+
+def label_chessboard(img):
+    """
+    Labels the chessboard squares with detected pieces and their background colors.
+    This function takes an image of a chessboard, detects the pieces on each square,
+    and assigns a label to each square indicating the piece and the background color.
+    Args:
+        img (numpy.ndarray): The input image of the chessboard.
+    Returns:
+        dict: A dictionary where each key is a square identifier (e.g., "A1", "B1", etc.)
+              and the value is another dictionary with keys "piece" and "background".
+              The "piece" key maps to the detected piece on that square (as a string),
+              and the "background" key maps to the background color of the square.
+    Example:
+        >>> img = cv2.imread('chessboard.jpg')
+        >>> labels = label_chessboard(img)
+        >>> print(labels["A1"])
+        {'piece': 'white', 'background': 'white'}
+    """
+    label_ids = chessboard_detection_3_hough(img)
+    labels_words = convert_ids_to_words(label_ids)
+
+    square_colour = board_background_labels()
+
+    SQUARES = [
+        "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1",
+        "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2",
+        "a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3",
+        "a4", "b4", "c4", "d4", "e4", "f4", "g4", "h4",
+        "a5", "b5", "c5", "d5", "e5", "f5", "g5", "h5",
+        "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6",
+        "a7", "b7", "c7", "d7", "e7", "f7", "g7", "h7",
+        "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
+    ]
+
+    label_dict = {}
+
+    for i in range(64):
+        label_dict[SQUARES[i]] = {"piece": labels_words[i], "background": square_colour[i]}
+
+    return label_dict
+
+def label_dict_to_str(label_dict):
+    """
+    Inputs a dict label_dict[SQUARES[i]] = {"piece": labels_words[i], "background": square_colour[i]}
+
+    outputs a dict label_dict_words[SQUARES[i]] = f"{labels_words[i]} on {square_colour[i]}"
+    """
+
+    label_dict_words = {}
+
+    for square, labels in label_dict.items():
+        label_dict_words[square] = f"{labels['piece']} on {labels['background']}"
+
+    return label_dict_words
 
 def main():
-    img_path1 = str(Path("Chessboard_detection", "TestImages", "Temp", "1.jpg"))
-    img1 = cv2.imread(img_path1)
+    img1 = str(Path("Chessboard_detection", "TestImages", "Temp", "1.jpg"))
+    blank_board = cv2.imread(img1)
 
-    img_path2 = str(Path("Chessboard_detection", "TestImages", "Temp", "2.jpg"))
+    img_path2 = str(Path("Chessboard_detection", "TestImages", "Temp", "a2.jpg"))
     img2 = cv2.imread(img_path2)
 
     # find_warped_2(img1, img2)
-    chessboard_detection_3_hough(img1, img2)
+    chessboard_detection_3_hough(blank_board, img2)
 
 if __name__ == "__main__":
     main()
