@@ -234,7 +234,10 @@ def calculate_rho_theta(point1, point2):
         intercept = y1 - slope * x1
 
         # Calculate theta
-        theta = np.arctan(-1 / slope)
+        if slope == 0:
+            theta = np.pi / 2
+        else:
+            theta = np.arctan(-1 / slope)
         if theta < 0:
             theta += np.pi
 
@@ -376,7 +379,7 @@ def find_board_corners(img):
     # expand points to 9x9 grid
     expanded_points = expand_board_pts(intersection_points, shifted_vertical_lines, shifted_horizontal_lines)
 
-    if True:
+    if False:
         draw_pipeline_plots(
             img, vertical_lines, horizontal_lines, grouped_vertical_lines, grouped_horizontal_lines,
             filtered_vertical_lines, filtered_horizontal_lines, intersection_points, expanded_points, edges,
