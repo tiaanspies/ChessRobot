@@ -98,7 +98,7 @@ def determine_piece_color(square):
     Then use the color of the pixels inside the outline to determine the color of the piece.
     """
     # # Convert the image to the LUV color space
-    # luv_square = cv2.cvtColor(square, cv2.COLOR_BGR2LUV)
+    luv_square = cv2.cvtColor(square, cv2.COLOR_BGR2LUV)
 
     # # Apply mean shift segmentation
     # shifted = cv2.pyrMeanShiftFiltering(luv_square, sp=11, sr=11)
@@ -107,11 +107,12 @@ def determine_piece_color(square):
     # output = cv2.cvtColor(shifted, cv2.COLOR_LUV2BGR)
     # proj.showImg(output)
 
-    # filter to reduce noise
+    # blur to reduce noise
     img = cv2.medianBlur(square, 3)
 
     # flatten the image
-    flat_image = img.reshape((-1,3))
+    luv_square = cv2.cvtColor(img, cv2.COLOR_BGR2LUV)
+    flat_image = luv_square.reshape((-1,3))
     flat_image = np.float32(flat_image)
 
     # meanshift
@@ -125,19 +126,50 @@ def determine_piece_color(square):
     segments = np.unique(labeled)
     print('Number of segments: ', segments.shape[0])
 
+    #create a mask of the boder pixels and flatten it
+    mask = np.ones((img.shape[0], img.shape[1]), dtype=np.uint8)
+    mask[1:-1, 1:-1] = 0
+    mask = mask.reshape((-1,1))
+
+    # count the number of border pixels in each segment
+    border_count = np.zeros(segments.shape[0])
+    for i, label in enumerate(labeled):
+        border_count[label] += mask[i]
+
+    # for squares with 2 or 3 segments, remove the pixels of the segment with the most border pixels.
+    # for squares for more than 3 segments. Removes pixels of border segments with more 30% of the border pixels.
+
+    for i, label in enumerate(labeled):
+        if segments.shape[0] == 2 or segments.shape[0] == 3:
+            if border_count[label] == max(border_count):
+                labeled[i] = -1
+        elif segments.shape[0] > 3:
+            if border_count[label] > 0.3 * sum(border_count):
+                labeled[i] = -1
+    # print the border count as a ratio of the whole border
+    border_ratio = border_count / sum(border_count)
+    print('Border count ratio: ', border_ratio)
+
     # get the average color of each segment
     total = np.zeros((segments.shape[0], 3), dtype=float)
     count = np.zeros(total.shape, dtype=float)
     for i, label in enumerate(labeled):
+        if label == -1:
+            continue
         total[label] = total[label] + flat_image[i]
         count[label] += 1
+        
     avg = total/count
     avg = np.uint8(avg)
 
     # cast the labeled image into the corresponding average color
-    res = avg[labeled]
+    green = np.array([125, 100, 50], dtype=np.uint8)
+    res = np.array([avg[label] if label != -1 else green for label in labeled])
     result = res.reshape((img.shape))
+    result = cv2.cvtColor(result, cv2.COLOR_LUV2BGR)
 
+
+    proj.showImg(square)
     proj.showImg(result)
 
     return 1
