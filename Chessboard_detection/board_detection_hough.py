@@ -183,16 +183,22 @@ def find_closest_distances(lines):
     return distances
 
 def discard_outliers(lines, distances, num_keep=7):
-    mean = np.mean(distances)
-    std = np.std(distances)
-    z_scores = np.abs((distances - mean) / std)
     
-    # Sort lines by their z-scores
-    sorted_indices = np.argsort(z_scores)
-    
-    # Keep the 7 lines with the lowest z-scores
-    best_indices = sorted_indices[:num_keep]
-    filtered_lines = [lines[i] for i in best_indices]
+    # Combine lines and distances into a list of tuples
+    lines_with_distances = list(zip(lines, distances))
+
+    # Sort the lines by their corresponding distances
+    sorted_lines_with_distances = sorted(lines_with_distances, key=lambda x: x[1])
+
+    min_spread = float('inf')
+    min_spread_idx = 0
+    for i in range(len(lines) - num_keep + 1):
+        spread = sorted_lines_with_distances[i+num_keep-1][1] - sorted_lines_with_distances[i][1]
+        if spread < min_spread:
+            min_spread = spread
+            min_spread_idx = i
+
+    filtered_lines = [line for line, _ in sorted_lines_with_distances[min_spread_idx:min_spread_idx+num_keep]]
     
     return filtered_lines
 
