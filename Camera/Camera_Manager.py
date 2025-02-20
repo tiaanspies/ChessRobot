@@ -162,7 +162,7 @@ class RPiCamera:
             self.camera.capture(output, 'rgb', use_video_port=True)
             
             self.frame = output.copy()
-            # self.frame = cv.cvtColor(self.frame, cv.COLOR_RGB2BGR)
+            self.frame = cv.cvtColor(self.frame, cv.COLOR_RGB2BGR)
 
         ret = self.frame is not None
 
