@@ -116,3 +116,16 @@ class Robot:
         angles = np.array([base, shoulder, elbow]).reshape(3,1)
 
         self.motor_commands.filter_go_to(angles, self.motor_commands.GRIPPER_OPEN)
+
+    def execute_chess_move(self, robot_move, capture_square):
+        """creates and executes the robot's physical move"""
+        start = self.motion_planner.get_coords(robot_move[:2])
+        goal = self.motion_planner.get_coords(robot_move[2:])
+
+        if capture_square is not None:
+            capture_square = self.motion_planner.get_coords(capture_square)
+
+        print(f"Start: {start}, Goal: {goal}, Capture: {capture_square}")
+        path, gripper_commands = self.motion_planner.generate_quintic_path(start, goal, capture_square) # generate waypoints
+        
+        self.move_to_path(path, gripper_commands, True) # move the robot

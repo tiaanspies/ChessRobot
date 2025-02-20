@@ -338,6 +338,29 @@ def shift_lines(lines, offset):
 
     return shifted_lines
 
+def check_if_valid(lines):
+    """
+    Fit a linear regression to the spacing between lines. Check if valid by checking the R^2 value.
+
+    Params:
+    lines (numpy array): List of lines in the format [(rho, theta), (rho, theta)]
+
+    Returns:
+    bool: True if valid, False if not.
+    
+    """
+    diffs = np.array([lines[i + 1][0] - lines[i][0] for i in range(6)])
+    x = np.arange(len(diffs))
+    m_x, b_x = np.polyfit(x, diffs, 1)
+
+    # Calculate R^2 value
+    y_pred = m_x * x + b_x
+    y_mean = np.mean(diffs)
+    ss_res = np.sum((diffs - y_pred) ** 2)
+    ss_tot = np.sum((diffs - y_mean) ** 2)
+    r_squared = 1 - (ss_res / ss_tot)
+
+    return r_squared > 0.9
 
 def find_board_corners(img):
     """
@@ -371,7 +394,12 @@ def find_board_corners(img):
     filtered_horizontal_lines = discard_outliers(grouped_horizontal_lines, horizontal_distances)
 
     assert len(filtered_vertical_lines) == 7 and len(filtered_horizontal_lines) == 7 # Ensure we have 7 lines of each
+    
+    vert_valid = check_if_valid(filtered_vertical_lines)
+    hor_valid = check_if_valid(filtered_horizontal_lines)
 
+    if not vert_valid or not hor_valid:
+        print("Lines are not valid!!!")
     # sort lines
     sorted_vertical_lines = sort_lines(filtered_vertical_lines)
     sorted_horizontal_lines = sort_lines(filtered_horizontal_lines)
