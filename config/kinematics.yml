@@ -8,35 +8,30 @@ IK_CONFIG:
     z: 57
   chess_square_width: 40
   grip_height: 130
+  home_pos_backward:
+    x: 0
+    y: 200
+    z: 500
+  home_pos_backward_joint_angles:
+    base: 1.5504277864564266
+    elbow: 4.751949783103875
+    shoulder: 1.8714909237012198
+  home_pos_forward:
+    x: 0
+    y: 280
+    z: 500
+  home_pos_forward_joint_angles:
+    base: 1.5738002358179315
+    elbow: 4.945639877142793
+    shoulder: 1.6314183152348964
   home_position:
     x: 0
     y: 240
     z: 500
   home_position_joint_angles:
-    base: 1.5774677124633947
-    elbow: 4.882091918541256
-    shoulder: 1.7491862587994256
-
-  home_pos_forward:
-    x: 0
-    y: 280
-    z: 500
-
-  home_pos_forward_joint_angles:
-    base: 1.5774677124633947
-    elbow: 4.882091918541256
-    shoulder: 1.7491862587994256
-
-  home_pos_backward:
-    x: 0
-    y: 200
-    z: 500
-  
-  home_pos_backward_joint_angles:
-    base: 1.5774677124633947
-    elbow: 4.882091918541256
-    shoulder: 1.7491862587994256
-
+    base: 1.569061559195169
+    elbow: 4.840069064552369
+    shoulder: 1.7510668398223674
   l1_params:
   - 0.78539816339
   - 1.57079632679

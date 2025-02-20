@@ -10,6 +10,7 @@ import Chessboard_detection.board_detection_hough as bdh
 import Chessboard_detection.projection as proj
 
 
+import Chessboard_detection.pi_debugging as debug
 
 class ChessVisionHough:
     def __init__(self, img):
@@ -112,8 +113,10 @@ class ChessVisionHough:
         upper_green = np.array([75, 255, 255])
 
         piece_label_ids = []
-        for square in squares:
+
+        for i, square in enumerate(squares):
             # Count red and green pixels
+                      
             red_mask = cv2.inRange(square, lower_red_1, upper_red_1)
             red_mask += cv2.inRange(square, lower_red_2, upper_red_2)
             green_mask = cv2.inRange(square, lower_green, upper_green)

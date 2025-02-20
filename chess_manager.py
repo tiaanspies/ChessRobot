@@ -34,6 +34,7 @@ import chess
 from Chessboard_detection.chess_vision_hough import ChessVisionHough
 from Positioning.robot_manager import Robot
 import logging
+import Chessboard_detection.pi_debugging as debug
 ### INITIALIZE ###
 
 # define global variables for tracking the running score
@@ -136,6 +137,8 @@ def play_again():
 def seeBoardReal(cam, board_vision:ChessVisionHough):
     """Uses CV to determine which squares are occupied, returns -1, 0, 1 representation"""
     s, img = cam.read()  # read in image from camera
+
+    debug.saveTempImg(img, "chessboard.jpg")
     positions = board_vision.indentify_piece_ids(img) # turn it into -1, 0, 1 representation
     
     visboard = np.fliplr(np.array(positions).reshape(8,8))
@@ -251,8 +254,8 @@ def perceiveHumanMove(previous_visboard, cam, board):
         return perceiveHumanMove(previous_visboard, cam, board)
     
     # if move was a promotion, find out which piece they chose
-    if chess.Move.from_uci(human_move + "q") in board.legal_moves:
-        human_move += input("Which piece did you promote the pawn to? [q,r,b,n]: ")
+    # if chess.Move.from_uci(human_move + "q") in board.legal_moves:
+    #     human_move += input("Which piece did you promote the pawn to? [q,r,b,n]: ")
     
     return new_visboard, human_move
 

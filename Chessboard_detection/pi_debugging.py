@@ -12,8 +12,7 @@ def saveTempImg(img, name):
     relPath = Path("TestImages","Temp")
     absPath = Path(dirPath, relPath,name)
     
-    img1 = cv.cvtColor(img, cv.COLOR_BGR2RGB)
-    cv.imwrite(str(absPath.resolve()), img1)
+    cv.imwrite(str(absPath.resolve()), img)
 
 def showImg(images, variables):
 
@@ -98,7 +97,7 @@ class imgDBManager:
             print("Error: Logfile image already exists in: "+str(imgPath.resolve()))
             return
 
-        img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+        # img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
         cv.imwrite(str(imgPath.resolve()), img)
         self.imgID += 1
 

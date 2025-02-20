@@ -84,8 +84,8 @@ class MotionPlanner():
         self.board_coords[2,:,:] = self.BOARD_HEIGHT + self.GRIP_HEIGHT
 
         # define and set x and y coords of board
-        self.file_coords = np.linspace(-3.5*self.SQUARE_WIDTH,3.5*self.SQUARE_WIDTH,8,endpoint=True)
-        self.rank_coords = np.linspace(7.5*self.SQUARE_WIDTH,0.5*self.SQUARE_WIDTH,8,endpoint=True) + self.BASE_DIST
+        self.file_coords = np.linspace(3.5*self.SQUARE_WIDTH,-3.5*self.SQUARE_WIDTH,8,endpoint=True)
+        self.rank_coords = np.linspace(0.5*self.SQUARE_WIDTH,7.5*self.SQUARE_WIDTH,8,endpoint=True) + self.BASE_DIST
         self.board_coords[:2,:,:] = np.array(np.meshgrid(self.file_coords,self.rank_coords))
     
         # define array for coords of captured pieces

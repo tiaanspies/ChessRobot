@@ -112,7 +112,7 @@ class RPiCamera:
 
         # Change statenum to -1 to use saved picture as first picture.
         # Change statenum to 1 to used camera for all pictures
-        logging.debug(
+        print(
             f"Creating camera object.\n"\
             f"\t loadSavedFirst: {loadSavedFirst}\n"\
             f"\t storeImgHist: {storeImgHist}\n"\
@@ -150,7 +150,6 @@ class RPiCamera:
         
         if self.stateNum <= 0:
             self.frame = cv.imread(os.path.join(self.path_full, "empty.jpg"))
-            self.frame = cv.cvtColor(self.frame, cv.COLOR_RGB2BGR)
 
             if self.frame is None:
                 print("Cannot read stored initialization file")
@@ -161,8 +160,9 @@ class RPiCamera:
             # Read Stream Method
             output = np.empty((self.cameraRes[1], self.cameraRes[0], 3), dtype=np.uint8)
             self.camera.capture(output, 'rgb', use_video_port=True)
-
+            
             self.frame = output.copy()
+            # self.frame = cv.cvtColor(self.frame, cv.COLOR_RGB2BGR)
 
         ret = self.frame is not None
 

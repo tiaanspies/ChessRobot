@@ -70,7 +70,7 @@ def find_target_position(position_name):
 
     # target pos offset is the position to move back and forth to.
     # Moving away and back is meant to help overcome static friction.
-    target_pos_compensated = target_position
+    target_pos_compensated = target_position.copy()
     target_pos_offset = target_pos_compensated - np.array([[0], [100], [100]])
 
     # move to offset position before actual to overcome static friction.
@@ -86,7 +86,7 @@ def find_target_position(position_name):
 
     print(f"Error: \n{error}; Error norm: {error_norm}")
     iter = 0
-    while error_norm > 3 and iter < 10:
+    while error_norm > 4 and iter < 20:
         # get position in RCS
         target_pos_compensated += error * 0.6
         iter += 1
@@ -96,13 +96,13 @@ def find_target_position(position_name):
         robot.move_to_single(target_pos_compensated, robot.motor_commands.GRIPPER_OPEN, apply_compensation=False)
 
         # measure new position
-        sleep(1)
+        sleep(2)
         rcs_control_pt_pos = robot.get_rcs_pos_aruco()
 
         error = target_position - rcs_control_pt_pos
         error_norm = np.linalg.norm(error)
 
-        print(f"Error: {error}; Error norm: {error_norm}")
+        print(f"Target_position: \n{target_pos_compensated}\n Position: \n{rcs_control_pt_pos}\nError: \n{error}\nError norm: \n{error_norm}")
 
     joint_angles = robot.motion_planner.inverse_kinematics(target_pos_compensated, apply_compensation=False)
     print("Target position found")
