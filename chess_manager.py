@@ -30,7 +30,8 @@ loop: when the human makes their turn (hits the timer)
 from stockfish import Stockfish
 import numpy as np
 import chess
-from Chessboard_detection import Chess_Vision_kmeans
+# from Chessboard_detection import Chess_Vision_kmeans
+from Chessboard_detection.chess_vision_hough import ChessVisionHough
 from Positioning.robot_manager import Robot
 import logging
 ### INITIALIZE ###
@@ -46,27 +47,21 @@ def setup_board_vision(cam):
     # Initialize ChessBoard object and select optimal thresh
     # Board must be empty when this is called
     while True:
-        ans = input("Is the empty board in view? (y/n): ").strip().lower()
+        ans = input("Is starting board setup in view? (y/n): ").strip().lower()
         if ans == 'y':
             _, img = cam.read()
 
-            return Chess_Vision_kmeans.ChessBoard(img)
+            return ChessVisionHough(img)
         else:
             print("Please put the empty board is in view.")
 
 
-def identifyColors(cam, board: Chess_Vision_kmeans.ChessBoard):
+def identifyColors(cam, board_vision: ChessVisionHough):
     """Runs k-means to set color centroids, then uses this to determine who's playing which color"""
-    # NB --- Board is setup in starting setup.
-    # Runs kmeans clustering to group piece and board colours
-    while True:
-        ans = input("Are all the pieces placed now? (y/n): ").strip().lower()
-        if ans== 'y':
-            _, img = cam.read()
-            HUMAN, ROBOT = board.initBoardWithStartPos(img)
-            return HUMAN, ROBOT
-        else:
-            print("Please set up the board.")
+    
+    # Assume the human is white for now
+
+    return chess.WHITE, chess.BLACK
         
 
 def whichColor():
@@ -138,12 +133,13 @@ def play_again():
         play_again()
 
 # functions for handling visboard (the -1, 0, 1 representation)
-def seeBoardReal(cam, board):
+def seeBoardReal(cam, board_vision:ChessVisionHough):
     """Uses CV to determine which squares are occupied, returns -1, 0, 1 representation"""
     s, img = cam.read()  # read in image from camera
-    positions = board.getCurrentPositions(img) # turn it into -1, 0, 1 representation
-    visboard = np.fliplr(positions)
-    # print(visboard)
+    positions = board_vision.indentify_piece_ids(img) # turn it into -1, 0, 1 representation
+    
+    visboard = np.fliplr(np.array(positions).reshape(8,8))
+    print(visboard)
     return visboard
 
 def seeBoardFiller(board):
@@ -251,6 +247,7 @@ def perceiveHumanMove(previous_visboard, cam, board):
     
     # if move was not successfully detected, start over
     if human_move is None:
+        print("Let's try that again")
         return perceiveHumanMove(previous_visboard, cam, board)
     
     # if move was a promotion, find out which piece they chose
@@ -407,15 +404,13 @@ def main():
     robot.move_home()
 
     # create an instance of the cam and board classes for converting input from the camera
-    board = setup_board_vision(robot.cam)
+    board_vision = setup_board_vision(robot.cam)
     
-    # determine who is playing which side and run k-means to set color centroids
     global HUMAN, ROBOT 
-    HUMAN, ROBOT = identifyColors(robot.cam, board)
+    HUMAN, ROBOT = identifyColors(robot.cam, board_vision)
 
     print(f"Robot: {ROBOT}, Human: {HUMAN}")
     print(f"White: {chess.WHITE}")
-    input("WOWOWOWOW lets wait here")
 
     if ROBOT == chess.WHITE: # if robot is playing white, have it go first
         print("Sweet! Since I am white, my turn first")
@@ -430,7 +425,7 @@ def main():
         
         ### HUMAN'S TURN ###
         # figure out what their move was
-        seen_visboard, human_move = perceiveHumanMove(current_visboard, cam, board)
+        seen_visboard, human_move = perceiveHumanMove(current_visboard, robot.cam, board_vision)
         
         # if move is illegal make human try again
         if chess.Move.from_uci(human_move) not in pyboard.legal_moves:
