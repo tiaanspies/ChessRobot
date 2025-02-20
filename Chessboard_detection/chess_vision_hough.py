@@ -105,18 +105,19 @@ class ChessVisionHough:
         """
 
         # Define HSV ranges for red and green colors
-        lower_red_1 = np.array([0, 90, 50])
-        upper_red_1 = np.array([25, 255, 255])
-        lower_red_2 = np.array([165, 90, 50])
+        lower_red_1 = np.array([0, 120, 90])
+        upper_red_1 = np.array([35, 255, 255])
+        lower_red_2 = np.array([165, 120, 90])
         upper_red_2 = np.array([180, 255, 255])
-        lower_green = np.array([35, 90, 50])
+        lower_green = np.array([40, 90, 50])
         upper_green = np.array([75, 255, 255])
 
         piece_label_ids = []
 
         for i, square in enumerate(squares):
             # Count red and green pixels
-                      
+            square_bgr = cv2.cvtColor(square, cv2.COLOR_HSV2BGR)
+            debug.saveTempImg(square_bgr, f"square_{i}.jpg")
             red_mask = cv2.inRange(square, lower_red_1, upper_red_1)
             red_mask += cv2.inRange(square, lower_red_2, upper_red_2)
             green_mask = cv2.inRange(square, lower_green, upper_green)
