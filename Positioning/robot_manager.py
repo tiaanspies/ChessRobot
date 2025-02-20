@@ -1,6 +1,6 @@
 from IK_Solvers.traditional import MotionPlanner
 from Positioning.motor_commands import MotorCommandsSerial
-from Chessboard_detection import Aruco, Chess_Vision
+from Chessboard_detection import Aruco, Chess_Vision_kmeans
 from Camera import Camera_Manager
 import yaml, os
 import numpy as np
