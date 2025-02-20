@@ -101,6 +101,6 @@ def process_image(img):
     squares = split_image_into_squares(cropped_image)
 
     # shrink the squares to remove the border
-    squares = crop_squared_by_border_width(squares, border_width=1)
+    squares = crop_squared_by_border_width(squares, border_width=2)
 
     return squares

@@ -30,7 +30,7 @@ loop: when the human makes their turn (hits the timer)
 from stockfish import Stockfish
 import numpy as np
 import chess
-from Chessboard_detection import Chess_Vision
+from Chessboard_detection import Chess_Vision_kmeans
 from Positioning.robot_manager import Robot
 import logging
 ### INITIALIZE ###
@@ -50,12 +50,12 @@ def setup_board_vision(cam):
         if ans == 'y':
             _, img = cam.read()
 
-            return Chess_Vision.ChessBoard(img)
+            return Chess_Vision_kmeans.ChessBoard(img)
         else:
             print("Please put the empty board is in view.")
 
 
-def identifyColors(cam, board: Chess_Vision.ChessBoard):
+def identifyColors(cam, board: Chess_Vision_kmeans.ChessBoard):
     """Runs k-means to set color centroids, then uses this to determine who's playing which color"""
     # NB --- Board is setup in starting setup.
     # Runs kmeans clustering to group piece and board colours
