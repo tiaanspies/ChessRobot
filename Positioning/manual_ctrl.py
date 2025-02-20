@@ -10,7 +10,9 @@ def manual_control_menu():
     print('Please select an option:')
     print('1. Point-to-point move')
     print('2. Move to home position')
-    print('3. Take Image')
+    print('3. Move to home position backward')
+    print('4. Move to home position forward')
+    print('5. Take Image')
 
     choice = input('Enter your choice: ')
 
@@ -19,12 +21,26 @@ def manual_control_menu():
     elif choice == '2':
         move_to_home()
     elif choice == '3':
+        move_to_home_backward()
+    elif choice == '4':
+        move_to_home_forward()
+    elif choice == '5':
         take_image()
 
 def move_to_home():
     robot = Positioning.robot_manager.Robot()
 
     robot.move_home()
+
+def move_to_home_backward():
+    robot = Positioning.robot_manager.Robot()
+
+    robot.move_home_backward()
+
+def move_to_home_forward():
+    robot = Positioning.robot_manager.Robot()
+
+    robot.move_home_forward()
 
 def take_image():
     robot = Positioning.robot_manager.Robot()
