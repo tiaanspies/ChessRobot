@@ -27,7 +27,7 @@ class Robot:
         # create camera object
         dir_path = os.path.dirname(os.path.realpath(__file__))
         abs_path = dir_path + "/Chessboard_detection/TestImages/Temp"
-        self.cam = Camera_Manager.RPiCamera(abs_path,loadSavedFirst=False, storeImgHist=False)
+        self.cam = Camera_Manager.RPiCamera(abs_path,loadSavedFirst=False, storeImgHist=True)
 
         if not self.cam.isOpened():
             raise("Cannot open camera.")
@@ -91,6 +91,28 @@ class Robot:
         base = self.config_kinematics["home_position_joint_angles"]["base"]
         shoulder = self.config_kinematics["home_position_joint_angles"]["shoulder"]
         elbow = self.config_kinematics["home_position_joint_angles"]["elbow"]
+        angles = np.array([base, shoulder, elbow]).reshape(3,1)
+
+        self.motor_commands.filter_go_to(angles, self.motor_commands.GRIPPER_OPEN)
+
+    def move_home_forward(self):
+        """
+        Move robot to forward home position.
+        """
+        base = self.config_kinematics["home_pos_forward_joint_angles"]["base"]
+        shoulder = self.config_kinematics["home_pos_forward_joint_angles"]["shoulder"]
+        elbow = self.config_kinematics["home_pos_forward_joint_angles"]["elbow"]
+        angles = np.array([base, shoulder, elbow]).reshape(3,1)
+
+        self.motor_commands.filter_go_to(angles, self.motor_commands.GRIPPER_OPEN)
+
+    def move_home_backward(self):
+        """
+        Move robot to backward home position.
+        """
+        base = self.config_kinematics["home_pos_backward_joint_angles"]["base"]
+        shoulder = self.config_kinematics["home_pos_backward_joint_angles"]["shoulder"]
+        elbow = self.config_kinematics["home_pos_backward_joint_angles"]["elbow"]
         angles = np.array([base, shoulder, elbow]).reshape(3,1)
 
         self.motor_commands.filter_go_to(angles, self.motor_commands.GRIPPER_OPEN)
