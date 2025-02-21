@@ -340,7 +340,7 @@ def shift_lines(lines, offset):
 
 def check_if_valid(lines):
     """
-    Fit a linear regression to the spacing between lines. Check if valid by checking the R^2 value.
+    Not valid if the range between the min and max is too large.
 
     Params:
     lines (numpy array): List of lines in the format [(rho, theta), (rho, theta)]
@@ -350,17 +350,11 @@ def check_if_valid(lines):
     
     """
     diffs = np.array([lines[i + 1][0] - lines[i][0] for i in range(6)])
-    x = np.arange(len(diffs))
-    m_x, b_x = np.polyfit(x, diffs, 1)
+    min_diff = np.min(diffs)
+    max_diff = np.max(diffs)
+    range_diff = max_diff - min_diff
 
-    # Calculate R^2 value
-    y_pred = m_x * x + b_x
-    y_mean = np.mean(diffs)
-    ss_res = np.sum((diffs - y_pred) ** 2)
-    ss_tot = np.sum((diffs - y_mean) ** 2)
-    r_squared = 1 - (ss_res / ss_tot)
-
-    return r_squared > 0.9
+    return range_diff < 20
 
 def find_board_corners(img):
     """
@@ -395,14 +389,15 @@ def find_board_corners(img):
 
     assert len(filtered_vertical_lines) == 7 and len(filtered_horizontal_lines) == 7 # Ensure we have 7 lines of each
     
-    vert_valid = check_if_valid(filtered_vertical_lines)
-    hor_valid = check_if_valid(filtered_horizontal_lines)
-
-    if not vert_valid or not hor_valid:
-        print("Lines are not valid!!!")
     # sort lines
     sorted_vertical_lines = sort_lines(filtered_vertical_lines)
     sorted_horizontal_lines = sort_lines(filtered_horizontal_lines)
+
+    vert_valid = check_if_valid(sorted_vertical_lines)
+    hor_valid = check_if_valid(sorted_horizontal_lines)
+
+    if not vert_valid or not hor_valid:
+        print("Lines are not valid!!!")
 
     # shift the lines by 2 pixels
     shifted_vertical_lines = shift_lines(sorted_vertical_lines, 1)
