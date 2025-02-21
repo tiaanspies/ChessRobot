@@ -212,7 +212,7 @@ def orthogonal_distance_3d(point, line_point1, line_point2):
     
     return np.abs(orthogonal_vec)
 
-def ransac_3d(x_pts, y_pts, z_pts, threshold_x=10, threshold_y=0.005, threshold_z=5):
+def ransac_3d(x_pts, y_pts, z_pts, threshold_x=10, threshold_y=0.005, threshold_z=2):
 
     inlier_best = 0
     inlier_mask = np.zeros(len(x_pts))
@@ -267,7 +267,9 @@ def discard_outliers(lines, distances, num_keep=7):
 
         # Check again if the number of inliers is 7
         # add the closest ones to the end pts
-        while np.sum(inlier_mask) < 7:
+        while np.sum(inlier_mask) < 7 and len(lines) >= 7:
+            inlier_indices = np.where(inlier_mask == 1)[0]
+
             first_inlier_idx = inlier_indices[0]
             last_inlier_idx = inlier_indices[-1]
 
@@ -285,6 +287,20 @@ def discard_outliers(lines, distances, num_keep=7):
                 inlier_mask[first_inlier_idx - 1] = 1
             else:
                 inlier_mask[last_inlier_idx + 1] = 1
+
+    while np.sum(inlier_mask) > 7:
+        inlier_indices = np.where(inlier_mask == 1)[0]
+
+        first_inlier_idx = inlier_indices[0]
+        last_inlier_idx = inlier_indices[-1]
+
+        bot_dist = abs(rhos[first_inlier_idx] - rhos[first_inlier_idx + 1])
+        top_dist = abs(rhos[last_inlier_idx] - rhos[last_inlier_idx - 1])
+
+        if bot_dist > top_dist:
+            inlier_mask[first_inlier_idx] = 0
+        else:
+            inlier_mask[last_inlier_idx] = 0
 
     # Filter lines based on inliers
     filtered_lines = [sorted_lines_with_distances[i][0] for i in range(len(lines)) if inlier_mask[i] == 1]
@@ -476,7 +492,12 @@ def find_board_corners(img):
     filtered_vertical_lines = discard_outliers(grouped_vertical_lines, vertical_distances)
     filtered_horizontal_lines = discard_outliers(grouped_horizontal_lines, horizontal_distances)
 
-    assert len(filtered_vertical_lines) == 7 and len(filtered_horizontal_lines) == 7 # Ensure we have 7 lines of each
+    try:
+        assert len(filtered_vertical_lines) == 7 and len(filtered_horizontal_lines) == 7
+    except AssertionError:
+        print(f"Length of filtered_vertical_lines: {len(filtered_vertical_lines)}")
+        print(f"Length of filtered_horizontal_lines: {len(filtered_horizontal_lines)}")
+        raise
     
     # sort lines
     sorted_vertical_lines = sort_lines(filtered_vertical_lines)
@@ -497,7 +518,7 @@ def find_board_corners(img):
     # expand points to 9x9 grid
     expanded_points = expand_board_pts(intersection_points, shifted_vertical_lines, shifted_horizontal_lines)
 
-    if True:
+    if False:
         draw_pipeline_plots(
             img, vertical_lines, horizontal_lines, grouped_vertical_lines, grouped_horizontal_lines,
             filtered_vertical_lines, filtered_horizontal_lines, intersection_points, expanded_points, edges,
@@ -581,8 +602,8 @@ def draw_pipeline_plots(img, vertical_lines, horizontal_lines, grouped_vertical_
     plt.show()
 
 def main():
-    # img_path = Path("C:\\Users\\spies\\OneDrive\\Documents\\scap\\invalid_board", "3.jpg")
-    img_path = Path("Chessboard_detection", "dataset", "images", "rg_1.jpg")
+    img_path = Path("C:\\Users\\spies\\OneDrive\\Documents\\scap\\invalid_board", "4.jpg")
+    # img_path = Path("Chessboard_detection", "dataset", "images", "rg_1.jpg")
     img_path_str = str(img_path)
     img = cv2.imread(img_path_str)
     
