@@ -216,7 +216,7 @@ def ransac_3d(x_pts, y_pts, z_pts, threshold_x=10, threshold_y=0.005, threshold_
 
     inlier_best = 0
     inlier_mask = np.zeros(len(x_pts))
-    for i in range(50):
+    for i in range(200):
         pt_1_idx = np.random.randint(0, len(x_pts))
         pt_2_idx = np.random.randint(0, len(x_pts))
         while pt_1_idx == pt_2_idx:
@@ -260,17 +260,34 @@ def discard_outliers(lines, distances, num_keep=7):
     # Check if the number of inliers is less than 7
     if np.sum(inlier_mask) < 7:
         inlier_indices = np.where(inlier_mask == 1)[0]
-        if len(inlier_indices) > 0:
+
+        first_inlier_idx = inlier_indices[0]
+        last_inlier_idx = inlier_indices[-1]
+        inlier_mask[first_inlier_idx:last_inlier_idx + 1] = 1
+
+        # Check again if the number of inliers is 7
+        # add the closest ones to the end pts
+        while np.sum(inlier_mask) < 7:
             first_inlier_idx = inlier_indices[0]
             last_inlier_idx = inlier_indices[-1]
-            inlier_mask[first_inlier_idx:last_inlier_idx + 1] = 1
 
-    # Check again if the number of inliers is 7
-    if np.sum(inlier_mask) < 7:
-        raise ValueError("Unable to find 7 inliers")
+            if first_inlier_idx == 0:
+                bot_dist = 100000000000
+            else:
+                bot_dist = abs(rhos[first_inlier_idx] - rhos[first_inlier_idx - 1])
+
+            if last_inlier_idx == len(rhos) - 1:
+                top_dist = 100000000000
+            else:
+                top_dist = abs(rhos[last_inlier_idx] - rhos[last_inlier_idx + 1])
+
+            if bot_dist < top_dist:
+                inlier_mask[first_inlier_idx - 1] = 1
+            else:
+                inlier_mask[last_inlier_idx + 1] = 1
 
     # Filter lines based on inliers
-    filtered_lines = [line for line, inlier in zip(lines, inlier_mask) if inlier]
+    filtered_lines = [sorted_lines_with_distances[i][0] for i in range(len(lines)) if inlier_mask[i] == 1]
 
     return filtered_lines
 
@@ -569,7 +586,8 @@ def draw_pipeline_plots(img, vertical_lines, horizontal_lines, grouped_vertical_
     plt.show()
 
 def main():
-    img_path = Path("C:\\Users\\spies\\OneDrive\\Documents\\scap\\invalid_board", "3.jpg")
+    # img_path = Path("C:\\Users\\spies\\OneDrive\\Documents\\scap\\invalid_board", "3.jpg")
+    img_path = Path("Chessboard_detection", "dataset", "images", "rg_1.jpg")
     img_path_str = str(img_path)
     img = cv2.imread(img_path_str)
     
