@@ -174,8 +174,8 @@ class ChessManager:
         _, img = cam.read()
         debug.saveTempImg(img, "chessboard.jpg")
         positions = self.board_vision.indentify_piece_ids(img) # turn it into -1, 0, 1 representation
-        new_visboard = np.fliplr(np.array(positions).reshape(8,8))
-    
+        # self.current_visboard = np.fliplr(np.array(positions).reshape(8,8))
+        self.current_visboard = np.array(positions).reshape(8,8)
         human_move = self.compare_visboards() # Compare boards to figure out what piece moved
         
         # if move was not successfully detected, start over
@@ -187,7 +187,6 @@ class ChessManager:
         if chess.Move.from_uci(human_move + "q") in self.pyboard.legal_moves:
             human_move += input("Which piece did you promote the pawn to? [q,r,b,n]: ")
         
-        self.current_visboard = new_visboard
         return human_move
     
     def compare_visboards(self):
