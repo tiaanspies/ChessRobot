@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 from pathlib import Path
 from matplotlib import pyplot as plt
+from sklearn.linear_model import RANSACRegressor
+from mpl_toolkits.mplot3d import Axes3D
 
 def detect_lines(img, threshold_angle=15):
     """
@@ -182,24 +184,94 @@ def find_closest_distances(lines):
         distances.append(min_distance)
     return distances
 
+def orthogonal_distance_3d(point, line_point1, line_point2):
+    """
+    Calculate the orthogonal distance between a 3D point and a line defined by two points in 3D space.
+    
+    Parameters:
+    point (tuple): The 3D point (x, y, z).
+    line_point1 (tuple): The first point defining the line (x1, y1, z1).
+    line_point2 (tuple): The second point defining the line (x2, y2, z2).
+    
+    Returns:
+    float: The orthogonal distance between the point and the line.
+    """
+    point = np.array(point)
+    line_point1 = np.array(line_point1)
+    line_point2 = np.array(line_point2)
+    
+    line_vec = line_point2 - line_point1
+    point_vec = point - line_point1
+    
+    line_vec_norm = line_vec / np.linalg.norm(line_vec)
+    projection_length = np.dot(point_vec, line_vec_norm)
+    projection_vec = projection_length * line_vec_norm
+    
+    orthogonal_vec = point_vec - projection_vec
+    distance = np.linalg.norm(orthogonal_vec)
+    
+    return np.abs(orthogonal_vec)
+
+def ransac_3d(x_pts, y_pts, z_pts, threshold_x=10, threshold_y=0.005, threshold_z=5):
+
+    inlier_best = 0
+    inlier_mask = np.zeros(len(x_pts))
+    for i in range(50):
+        pt_1_idx = np.random.randint(0, len(x_pts))
+        pt_2_idx = np.random.randint(0, len(x_pts))
+        while pt_1_idx == pt_2_idx:
+            pt_2_idx = np.random.randint(0, len(x_pts))
+
+        pt_1 = (x_pts[pt_1_idx], y_pts[pt_1_idx], z_pts[pt_1_idx])
+        pt_2 = (x_pts[pt_2_idx], y_pts[pt_2_idx], z_pts[pt_2_idx])
+
+        current_inliers = 0
+        current_inlier_mask = np.zeros(len(x_pts))
+        for j in range(len(x_pts)):
+            # if j == pt_1_idx or j == pt_2_idx:
+            #     continue
+            x_dist, y_dist, z_dist = orthogonal_distance_3d((x_pts[j], y_pts[j], z_pts[j]), pt_1, pt_2)
+
+            if x_dist < threshold_x and y_dist < threshold_y and z_dist < threshold_z:
+                current_inliers += 1
+                current_inlier_mask[j] = 1
+
+        if current_inliers > inlier_best:
+            inlier_best = current_inliers
+            inlier_mask = current_inlier_mask
+
+    return inlier_mask
+
 def discard_outliers(lines, distances, num_keep=7):
     
     # Combine lines and distances into a list of tuples
     lines_with_distances = list(zip(lines, distances))
 
     # Sort the lines by their corresponding distances
-    sorted_lines_with_distances = sorted(lines_with_distances, key=lambda x: x[1])
+    sorted_lines_with_distances = sorted(lines_with_distances, key=lambda x: x[0][0])
+    # Extract rho, theta, and distance values
+    rhos = np.array([line[0][0] for line in sorted_lines_with_distances])
+    thetas =  np.array([line[0][1] for line in sorted_lines_with_distances])
+    distances =  np.array([line[1] for line in sorted_lines_with_distances])
 
-    min_spread = float('inf')
-    min_spread_idx = 0
-    for i in range(len(lines) - num_keep + 1):
-        spread = sorted_lines_with_distances[i+num_keep-1][1] - sorted_lines_with_distances[i][1]
-        if spread < min_spread:
-            min_spread = spread
-            min_spread_idx = i
+    # Apply RANSAC to find inliers and outliers
+    inlier_mask = ransac_3d(rhos, thetas, distances)
 
-    filtered_lines = [line for line, _ in sorted_lines_with_distances[min_spread_idx:min_spread_idx+num_keep]]
-    
+    # Check if the number of inliers is less than 7
+    if np.sum(inlier_mask) < 7:
+        inlier_indices = np.where(inlier_mask == 1)[0]
+        if len(inlier_indices) > 0:
+            first_inlier_idx = inlier_indices[0]
+            last_inlier_idx = inlier_indices[-1]
+            inlier_mask[first_inlier_idx:last_inlier_idx + 1] = 1
+
+    # Check again if the number of inliers is 7
+    if np.sum(inlier_mask) < 7:
+        raise ValueError("Unable to find 7 inliers")
+
+    # Filter lines based on inliers
+    filtered_lines = [line for line, inlier in zip(lines, inlier_mask) if inlier]
+
     return filtered_lines
 
 def find_all_intersections(lines_vertical, lines_horizontal):
@@ -413,7 +485,7 @@ def find_board_corners(img):
     # expand points to 9x9 grid
     expanded_points = expand_board_pts(intersection_points, shifted_vertical_lines, shifted_horizontal_lines)
 
-    if False:
+    if True:
         draw_pipeline_plots(
             img, vertical_lines, horizontal_lines, grouped_vertical_lines, grouped_horizontal_lines,
             filtered_vertical_lines, filtered_horizontal_lines, intersection_points, expanded_points, edges,
@@ -497,10 +569,10 @@ def draw_pipeline_plots(img, vertical_lines, horizontal_lines, grouped_vertical_
     plt.show()
 
 def main():
-    img_path = Path("Chessboard_detection", "TestImages", "Temp", "1.jpg")
+    img_path = Path("C:\\Users\\spies\\OneDrive\\Documents\\scap\\invalid_board", "3.jpg")
     img_path_str = str(img_path)
-    img = cv2.imread(img_path_str, cv2.IMREAD_GRAYSCALE)
-
+    img = cv2.imread(img_path_str)
+    
     find_board_corners(img)
 
 if __name__ == "__main__":
