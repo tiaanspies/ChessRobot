@@ -37,7 +37,7 @@ gripper:
   reverse: false
   servo_id: -1
   pickup_force: 40
-  angle_medium_open: 35
+  angle_medium_open: 40
 shoulder:
   angle_180: 180
   angle_max_overtravel: 212

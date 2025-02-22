@@ -7,7 +7,7 @@ IK_CONFIG:
     y: 2
     z: 57
   chess_square_width: 40
-  grip_height: 130
+  grip_height: 125
   home_pos_backward:
     x: 0
     y: 200
@@ -26,12 +26,12 @@ IK_CONFIG:
     shoulder: 1.6314183152348964
   home_position:
     x: 0
-    y: 240
+    y: 280
     z: 500
   home_position_joint_angles:
-    base: 1.569061559195169
-    elbow: 4.840069064552369
-    shoulder: 1.7510668398223674
+    base: 1.5738002358179315
+    elbow: 4.945639877142793
+    shoulder: 1.6314183152348964
   l1_params:
   - 0.78539816339
   - 1.57079632679
