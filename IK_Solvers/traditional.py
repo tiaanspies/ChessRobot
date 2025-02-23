@@ -223,30 +223,46 @@ class MotionPlanner():
         return path
 
     def draw_cube(self, v, slice_num):
-        top_left = np.array([v["left"],v["close"],v["top"]]).reshape(3, 1)
-        bottom_left = np.array([v["left"],v["close"],v["bottom"]]).reshape(3, 1)
-        top_right = np.array([v["right"],v["close"],v["top"]]).reshape(3, 1)
-        bottom_right = np.array([v["right"],v["close"],v["bottom"]]).reshape(3, 1)
-        step = 10
-        path = self.quintic_line(self.HOME, top_left, step)
-        
-        slice_width = (v["far"] - v["close"]) / slice_num
-        slice_step = np.array([[0.0], [slice_width],[0.0]], dtype=int)
+        #NUM LAYERS MUST BE EVEN
+        NUM_LAYERS = 8
 
-        for i in range(slice_num):
-            path = np.hstack((path, 
-                            self.quintic_line(top_left, bottom_right, step), 
-                            self.quintic_line(bottom_right, bottom_left, step), 
-                            self.quintic_line(bottom_left, top_right, step), 
-                            self.quintic_line(top_right, top_left, step)))
-            if i < (slice_num)-1: # - 1):
-                path = np.hstack((path, self.quintic_line(top_left, top_left + slice_step, step)))
-                top_left += slice_step
-                top_right += slice_step
-                bottom_left += slice_step
-                bottom_right += slice_step
+        #NUM ROWS MUST BE EVEN
+        NUM_ROWS = 10
+        path = np.zeros((3, 0))
+        layers = np.linspace(v["top"], v["bottom"], NUM_LAYERS, endpoint=True)
+
+        for j in range(0, NUM_LAYERS, 2):
+            layer_zig_zag = np.zeros((3, 0))
+            rows = np.linspace(v["close"], v["far"], NUM_ROWS, endpoint=True)
+
+            for i in range(0, NUM_ROWS, 2):
+                start_dir_right = np.array([v["left"], rows[i], layers[j]]).reshape(3, 1)
+                end_dir_right = np.array([v["right"], rows[i], layers[j]]).reshape(3, 1)
+
+                start_dir_left = np.array([v["right"], rows[i+1], layers[j]]).reshape(3, 1)
+                end_dir_left = np.array([v["left"], rows[i+1], layers[j]]).reshape(3, 1)
+
+                layer_zig_zag = np.hstack([layer_zig_zag, 
+                    self.line(start_dir_right, end_dir_right, 20),
+                    self.line(end_dir_right, start_dir_left, 20),
+                    self.line(start_dir_left, end_dir_left, 20),
+                ])
+
+            rows = np.linspace(v["far"], v["close"], NUM_ROWS, endpoint=True)
+            for i in range(0, NUM_ROWS, 2):
+                start_dir_right = np.array([v["left"], rows[i], layers[j+1]]).reshape(3, 1)
+                end_dir_right = np.array([v["right"], rows[i], layers[j+1]]).reshape(3, 1)
+
+                start_dir_left = np.array([v["right"], rows[i+1], layers[j+1]]).reshape(3, 1)
+                end_dir_left = np.array([v["left"], rows[i+1], layers[j+1]]).reshape(3, 1)
+
+                layer_zig_zag = np.hstack([layer_zig_zag, 
+                    self.line(start_dir_right, end_dir_right, 20),
+                    self.line(end_dir_right, start_dir_left, 20),
+                    self.line(start_dir_left, end_dir_left, 20),
+                ])         
             
-        path = np.hstack((path, self.quintic_line(top_left, self.HOME, step)))  
+            path = np.hstack([path, layer_zig_zag])
 
         return path
 
@@ -348,11 +364,12 @@ class MotionPlanner():
         """Creates a 3xN nparray of 3D waypoints roughly 'step' distance apart between two 3D points"""
         dist = np.linalg.norm(goal - start)
         n_steps = int(dist // step)
-        x_points = np.linspace(start[0], goal[0], n_steps, endpoint=False)
-        y_points = np.linspace(start[1], goal[1], n_steps, endpoint=False)
-        z_points = np.linspace(start[2], goal[2], n_steps, endpoint=False)
+        x_points = np.linspace(start[0], goal[0], n_steps, endpoint=True).T
+        y_points = np.linspace(start[1], goal[1], n_steps, endpoint=True).T
+        z_points = np.linspace(start[2], goal[2], n_steps, endpoint=True).T
         
-        return np.vstack((x_points, y_points, z_points))
+        line = np.vstack((x_points, y_points, z_points))
+        return line
 
     def control_pt_to_camera_pos(self, control_pt_coords: np.ndarray):
         """Gets the position of the camera when given the control pt position"""

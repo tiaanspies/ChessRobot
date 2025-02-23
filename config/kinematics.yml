@@ -54,7 +54,7 @@ IK_CONFIG:
   - 0
   lift: 120
   position_compensation_matrices:
-  - 20250202_163054_H_matrix.csv
+  - 20250222_163849_H_matrix.csv
   rcs_to_ccs_offset:
     x: 215
     y: -60
