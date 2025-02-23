@@ -216,29 +216,30 @@ def ransac_3d(x_pts, y_pts, z_pts, threshold_x=10, threshold_y=0.005, threshold_
 
     inlier_best = 0
     inlier_mask = np.zeros(len(x_pts))
-    for i in range(200):
-        pt_1_idx = np.random.randint(0, len(x_pts))
-        pt_2_idx = np.random.randint(0, len(x_pts))
-        while pt_1_idx == pt_2_idx:
-            pt_2_idx = np.random.randint(0, len(x_pts))
+    for x in range(len(x_pts)):
+        for y in range(x + 1, len(x_pts)):
+            pt_1_idx = x
+            pt_2_idx = y
+            while pt_1_idx == pt_2_idx:
+                pt_2_idx = np.random.randint(0, len(x_pts))
 
-        pt_1 = (x_pts[pt_1_idx], y_pts[pt_1_idx], z_pts[pt_1_idx])
-        pt_2 = (x_pts[pt_2_idx], y_pts[pt_2_idx], z_pts[pt_2_idx])
+            pt_1 = (x_pts[pt_1_idx], y_pts[pt_1_idx], z_pts[pt_1_idx])
+            pt_2 = (x_pts[pt_2_idx], y_pts[pt_2_idx], z_pts[pt_2_idx])
 
-        current_inliers = 0
-        current_inlier_mask = np.zeros(len(x_pts))
-        for j in range(len(x_pts)):
-            # if j == pt_1_idx or j == pt_2_idx:
-            #     continue
-            x_dist, y_dist, z_dist = orthogonal_distance_3d((x_pts[j], y_pts[j], z_pts[j]), pt_1, pt_2)
+            current_inliers = 0
+            current_inlier_mask = np.zeros(len(x_pts))
+            for j in range(len(x_pts)):
+                # if j == pt_1_idx or j == pt_2_idx:
+                #     continue
+                x_dist, y_dist, z_dist = orthogonal_distance_3d((x_pts[j], y_pts[j], z_pts[j]), pt_1, pt_2)
 
-            if x_dist < threshold_x and y_dist < threshold_y and z_dist < threshold_z:
-                current_inliers += 1
-                current_inlier_mask[j] = 1
+                if x_dist < threshold_x and y_dist < threshold_y and z_dist < threshold_z:
+                    current_inliers += 1
+                    current_inlier_mask[j] = 1
 
-        if current_inliers > inlier_best:
-            inlier_best = current_inliers
-            inlier_mask = current_inlier_mask
+            if current_inliers > inlier_best:
+                inlier_best = current_inliers
+                inlier_mask = current_inlier_mask
 
     return inlier_mask
 
@@ -518,7 +519,7 @@ def find_board_corners(img):
     # expand points to 9x9 grid
     expanded_points = expand_board_pts(intersection_points, shifted_vertical_lines, shifted_horizontal_lines)
 
-    if False:
+    if True:
         draw_pipeline_plots(
             img, vertical_lines, horizontal_lines, grouped_vertical_lines, grouped_horizontal_lines,
             filtered_vertical_lines, filtered_horizontal_lines, intersection_points, expanded_points, edges,
@@ -602,7 +603,7 @@ def draw_pipeline_plots(img, vertical_lines, horizontal_lines, grouped_vertical_
     plt.show()
 
 def main():
-    img_path = Path("C:\\Users\\spies\\OneDrive\\Documents\\scap\\invalid_board", "4.jpg")
+    img_path = Path("C:\\Users\\spies\\OneDrive\\Documents\\scap\\invalid_board", "8.jpg")
     # img_path = Path("Chessboard_detection", "dataset", "images", "rg_1.jpg")
     img_path_str = str(img_path)
     img = cv2.imread(img_path_str)
