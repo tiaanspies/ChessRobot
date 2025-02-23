@@ -50,12 +50,12 @@ def take_image():
 
 def pt2pt_move():
     # importing here to prevent camera being init in chess_manager class
-    import chess_manager as chess_man
+    robot = Positioning.robot_manager.Robot()
     print("Enter start and end positions of the piece you want to move. e.g. a1e5")
 
     pos = input('Enter positions: ')
 
-    chess_man.robotsPhysicalMove(pos, None)
+    robot.execute_chess_move(pos, None)
 
 def main():
     log_level = sys.argv[1] if len(sys.argv) > 1 else "Debug"

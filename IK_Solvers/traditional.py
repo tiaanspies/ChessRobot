@@ -94,6 +94,9 @@ class MotionPlanner():
             np.linspace(self.BASE_DIST,self.BOARD_WIDTH,15,endpoint=True),
             np.ones(15)*self.GRIP_HEIGHT)
         ).T)
+        
+        #each coordinate has to be 3,1
+        self.storage_coords = [coord.reshape(3,1) for coord in self.storage_coords]
 
     def initialize_arm(self, param_list=None):
         """initialize inthetasstance of NLinkArm with Denavit-Hartenberg parameters of chess arm"""
@@ -142,8 +145,6 @@ class MotionPlanner():
         lift_vector_storage = np.array([[0], [0], [self.LIFT + self.BOARD_HEIGHT]])
         if cap_sq is not None:
             storage = np.array(self.storage_coords.pop(0))
-            print(f"Storage: {storage}")
-            input("is storage OK?")
             move1 = self.quintic_line(self.HOME, cap_sq+lift_vector, step)
             # Gripper medium open
             move2 = self.quintic_line(cap_sq+lift_vector, cap_sq, step/2)
@@ -176,11 +177,15 @@ class MotionPlanner():
 
         else:
             move1 = self.quintic_line(self.HOME, start+lift_vector, step)
+            #gripper medium open
             move2 = self.quintic_line(start+lift_vector, start, step)
 
             first_moves = np.hstack((move1, move2))
 
+            gripper_medium = np.size(move1, 1)
+
             gripper_commands_move1 = np.zeros((1, np.size(move1, 1) + np.size(move2, 1)))
+            gripper_commands_move1[0, gripper_medium] = 2
         
         #Close Gripper
         move1 = self.quintic_line(start, start+lift_vector, step/2)
