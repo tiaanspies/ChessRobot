@@ -69,6 +69,14 @@ class Robot:
         gripper_state: defined in motor commands
         apply_compensation (bool): whether to apply position compensation
         """
+        theta = np.tan(pos_xyz[0, 0]/pos_xyz[1,0])
+
+        grip_y_comp = 22 * np.sin(theta)
+        grip_x_comp = 22 * np.sin(theta)
+
+        pos_xyz[0,0] += grip_x_comp
+        pos_xyz[1,0] += grip_y_comp
+
         thetas = self.motion_planner.inverse_kinematics(pos_xyz, apply_compensation)
         self.motor_commands.filter_go_to(thetas, np.array([gripper_state]))
 
@@ -81,6 +89,14 @@ class Robot:
         gripper_commands: defined in motor commands
         apply_compensation (bool): whether to apply position compensation
         """
+        theta = np.tan(path_xyz[0, :]/path_xyz[1, :])
+
+        grip_y_comp = 22 * np.sin(theta)
+        grip_x_comp = 14 * np.sign(theta)*(1-np.cos(theta))
+
+        path_xyz[0,:] += grip_x_comp
+        path_xyz[1,:] += grip_y_comp
+
         joint_angles = self.motion_planner.inverse_kinematics(path_xyz, apply_compensation) # convert waypoints to joint angles
         self.motor_commands.filter_run(joint_angles, gripper_commands)
     
