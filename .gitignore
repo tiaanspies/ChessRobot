@@ -1,6 +1,6 @@
 *.pyc
 __pycache__
 .vscode
-Chessboard_detection/TestImages/Temp/*
+Chessboard_detection/TestImages/*
 *.log
 scrap.py
