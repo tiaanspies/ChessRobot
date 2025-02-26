@@ -23,6 +23,8 @@ class MotorCommandsSerial:
         except NameError as e:
             logging.error(f"error creating MotorCommands Object in __init__ in motor_commands.py: {e}")
 
+        self.slow_first_move = True
+
         self.OPEN = np.pi/4 # TODO: replace this with the angle needed for it to be open (in radians)
         self.CLOSED = 3*np.pi/4 # TODO: replace this with the angle needed for it to be closed (in radians)
 
@@ -52,7 +54,10 @@ class MotorCommandsSerial:
             'elbow': angle[2]
         }
 
-        self.motor.move_to_multi_angle_pos(5000, pos_dict)
+        if self.slow_first_move:
+            self.motor.move_to_multi_angle_pos(5000, pos_dict)
+        else:
+            self.motor.move_to_multi_angle_pos(500, pos_dict)
 
     def run(self, thetas, angletype='rad'):
         """runs the full set of theta commands"""
