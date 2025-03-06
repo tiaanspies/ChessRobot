@@ -72,7 +72,7 @@ class Robot:
         theta = np.tan(pos_xyz[0, 0]/pos_xyz[1,0])
 
         grip_y_comp = 22 * np.sin(theta)
-        grip_x_comp = 22 * np.sin(theta)
+        grip_x_comp = 14 * np.sin(theta)
 
         pos_xyz[0,0] += grip_x_comp
         pos_xyz[1,0] += grip_y_comp
