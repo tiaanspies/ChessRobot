@@ -264,11 +264,11 @@ def generate_ideal_pattern():
 
     robot = robot_manager.Robot()
     vertices = {
-        "top" : 260,
-        "bottom" : 180,
-        "right" : 160,
-        "left" : -160,
-        "close" : 150,
+        "top" : 230,
+        "bottom" : 130,
+        "right" : 170,
+        "left" : -170,
+        "close" : 130,
         "far" : 420
     }
 
@@ -387,7 +387,7 @@ def generate_transformed_pattern():
 
     # solve inverse kinematics
     logging.info("solving inverse kinematics...")
-    thetas = robot.motion_planner.inverse_kinematics(compensated_points, True) # convert waypoints to joint angles
+    thetas = robot.motion_planner.inverse_kinematics(compensated_points, False) # convert waypoints to joint angles
     joint_angles, exceeds_lim = robot.motor_commands.sort_commands(thetas, None)
 
     logging.info("Correcting joint angles")
