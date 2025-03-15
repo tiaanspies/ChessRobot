@@ -1,10 +1,7 @@
 import cv2 as cv
-from pathlib import Path
 from time import sleep
 from Chessboard_detection import board_detection_hough as bdh
 import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.linear_model import LogisticRegression
 
 """
 Manages image projection and perspective transformations so that the chessboard pattern standardized in the image.

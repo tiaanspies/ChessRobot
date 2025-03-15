@@ -31,8 +31,10 @@ class ChessVisionHough:
         self.model_piece_vs_empty = self.get_piece_vs_empty_model(blurred_hsv_squares)
 
         if self.piece_detection_algo == "kmeans":
-            cropped_image = proj.process_image_single_board(img)
-            self.kmeans = kmeans.ChessBoardClassifier(cropped_image)
+            # preprocess the squares (apply Gaussian blur and convert to HSV)
+            blurred_hsv_squares = np.array([preprocess_square(square) for square in squares])
+
+            self.kmeans = kmeans.ChessBoardClassifier(blurred_hsv_squares)
 
     def get_piece_vs_empty_model(self, squares):
         """

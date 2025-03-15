@@ -58,7 +58,7 @@ def gkern(kernlen=21, std=3):
     return gkern2d
 
 class ChessBoardClassifier:
-    def __init__(self, img) -> None:
+    def __init__(self, blurred_hsv_squares) -> None:
         """
         Initializes board object and finds position of empty board
         """
@@ -75,7 +75,7 @@ class ChessBoardClassifier:
         self.whiteID = None
         self.blackID = None
 
-        self.initBoardWithStartPos(img)
+        self.initBoardWithStartPos(blurred_hsv_squares)
 
     def findClusterImg(self, img):
         """
@@ -110,74 +110,42 @@ class ChessBoardClassifier:
 
         return predictions
     
-    def initBoardWithStartPos(self, img):
-        self.fitKClusters(img, weighted=True)
+    def initBoardWithStartPos(self, blurred_hsv_squares):
+        self.fitKClusters(blurred_hsv_squares, weighted=True)
 
-        positions = self.getCurrentPositions(img)
+        positions = self.getCurrentPositions(blurred_hsv_squares)
 
-        meanBottom = np.round(np.mean(positions[-2:, :], axis=(0, 1)))
-        meanTop = np.round(np.mean(positions[:2, :]))
-
-        if meanTop == -1:
-            self.flipBoard = True
-
-        # Check if starting position is valid with all pieces on starting squares
-        topCorrect = (positions.flatten()[:16] == meanTop).all()
-        middleCorrect = (positions.flatten()[16:48] == 0).all()
-        bottomCorrect = (positions.flatten()[48:] == -1*meanTop).all()
-        if not topCorrect or not middleCorrect or not bottomCorrect:
-            raise("starting position is incorrect")
-
-        humanColor = meanTop
-        robotColor = meanBottom
-
-        return humanColor, robotColor
+        return positions
 
 
-
-    def fitKClusters(self, img, weighted=False):
+    def fitKClusters(self, blurred_hsv_squares:np.ndarray, weighted=False):
         """
         Fit 4 k-means clusters to the image. Use HSV color scale
         Weighting can be used if pieces are on starting squares.
         To increase the weight of pieces.
         """
-
-        # Mask image by turning all pixels outside of board black
-        maskedImage = self.maskImage(img)
-        maskedImageHSV = cv.cvtColor(maskedImage, cv.COLOR_RGB2HSV)
-
-        # Get a block for each square and resize it to 32x32,
-        # then stack back together for 256x256 image
-        blocks = self.splitBoardIntoSquares(maskedImageHSV)
-        resizedImg = np.reshape(blocks, (8, 8, 32, 32, 3))
-        resizedImg = np.hstack(resizedImg)
-        resizedImg = np.hstack(resizedImg)
-
-        blur = cv.medianBlur(resizedImg, 7)
-        
         # reshape image into a single line for k means fitting
         self.kmeans = KMeans(n_clusters=4, init='k-means++', n_init=1)
-        imgReshaped = np.reshape(blur, (blur.shape[0]*blur.shape[1], 3))
+        n, h, w, c = blurred_hsv_squares.shape
+        imgReshaped = np.reshape(blurred_hsv_squares, (n * h * w, c))
 
         # if weighed is true apply a gaussian weight to each block.
         # add priority to blocks with peices on (starting squares)
         if weighted:
-            kern = gkern(int(np.shape(blocks[0])[0]), self.KERN_STD)
-            kernArr = np.tile(kern, (8, 8))
-            kernArr[:2*32, :8*32] *= 2
-            kernArr[-2*32:, -8*32:] *= 2
+            kern = gkern(h, self.KERN_STD)
+            kernArr = np.tile(kern, (n))
         
-            kernReshaped = np.reshape(kernArr, (blur.shape[0]*blur.shape[1]))
+            kernReshaped = kernArr.flatten()
             self.kmeans.fit(imgReshaped, sample_weight=kernReshaped)
         else:
             self.kmeans.fit(imgReshaped)       
         
+        img = self.findClusterImg(blurred_hsv_squares.reshape(n*h, w, c))
+        debug.saveTempImg(cv.cvtColor(img, cv.COLOR_HSV2BGR), "cluster.jpg")
         #Assign cluster id to all pixels on blocks
         # find what cluster id is black or white
-        blockClusterID = self.findBlockClusters(blocks)
-        self.findPieceID(blockClusterID)
-
-        return None
+        blockClusterID = self.findBlockClusters(blurred_hsv_squares)
+        self.setBlackWhiteIDs(blockClusterID)
 
 
     def findGrayBlur(self, img, blurSize):
@@ -237,10 +205,10 @@ class ChessBoardClassifier:
         given a square, detect which cluster is likely present in the center.
         """
 
-        blocksize = blocks.shape[0] # assuming pieces are square
-        kern = gkern(kernlen=int(blocksize/2), std=self.KERN_STD)
+        n, h, w = blocks.shape # assuming pieces are square
+        kern = gkern(kernlen=h, std=self.KERN_STD)
         
-        pieces = np.zeros((np.shape(blocks)[0]), dtype=np.int8)
+        pieces = np.zeros((n), dtype=np.int8)
 
         for id, block in enumerate(blocks):
             pieceID = self.detectPiece(block, kern)
@@ -253,7 +221,7 @@ class ChessBoardClassifier:
 
         return pieces
 
-    def findPieceID(self, blocks):
+    def setBlackWhiteIDs(self, blocks):
         """
         Assign find which cluster the black and white pieces
         belong to.
@@ -261,7 +229,9 @@ class ChessBoardClassifier:
         topPieces = np.zeros((self.BOARD_SIZE_INT[0]+1)*2)
         bottomPieces = np.zeros((self.BOARD_SIZE_INT[0]+1)*2)
 
-        kern = gkern(kernlen=int(np.shape(blocks)[0]/2), std=self.KERN_STD)
+        n, h, w = blocks.shape
+
+        kern = gkern(kernlen=h, std=self.KERN_STD)
 
         for id, block in enumerate(blocks[0:16]):
             topPieces[id] = self.detectPiece(block, kern)
@@ -272,17 +242,24 @@ class ChessBoardClassifier:
         topPieceMax = (Counter(topPieces).most_common(1))[0][0]
         bottomPieceMax = (Counter(bottomPieces).most_common(1))[0][0]
 
-        img = np.zeros(shape=(1,2,3))
-        img[0, 0] = np.array(self.kmeans.cluster_centers_[int(topPieceMax)])
-        img[0, 1] = np.array(self.kmeans.cluster_centers_[int(bottomPieceMax)])
+        # img = np.zeros(shape=(1,2,3))
+        # img[0, 0] = np.array(self.kmeans.cluster_centers_[int(topPieceMax)])
+        # img[0, 1] = np.array(self.kmeans.cluster_centers_[int(bottomPieceMax)])
 
-        imgGray = cv.cvtColor(img.astype(np.uint8), cv.COLOR_BGR2GRAY)
-        if imgGray[0, 0] > imgGray[0, 1]:
-            self.whiteID = int(topPieceMax)
-            self.blackID = int(bottomPieceMax)
-        else:
-            self.whiteID = int(bottomPieceMax)
-            self.blackID = int(topPieceMax)
+        # imgGray = cv.cvtColor(img.astype(np.uint8), cv.COLOR_BGR2GRAY)
+        # if imgGray[0, 0] > imgGray[0, 1]:
+        #     self.whiteID = int(topPieceMax)
+        #     self.blackID = int(bottomPieceMax)
+        # else:
+        #     self.whiteID = int(bottomPieceMax)
+        #     self.blackID = int(topPieceMax)
+
+        # TODO: add decting color functionality. 
+        # TODO: for now assuming white is at the bottom and black is at the top
+
+        self.whiteID = int(bottomPieceMax)
+        self.blackID = int(topPieceMax)
+        
  
 def showImg(img):
     # while cv.waitKey(1) != ord('q'):
