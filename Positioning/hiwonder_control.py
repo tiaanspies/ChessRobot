@@ -5,6 +5,7 @@ import yaml
 # COMMANDS supported by dev board.
 COMMAND_MOVE_MULTI = 3
 COMMAND_READ_POS_MULTI = 21
+COMMAND_READ_VOLTAGE = 15
 
 class SerialServoCtrl:
     def __init__(self, config_file="config/servo_config.yml"):
@@ -132,6 +133,30 @@ class SerialServoCtrl:
             index += 3
         
         return positions
+    
+    def read_voltage(self):
+        """
+        Input: Array of servo motor positions to read.
+        Output: Dict of servo positions of the servos (integers 0-1000)
+        """
+        parameters = []
+    
+        self.send_command(self.serial_con, COMMAND_READ_VOLTAGE, parameters)
+
+        # 5 + x*3 bytes are returned, where x is the number of servos
+        response = self.serial_con.read(5)
+
+        if len(response) < 5:
+            print(f"Invalid response received from servo master: {response}")
+            return None  # Invalid response
+
+        if response[0] != 0x55 or response[1] != 0x55:
+            print(f"Invalid header received from servo master: {response[0:2]}")
+            return None  # Invalid header
+
+
+        
+        return voltage
     
     def interpolate_serial(self, serial_pos, limit_dict):
         """
