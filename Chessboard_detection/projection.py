@@ -82,7 +82,24 @@ def crop_squared_by_border_width(squares, border_width=2):
         cropped_squares.append(cropped_square)
     return cropped_squares
 
-def process_image(img):
+def process_image_single_board(img):
+    """
+    Pipeline to find chessboard, split into squares and crop away the border.
+
+    Parameters:
+    img: Image of the chessboard pattern.
+
+    Returns:
+    cropped_image: Image of the chessboard pattern cropped to only contain the board.
+    """
+
+    corners = bdh.find_board_corners(img)
+    # find offsets to overlay img 1 and 2 perfectly
+    cropped_image = project_board_2_square(img, corners) 
+
+    return cropped_image
+
+def process_image_multiple_squares(img):
     """
     Pipeline to find chessboard, split into squares and crop away the border.
 

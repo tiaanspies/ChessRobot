@@ -6,16 +6,23 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.cluster import MeanShift, estimate_bandwidth
 from sklearn.mixture import GaussianMixture
 
-import Chessboard_detection.board_detection_hough as bdh
 import Chessboard_detection.projection as proj
-
-
 import Chessboard_detection.pi_debugging as debug
+import Chessboard_detection.Chess_Vision_kmeans as kmeans
 
 class ChessVisionHough:
-    def __init__(self, img):
+    def __init__(self, img, piece_detection_algo):
+        """
+        Sets up the ChessVisionHough object with the image and the piece detection algorithm.
+
+        Parameters:
+        img: 3D numpy array of the image.
+        piece_detection_algo: string of the piece detection algorithm to use. ["standard", "red_green", "kmeans"]
+        """
         # Process image into individual squares snippets (Array of 64 squares each 2D numpy array with 3 BGR channels)
-        squares = proj.process_image(img)
+        self.piece_detection_algo = piece_detection_algo
+
+        squares = proj.process_image_multiple_squares(img)
 
         # preprocess the squares (apply Gaussian blur and convert to HSV)
         blurred_hsv_squares = [preprocess_square(square) for square in squares]
@@ -23,9 +30,9 @@ class ChessVisionHough:
         # get the linear regression model to determine if a square has a piece or not.
         self.model_piece_vs_empty = self.get_piece_vs_empty_model(blurred_hsv_squares)
 
-        self.board_type = "red_green"
-
-        # w_o_w, w_o_b, b_o_w, b_o_b, e_w, e_b = get_init_board_groups()
+        if self.piece_detection_algo == "kmeans":
+            cropped_image = proj.process_image_single_board(img)
+            self.kmeans = kmeans.ChessBoardClassifier(cropped_image)
 
     def get_piece_vs_empty_model(self, squares):
         """
@@ -52,7 +59,7 @@ class ChessVisionHough:
         """
         Input the image from the camera and return -1 for each black piece, 0 for empty and 1 for white piece.
         """
-        squares = proj.process_image(img)
+        squares = proj.process_image_multiple_squares(img)
 
         # preprocess the squares (apply Gaussian blur and convert to HSV)
         blurred_hsv_squares = [preprocess_square(square) for square in squares]
@@ -63,8 +70,10 @@ class ChessVisionHough:
 
         if self.board_type == "standard":
             piece_label_ids = self.predict_piece_standard(piece_squares)
-        else:
+        elif self.board_type == "red_green":
             piece_label_ids = self.predict_piece_red_green(piece_squares)
+        elif self.board_type == "kmeans":
+            piece_label_ids = self.kmeans.getCurrentPositions(piece_squares)
 
         board_ids = []
         for i in range(64):

@@ -88,7 +88,7 @@ class ChessManager:
             if ans == 'y':
                 _, img = cam.read()
 
-                self.board_vision = ChessVisionHough(img)
+                self.board_vision = ChessVisionHough(img, 'kmeans')
 
                 return
             else:
