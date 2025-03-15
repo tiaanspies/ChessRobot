@@ -6,7 +6,6 @@ from scipy import signal
 from sklearn.cluster import KMeans
 import cv2 as cv
 from collections import Counter
-import Chessboard_detection.board_detection_hough as board_detection_hough
 
 try:
     from Chessboard_detection import pi_debugging as debug
@@ -58,7 +57,7 @@ def gkern(kernlen=21, std=3):
     gkern2d = np.outer(gkern1d, gkern1d)
     return gkern2d
 
-class ChessBoard:
+class ChessBoardClassifier:
     def __init__(self, img) -> None:
         """
         Initializes board object and finds position of empty board
@@ -76,29 +75,7 @@ class ChessBoard:
         self.whiteID = None
         self.blackID = None
 
-        # save the blank boardS
-        # self.setInitialImage(camera)
-        self.initialImage = img
-
-        # see which blak and white threshold makes the board the easiest to find
-        # Opt is estimated by middle of min and max
-        # thresholdOpt = self.findOptimalThreshold(self.initialImage, onlyFindOne=False, erodeSize=3, blurSize=3)
-
-        # _, cornersInt  = self.findBoardCorners(self.initialImage, thresholdOpt)
-
-        # cornersIntReshaped = np.reshape(cornersInt, self.BOARD_SIZE_INT + (2,))
-        # cornersIntReoriented = self.makeTopRowFirst(cornersIntReshaped)
-
-        # self.cornersExt = self.estimateExternalCorners(cornersIntReoriented)
-
-        self.cornersExt = board_detection_hough.find_board_corners(self.initialImage)
-        self.flipBoard = False       
-
-        
-        # # # ====== Uncomment this code to draw chessboardCorners
-        # cornersNew = np.reshape(self.cornersExt, (81, 2))
-        # img_new = cv.drawChessboardCorners(img, self.BOARD_SIZE, cornersNew, True)
-        # showImg(img_new)
+        self.initBoardWithStartPos(img)
 
     def findClusterImg(self, img):
         """
@@ -201,39 +178,7 @@ class ChessBoard:
         self.findPieceID(blockClusterID)
 
         return None
-    
-    def setInitialImage(self, camera, confirmFirst=False):
-        """
-        If confirmFirst then it will ask the user for confirmation 
-        on whether they want to initialize on that image.
-        Otherwise just use image immediatly
-        """
-        while True:
-            #Get image frame
-            ret, frame = camera.read()
 
-            if not ret:
-                print("Can't receive frame (stream end?).")
-                raise("Could not receive frame from camera to set initial image")
-            
-            # Display video
-            if confirmFirst:
-                cv.imshow('Initial Image', frame)
-
-                # Pause video when q is pressed
-                if cv.waitKey(1) == ord('q'):
-                    resp = input("Are you happy with this initialization image? (y/n)")
-                
-                    # Check if the image is good enough
-                    if resp == 'y':
-                        cv.destroyWindow('Initial Image')
-                        break
-
-            if not confirmFirst:
-                break
-        one = np.ones((8, 8), dtype=np.int32)
-        self.initialImage = frame.copy()
-        
 
     def findGrayBlur(self, img, blurSize):
         # Convert img to grayscale
@@ -248,271 +193,24 @@ class ChessBoard:
 
         return blur
 
-    def threshHoldAndFindBoard(self, grayBlurImg, threshold, erodeSize):
-        """
-        Theshold image and invert as detect chessboard requires a white border around chessboard.
-        """
-        # Threshold
-        _, thresh = cv.threshold(grayBlurImg, threshold, 255, cv.THRESH_BINARY_INV)
-        
-        # If erodeSize is invalid skip eroding and dilating
-        if erodeSize > 0:
-            element = cv.getStructuringElement(cv.MORPH_RECT, (erodeSize, erodeSize))
-            erode = cv.erode(thresh, element)
-            dilate = cv.dilate(erode, element)
-        else:
-            dilate = thresh
-
-        # find chessboard corners, If its too slow add the fast stop param
-        didFind, intCorners = cv.findChessboardCorners(dilate, self.BOARD_SIZE_INT)
-        print(didFind)
-
-        # Plot the image after dilation
-        cv.imshow('Dilated Image', dilate)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
-
-        return didFind, intCorners
-
-    def findBoardCorners(self, img, threshold, blursize=3, erodeSize=3):
-        grayBlur = self.findGrayBlur(img, blursize)
-        ret, corners = self.threshHoldAndFindBoard(grayBlur, threshold, erodeSize)
-        return ret, corners
-    
-    def homomorphic_filter(self, img, d0=30, rh=2, rl=0.5, c=1):
-        img_log = np.log1p(np.array(img, dtype="float") / 255)
-        rows, cols = img.shape
-        M, N = 2 * rows + 1, 2 * cols + 1
-        H = np.zeros((M, N), dtype=np.float32)
-        for u in range(M):
-            for v in range(N):
-                Duv = np.sqrt((u - M / 2) ** 2 + (v - N / 2) ** 2)
-                H[u, v] = (rh - rl) * (1 - np.exp(-c * (Duv ** 2 / d0 ** 2))) + rl
-
-        H = np.fft.ifftshift(H)
-        img_fft = np.fft.fft2(img_log, (M, N))
-        img_fft_filt = H * img_fft
-        img_filt = np.fft.ifft2(img_fft_filt)
-        img_filt = np.real(img_filt)
-        img_filt = img_filt[:rows, :cols]
-        img_exp = np.expm1(img_filt)
-        img_exp = (img_exp - np.min(img_exp)) / (np.max(img_exp) - np.min(img_exp))
-        img_exp = np.array(255 * img_exp, dtype="uint8")
-        return img_exp
-
-    def findOptimalThreshold(self, img, blurSize=3, erodeSize=3, onlyFindOne=False):
-        print("Finding Threshold")
-        stepSize = 10
-
-        #Find gray blurry img
-        # grayBlur = self.findGrayBlur(img, blurSize)
-
-        #do a first rough pass by checking all values with step size
-        # There is no point in checking 0 and 255
-        result_array = [0]*(math.ceil(255/stepSize)-2)
-        for i in range(1, math.floor(255/stepSize)):
-            filtered = self.homomorphic_filter(img, d0=30, rh=2, rl=0.1, c=1)
-            grayBlur = blur = cv.medianBlur(filtered, blurSize)
-            result_array[i-1], _ = self.threshHoldAndFindBoard(filtered, i*stepSize, erodeSize)
-
-            # stop at first success if flag to find one is true
-            if onlyFindOne and result_array[i-1] == True:
-                return i*stepSize
-            
-
-
-        #Find min and max threshold bound
-        respMin, minBound = minPos(result_array)
-        minBound = stepSize + minBound*stepSize - 1
-        respMax, maxBound = maxPos(result_array)
-        maxBound = stepSize + maxBound*stepSize + 1
-
-        if not respMin or not respMax:
-            print("Could not find successful threshold")
-            exit()
-
-        # finetune min
-        iter = 0
-        result = False
-        while iter < 10:
-            result, _ = self.threshHoldAndFindBoard(grayBlur, minBound, erodeSize)
-            if not result:
-                break
-            minBound -= 1
-        else:
-            raise("minbound never found finetuned val")
-
-        # finetune max
-        result = False
-        while iter < 10:
-            result, _ = self.threshHoldAndFindBoard(grayBlur, maxBound, erodeSize)
-            if not result:
-                break
-            maxBound += 1
-        else:
-            raise("maxBound never found finetuned val")
-
-        # return average of minBound and Maxbound to hopefully be most reliable threshold
-        thresholdOpt = int((maxBound+minBound)/2)
-        print("Opt Thresh:", thresholdOpt)
-        return thresholdOpt 
-
-    def estimateExternalCorners(self, cornersInt):
-        """
-        Expand the internal corners by one row. 
-        """
-
-        diffRow = np.diff(cornersInt, axis=0)
-        meanDiffRow = np.mean(diffRow, axis=0)
-        externTop = 2*cornersInt[None, 0, :, :] - cornersInt[None, 1, :, :]
-        externBottom = 2*cornersInt[None, -1, :, :] - cornersInt[None, -2, :, :]
-
-        difCol = np.diff(cornersInt, axis=1)
-        meanDiffCol = np.mean(difCol, axis=1)
-        meanDiffCol = np.reshape(meanDiffCol, (7, 1, 2))
-
-        externleft = 2*cornersInt[:, None, 0, :] - cornersInt[:, None, 1, :]
-        externRight = 2*cornersInt[:, None, -1, :] - cornersInt[:, None, -2, :]
-
-        topLeft = 3*cornersInt[None, 0, None, 0, :] - cornersInt[None, 1, None, 0, :] - cornersInt[None, 0, None, 1, :]
-        topRight = 3*cornersInt[None, 0, None, -1, :] - cornersInt[None, 1, None, -1, :] - cornersInt[None, 0, None, -2, :]
-        botLeft = 3*cornersInt[None, -1, None, 0, :] - cornersInt[None, -2, None, 0, :] - cornersInt[None, -1, None, 1, :]
-        botRight = 3*cornersInt[None, -1, None, -1, :] - cornersInt[None, -2, None, -1, :] - cornersInt[None, -1, None, -2, :]
-
-        cornersExtRow0 = np.hstack([topLeft, externTop, topRight])
-        cornersExtRow1 = np.hstack([externleft, cornersInt, externRight])
-        cornersExtRow2 = np.hstack([botLeft, externBottom, botRight])
-
-        cornersExt = np.vstack([cornersExtRow0, cornersExtRow1, cornersExtRow2])
-
-        return cornersExt
-    
-    def findCentroidsOfCorners(self, corners):
-        row_top_pt_1 = corners[0][0]
-        row_top_pt_2 = corners[0][-1]
-        centroid_top = (row_top_pt_1 + row_top_pt_2) / 2
-
-        row_left_pt_1 = corners[0][0]
-        row_left_pt_2 = corners[-1][0]
-        centroid_left = (row_left_pt_1 + row_left_pt_2) / 2
-
-        row_right_pt_1 = corners[0][-1]
-        row_right_pt_2 = corners[-1][-1]
-        centroid_right = (row_right_pt_1 + row_right_pt_2) / 2
-
-        row_bottom_pt_1 = corners[-1][0]
-        row_bottom_pt_2 = corners[-1][-1]
-        centroid_bottom = (row_bottom_pt_1 + row_bottom_pt_2) / 2
-
-        return centroid_top, centroid_left, centroid_right, centroid_bottom
-
-    def makeTopRowFirst(self, corners):
-        # TODO: adjust angle to keep top row at the top of image
-        # The array should start form top left.
-        # top row is the top row of array. We are aiming to make it the 
-        # top row of the image as well
-        
-        top, left, right, bottom = self.findCentroidsOfCorners(corners)
-
-        if top[1] > np.min([left[1], right[1], bottom[1]]) \
-            and top[1] < np.max([left[1], right[1], bottom[1]]):
-            # top row is between. therefore it must be on the side of the image.
-            # transpose, and flip it.
-            newArr = np.transpose(corners, axes=(1, 0, 2))
-        else:
-            newArr = corners
-        
-        top, left, right, bottom = self.findCentroidsOfCorners(newArr)
-        
-        if top[1] > np.max([left[1], right[1], bottom[1]]):
-            #Row is at bottom of all. flip to make top.
-            newArr = np.flip(newArr, axis=0)
-        
-        diff = newArr[0][-1] - newArr[0][0]
-        firstRowAngle = np.arctan2(diff[1], diff[0])
-        firstRowAngle = (firstRowAngle + 2*np.pi) % (2*np.pi)
-        if firstRowAngle > np.pi/2 and firstRowAngle < (4/3*np.pi):
-            newArr = np.flip(newArr, axis=1)
-
-        return newArr
-    
-    def maskImage(self, img):
-        """
-        Create a mask so that only the chessboard is visible.
-        Uses the 4 furthest corners for mask edge.
-        """
-        outerCorners = np.vstack([
-                self.cornersExt[None, 0, 0, :],
-                self.cornersExt[None, 0, -1, :],
-                self.cornersExt[None, -1, -1, :],
-                self.cornersExt[None, -1, 0, :]
-            ])
-
-        mask = np.zeros(img.shape, dtype=np.uint8)
-        mask = cv.fillConvexPoly(mask, np.int32(outerCorners), color=(255, 255, 255))
-
-        maskedImage = cv.bitwise_and(img, mask)
-        return maskedImage
-
-    def getCurrentPositions(self, img):
+    def getCurrentPositions(self, blocks):
         """
         Look at each square in board and see which color piece is on it.
         """
-        # Read new image from camera object
-        hsv = cv.cvtColor(img, cv.COLOR_RGB2HSV)
-        blurredHSV = cv.medianBlur(hsv, 11)
-        
         
         ### DEBUG TO SHOW CLUSTER IMAGE
-        masked = self.maskImage(blurredHSV)
-        cluster = self.findClusterImg(masked)
-        img_new = cv.cvtColor(cluster, cv.COLOR_HSV2RGB)
+        cluster = self.findClusterImg(blocks[0])
+        img_new = cv.cvtColor(cluster, cv.COLOR_HSV2BGR)
 
         debug.saveTempImg(img_new, "test.jpg")
         ## END DEBUG
-
-        blocks = self.splitBoardIntoSquares(blurredHSV)
+        
+        # raise NotImplementedError
         clustered = self.findBlockClusters(blocks)
         blockIDs = self.detectPieces(clustered)
-
-        blockIDs = np.reshape(blockIDs, (8, 8))
-
-        if self.flipBoard:
-            blockIDs = np.flip(blockIDs, axis=0)
-            blockIDs = np.flip(blockIDs, axis=1)
         
         print(blockIDs)
         return blockIDs
-
-    def splitBoardIntoSquares(self, img):
-        """
-        Take a img of the chessboard with vertex positions and split
-        each square into a seperate array.
-        """
-        blocks = []
-        for r in range(self.BOARD_SIZE_INT[0] + 1):
-            for c in range(self.BOARD_SIZE_INT[1] + 1):
-                # minX = np.min([self.cornersExt[r, c, 0], self.cornersExt[r+1, c, 0]])
-                # minY = np.min([self.cornersExt[r, c, 0], self.cornersExt[r, c+1, 0]])
-
-                # maxX = np.max([self.cornersExt[r, c+1, 0], self.cornersExt[r+1, c+1, 0]])
-                # maxY = np.max([self.cornersExt[r+1, c, 0], self.cornersExt[r+1, c+1, 0]])
-
-                vertices = self.cornersExt[r:r+2, c:c+2, :].astype(np.uint)
-                minX = np.min(vertices[:, :, 0], axis=(0,1))
-                minY = np.min(vertices[:, :, 1], axis=(0,1))
-                
-                maxX = np.max(vertices[:, :, 0], axis=(0,1))
-                maxY = np.max(vertices[:, :, 1], axis=(0,1))
-
-                block = img[minY:maxY, minX:maxX]
-                block = cv.resize(block, (32, 32))
-
-                # img = cv.rectangle(img, [minX, minY], [maxX, maxY], (255, 0, 0))
-
-                blocks.append(block)
-
-        return blocks
     
     def detectPiece(self, block, kern):
         """
@@ -595,35 +293,7 @@ def showImg(img):
 
 
 def main():
-    # Open Video camera
-    # cam = cv.VideoCapture(0)
-    dirPath = os.path.dirname(os.path.realpath(__file__))
-    relPath = "\\TestImages\\Test_Set_1"
-    cam = Camera_Manager.FakeCamera(CAMERA_RESOLUTION, dirPath + relPath)    
-
-    if not cam.isOpened():
-        raise("Cannot open camera.")
-
-    # Initialize ChessBoard object and select optimal thresh
-    # Board must be empty when this is called
-    s, img = cam.read()
-    board = ChessBoard(img)
-
-    # NB --- Board is setup in starting setup.
-    # Runs kmeans clustering to group peice and board colours
-    s, img = cam.read()
-    board.fitKClusters(img, True)
-
-    # display video of chessboard with corners
-    s, img = cam.read()  
-    while s is True:  
-        positions = board.getCurrentPositions(img)
-        s, img = cam.read()  
-        print(positions)
-
-    cam.release()
-    cv.destroyAllWindows()
-
+    pass
 
 if __name__ == "__main__":
     main()
