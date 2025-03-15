@@ -78,17 +78,33 @@ class ChessManager:
         self.robot_color = None
         self.current_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*-1))
         self.prev_visboard = self.current_visboard.copy()
+        self.board_vision = ChessVisionHough("GMM")
 
-    def setup_board_vision(self, cam):
+    def setup_board_vision_empty(self, cam):
 
         # Initialize ChessBoard object and select optimal thresh
         # Board must be empty when this is called
         while True:
-            ans = input("Is starting board setup in view? (y/n): ").strip().lower()
+            ans = input("Is the empty board setup in view? (y/n): ").strip().lower()
             if ans == 'y':
                 _, img = cam.read()
 
-                self.board_vision = ChessVisionHough(img, 'kmeans')
+                self.board_vision.setup_empty_board(img)
+
+                return
+            else:
+                print("Please put the empty board is in view.")
+
+    def setup_board_vision_starting_position(self, cam):
+
+        # Initialize ChessBoard object and select optimal thresh
+        # Board must be empty when this is called
+        while True:
+            ans = input("Is the initial starting board setup in view? (y/n): ").strip().lower()
+            if ans == 'y':
+                _, img = cam.read()
+
+                self.board_vision.setup_starting_position_board(img)
 
                 return
             else:
@@ -173,6 +189,7 @@ class ChessManager:
         # get image
         _, img = cam.read()
         debug.saveTempImg(img, "chessboard.jpg")
+        
         positions = self.board_vision.indentify_piece_ids(img) # turn it into -1, 0, 1 representation
         # self.current_visboard = np.fliplr(np.array(positions).reshape(8,8))
         self.current_visboard = np.array(positions).reshape(8,8)
@@ -289,12 +306,14 @@ def main():
 
     robot = Robot()
     chess_manager = ChessManager()
+    
 
     # move robot to starting position
     robot.move_home()
 
     # create an instance of the cam and board classes for converting input from the camera
-    chess_manager.setup_board_vision(robot.cam)
+    chess_manager.setup_board_vision_empty(robot.cam)
+    chess_manager.setup_board_vision_starting_position(robot.cam)
     
     #determine which color the Robot and human are playing.
     chess_manager.identify_colors()

@@ -633,18 +633,18 @@ def get_end_points(canny_img, vertical_lines, horizontal_lines):
     vertical_end_pts = ransac_2d(np.array(vertical_end_pts), threshold=10)
 
     # # Plot the start and end points on the canny image
-    plt.figure(figsize=(10, 10))
-    plt.imshow(canny_img, cmap='gray')
-    for (x, y) in horizontal_start_pts:
-        plt.plot(x, y, 'go')  # Green dots for start points
-    for (x, y) in horizontal_end_pts:
-        plt.plot(x, y, 'ro')  # Red dots for end points
-    for (x, y) in vertical_start_pts:
-        plt.plot(x, y, 'bo')
-    for (x, y) in vertical_end_pts:
-        plt.plot(x, y, 'yo')
-    plt.title('Start and End Points on Canny Image')
-    plt.show()
+    # plt.figure(figsize=(10, 10))
+    # plt.imshow(canny_img, cmap='gray')
+    # for (x, y) in horizontal_start_pts:
+    #     plt.plot(x, y, 'go')  # Green dots for start points
+    # for (x, y) in horizontal_end_pts:
+    #     plt.plot(x, y, 'ro')  # Red dots for end points
+    # for (x, y) in vertical_start_pts:
+    #     plt.plot(x, y, 'bo')
+    # for (x, y) in vertical_end_pts:
+    #     plt.plot(x, y, 'yo')
+    # plt.title('Start and End Points on Canny Image')
+    # plt.show()
 
     # Get the innermost points
     min_x_horizontal_end = min([pt[0] for pt in horizontal_end_pts])

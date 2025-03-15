@@ -11,7 +11,7 @@ import Chessboard_detection.pi_debugging as debug
 import Chessboard_detection.Chess_Vision_kmeans as kmeans
 
 class ChessVisionHough:
-    def __init__(self, img, piece_detection_algo):
+    def __init__(self, piece_detection_algo):
         """
         Sets up the ChessVisionHough object with the image and the piece detection algorithm.
 
@@ -22,6 +22,27 @@ class ChessVisionHough:
         # Process image into individual squares snippets (Array of 64 squares each 2D numpy array with 3 BGR channels)
         self.piece_detection_algo = piece_detection_algo
 
+        
+
+        self.square_background_means = None
+        self.model_piece_vs_empty = None
+        self.model_piece_color = None
+
+        # in order to setup the class the following functions must be run
+        # 1. setup_empty_board
+        # 2. setup_starting_position_board
+    
+    def setup_empty_board(self, img):
+        """
+        Setup the empty board by getting the background means of the empty squares.
+        """
+        self.square_background_means = self.get_background_means(img)
+
+    def setup_starting_position_board(self, img):
+        """
+        Setup the starting position board by getting the piece color model.
+        """
+
         squares = proj.process_image_multiple_squares(img)
 
         # preprocess the squares (apply Gaussian blur and convert to HSV)
@@ -29,12 +50,8 @@ class ChessVisionHough:
 
         # get the linear regression model to determine if a square has a piece or not.
         self.model_piece_vs_empty = self.get_piece_vs_empty_model(blurred_hsv_squares)
+        self.model_piece_color = self.get_piece_color_model(squares)
 
-        if self.piece_detection_algo == "kmeans":
-            # preprocess the squares (apply Gaussian blur and convert to HSV)
-            blurred_hsv_squares = np.array([preprocess_square(square) for square in squares])
-
-            self.kmeans = kmeans.ChessBoardClassifier(blurred_hsv_squares)
 
     def get_piece_vs_empty_model(self, squares):
         """
@@ -45,6 +62,74 @@ class ChessVisionHough:
         model = get_logistic_regression_model(features, labels)
 
         # plot_decision_boundary(model, features, labels)
+
+        return model
+    
+    def get_background_means(self, img):
+        """
+        Inputs an image of the empty chessboard and returns the means of the V channel for each empty square.
+        """
+        empty_sqaures = proj.process_image_multiple_squares(img)
+
+        gmm_empty_means = []
+
+        for i, empty_square in enumerate(empty_sqaures):
+            empty_square_hsv = cv2.cvtColor(empty_square, cv2.COLOR_BGR2HSV)
+            value_channel = empty_square_hsv[:, :, 2].flatten()
+
+            gmm = GaussianMixture(n_components=1)
+            gmm.fit(value_channel.reshape(-1, 1))
+            gmm_empty_means.append(gmm.means_.flatten()[0])
+
+        return gmm_empty_means
+
+    def predict_piece_color(self, square):
+        """
+        Predicts the color of the piece on the square.
+        """
+
+        init_square_hsv = cv2.cvtColor(square, cv2.COLOR_BGR2HSV)
+
+        value_channel = init_square_hsv[:, :, 2].flatten()
+
+        gmm_piece = GaussianMixture(n_components=2)
+        gmm_piece.fit(value_channel.reshape(-1, 1))
+
+        means_piece = gmm_piece.means_.flatten()
+        mean_empty = self.square_background_means[i]
+
+        piece_mean = max(means_piece, key=lambda x: abs(x - mean_empty))
+
+        prediction = self.model_piece_color.predict([piece_mean])
+        
+        if prediction == 0:
+            prediction = -1
+        return prediction
+
+
+    def get_piece_color_model(self, init_squares):
+        """
+        Inputs a list of 64 squares and returns a logistic regression model that determins if a square has a white or black piece."""
+        piece_means = []
+
+        for i, init_square in enumerate(init_squares):
+            if i // 8 in [2, 3, 4, 5]:
+                continue
+            init_square_hsv = cv2.cvtColor(init_square, cv2.COLOR_BGR2HSV)
+
+            value_channel = init_square_hsv[:, :, 2].flatten()
+
+            gmm_piece = GaussianMixture(n_components=2)
+            gmm_piece.fit(value_channel.reshape(-1, 1))
+
+            means_piece = gmm_piece.means_.flatten()
+            mean_empty = self.square_background_means[i]
+
+            piece_mean = max(means_piece, key=lambda x: abs(x - mean_empty))
+            piece_means.append(piece_mean)
+
+        labels = get_init_piece_labels()
+        model = get_logistic_regression_model(piece_means, labels)
 
         return model
     
@@ -68,14 +153,15 @@ class ChessVisionHough:
 
         piece_v_empty = self.model_piece_vs_empty.predict(extract_features(blurred_hsv_squares))
 
-        piece_squares = [square for i, square in enumerate(blurred_hsv_squares) if piece_v_empty[i] != 0]
-
-        if self.board_type == "standard":
+        if self.piece_detection_algo == "standard":
+            piece_squares = [square for i, square in enumerate(blurred_hsv_squares) if piece_v_empty[i] != 0]
             piece_label_ids = self.predict_piece_standard(piece_squares)
-        elif self.board_type == "red_green":
+        elif self.piece_detection_algo == "red_green":
+            piece_squares = [square for i, square in enumerate(blurred_hsv_squares) if piece_v_empty[i] != 0]
             piece_label_ids = self.predict_piece_red_green(piece_squares)
-        elif self.board_type == "kmeans":
-            piece_label_ids = self.kmeans.getCurrentPositions(piece_squares)
+        elif self.piece_detection_algo == "GMM":
+            piece_squares = [square for i, square in enumerate(squares) if piece_v_empty[i] != 0]
+            piece_label_ids = self.predict_piece_GMM(piece_squares)
 
         board_ids = []
         for i in range(64):
@@ -144,6 +230,16 @@ class ChessVisionHough:
 
         return piece_label_ids
     
+    def predict_piece_GMM(self, squares):
+
+        piece_label_ids = []
+        for square in squares:
+            color = self.predict_piece_color()
+            piece_label_ids.append(color)
+
+        return piece_label_ids
+        
+    
     def label_chessboard(self, img):
         """
         Labels the chessboard squares with detected pieces and their background colors.
@@ -184,93 +280,6 @@ class ChessVisionHough:
             label_dict[SQUARES[i]] = {"piece": labels_words[i], "background": square_colour[i]}
 
         return label_dict
-    
-    def filter_segments(self, labeled_pixels, segment_count):
-        """
-        Create a mask of pixels to remove which are background.
-
-        Mask is created by removing segments with 2 or 3 segments and removing segments with more than 30% of the border pixels.
-
-        Parameters:
-        labeled_pixels: array of labels for each pixel in the image.
-
-        Returns:
-        mask_to_remove: array of boolean values where True is a pixel to remove.
-        
-        """
-
-        #create a mask of the boder pixels and flatten it
-        img_shape = np.round(np.sqrt(labeled_pixels.shape[0])).astype(int)
-        mask = np.ones((img_shape, img_shape), dtype=np.uint8)
-        mask[1:-1, 1:-1] = 0
-        mask = mask.reshape((-1,1))
-
-        # count the number of border pixels in each segment
-        border_count = np.zeros(segment_count)
-        for i, label in enumerate(labeled_pixels):
-            border_count[label] += mask[i]
-
-        # for squares with 2 or 3 segments, remove the pixels of the segment with the most border pixels.
-        # for squares for more than 3 segments. Removes pixels of border segments with more 30% of the border pixels.
-
-        segments_to_remove = []
-        if segment_count == 2 or segment_count == 3:
-            segments_to_remove.append(np.argmax(border_count))
-        elif segment_count > 3:
-            border_ratio = border_count / sum(border_count)
-            segments_to_remove.append(np.where(border_ratio > 0.3)[0])
-
-        # Create a mask where labeled is equal to a value in the segments_to_remove variable
-        mask_to_remove = np.isin(labeled_pixels, segments_to_remove)
-
-        return mask_to_remove
-    
-    def segment_piece(self, square):
-        """
-        Removes background and returns the V channels of pixels that are not background.
-
-        Parameters:
-        square: 2D numpy array of the square image.
-
-        Returns:
-        v_channel_filtered: 1D numpy array of the V channel of the pixels that are not background.
-        """
-        # blur to reduce noise
-        img = cv2.medianBlur(square, 3)
-
-        # flatten the image
-        luv_square = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        flat_image = np.float32(luv_square.reshape((-1,3)))
-
-        # Calculate the distance from the center of the image
-        # add these to the image as additional features
-        center_x, center_y = luv_square.shape[1] // 2, luv_square.shape[0] // 2
-        x_coords, y_coords = np.meshgrid(np.arange(luv_square.shape[1]), np.arange(luv_square.shape[0]))
-
-        x_coords = np.abs(x_coords - center_x)
-        y_coords = np.abs(y_coords - center_y)
-
-        luv_square_w_xy = np.dstack((luv_square, x_coords, y_coords))
-        flat_image_w_xy = luv_square_w_xy.reshape((-1,5))
-        flat_image_w_xy = np.float32(flat_image_w_xy)
-
-        # segment using meanshift segmentation
-        bandwidth = estimate_bandwidth(flat_image_w_xy, quantile=.15)
-        ms = MeanShift(bandwidth=bandwidth, max_iter=800, bin_seeding=True)
-        ms.fit(flat_image_w_xy)
-        labeled_pixels=ms.labels_
-
-        segment_count = len(np.unique(labeled_pixels))
-
-        # create background mask
-        background_mask = self.filter_segments(labeled_pixels, segment_count)
-
-        self.print_masked_image(img, background_mask, labeled_pixels, segment_count)
-
-        # Remove the pixels from the flat_image that are in the background mask
-        v_channel_filtered = flat_image_w_xy[~background_mask][:,2]
-
-        return v_channel_filtered
 
     def print_masked_image(self, img, mask, labeled_pixels, segment_count):
         """
@@ -330,6 +339,14 @@ def get_init_board_labels_piece_v_empty():
     """
 
     labels = [1]*16+[0]*32+[1]*16
+
+    return labels
+
+def get_init_piece_labels():
+    """
+    Return an array [32] where 1 is a white piece, -1 is a black piece and 0 is empty.
+    """
+    labels = [1]*16+[0]*16
 
     return labels
 
