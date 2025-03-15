@@ -21,6 +21,9 @@ class SerialServoCtrl:
 
         self.config_ids = {}
         for axis in self.servo_config:
+            if axis == "general":
+                continue
+
             self.config_ids[self.servo_config[axis]["servo_id"]] = axis
 
     def __del__(self):
@@ -46,7 +49,7 @@ class SerialServoCtrl:
         assert self.voltage_ok(), "Voltage too low to move servos"
 
         # make sure min move time is 200ms
-        move_time = max(self.servo_config["min_move_time_ms"], move_time)
+        move_time = max(self.servo_config["general"]["min_move_time_ms"], move_time)
 
         # clamp position values between 0 and 1000
         for id, pos in zip(motor_ids, positions):
@@ -143,7 +146,7 @@ class SerialServoCtrl:
         Output: Bool, True if voltage is within limits, False otherwise
         """
         voltage = self.read_voltage()
-        return voltage > self.servo_config["min_voltage"] 
+        return voltage > self.servo_config["general"]["min_voltage"] 
     
     def read_voltage(self):
         """
@@ -165,8 +168,6 @@ class SerialServoCtrl:
             print(f"Invalid header received from servo master: {response[0:2]}")
             return None  # Invalid header
 
-        print("Response:", " ".join(f"{byte:02x}" for byte in response))
-        print(len(response))
         pos_low = response[4]
         pos_high = response[5]
         voltage = (pos_high << 8) | pos_low

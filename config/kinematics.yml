@@ -7,7 +7,7 @@ IK_CONFIG:
     y: 2
     z: 57
   chess_square_width: 40
-  grip_height: 125
+  grip_height: 120
   home_pos_backward:
     x: 0
     y: 200
@@ -54,7 +54,7 @@ IK_CONFIG:
   - 0
   lift: 120
   position_compensation_matrices:
-  - 20250222_163849_H_matrix.csv
+  - 20250305_194107_H_matrix.csv
   rcs_to_ccs_offset:
     x: 215
     y: -60
