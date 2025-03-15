@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 from sklearn.linear_model import RANSACRegressor
 from mpl_toolkits.mplot3d import Axes3D
 
-def detect_lines(img, threshold_angle=15):
+def detect_lines(canny_img, threshold_angle=15):
     """
     Detects vertical and horizontal lines in an image using the Hough Line Transform.
     Parameters:
@@ -18,11 +18,10 @@ def detect_lines(img, threshold_angle=15):
         - edges (numpy.ndarray): The edges detected in the input image using the Canny edge detector.
     
     """
-    # Apply Canny edge detector
-    edges = cv2.Canny(img, 75, 150)
+
 
     # Use Hough Line Transform to detect lines
-    lines = cv2.HoughLines(edges, 2, np.pi / 180, 200)
+    lines = cv2.HoughLines(canny_img, 2, np.pi / 180, 200)
 
     vertical_lines = []
     horizontal_lines = []
@@ -39,7 +38,7 @@ def detect_lines(img, threshold_angle=15):
                 rho = -rho
                 vertical_lines.append((rho, theta))
 
-    return vertical_lines, horizontal_lines, edges
+    return vertical_lines, horizontal_lines
 
 def intersection(line1, line2):
     """
@@ -220,8 +219,6 @@ def ransac_3d(x_pts, y_pts, z_pts, threshold_x=10, threshold_y=0.005, threshold_
         for y in range(x + 1, len(x_pts)):
             pt_1_idx = x
             pt_2_idx = y
-            while pt_1_idx == pt_2_idx:
-                pt_2_idx = np.random.randint(0, len(x_pts))
 
             pt_1 = (x_pts[pt_1_idx], y_pts[pt_1_idx], z_pts[pt_1_idx])
             pt_2 = (x_pts[pt_2_idx], y_pts[pt_2_idx], z_pts[pt_2_idx])
@@ -242,6 +239,62 @@ def ransac_3d(x_pts, y_pts, z_pts, threshold_x=10, threshold_y=0.005, threshold_
                 inlier_mask = current_inlier_mask
 
     return inlier_mask
+
+def ransac_2d(pts, threshold=10):
+
+    inlier_best = 0
+    inlier_mask = np.zeros(pts.shape[0])
+    for x in range(pts.shape[0]):
+        for y in range(x + 1, pts.shape[0]):
+            pt_1_idx = x
+            pt_2_idx = y
+
+            pt_1 = pts[pt_1_idx]
+            pt_2 = pts[pt_2_idx]
+
+            current_inliers = 0
+            current_inlier_mask = np.zeros(pts.shape[0])
+            for j in range(pts.shape[0]):
+                dist = orthogonal_distance_2d(pts[j], pt_1, pt_2)
+
+                if dist < threshold:
+                    current_inliers += 1
+                    current_inlier_mask[j] = 1
+
+            if current_inliers > inlier_best:
+                inlier_best = current_inliers
+                inlier_mask = current_inlier_mask
+
+    inlier_pts = pts[inlier_mask == 1]
+    return inlier_pts
+
+def orthogonal_distance_2d(point, line_point1, line_point2):
+    """
+    Calculate the orthogonal distance between a 2D point and a line defined by two points in 2D space.
+    
+    Parameters:
+    point (tuple): The 2D point (x, y).
+    line_point1 (tuple): The first point defining the line (x1, y1).
+    line_point2 (tuple): The second point defining the line (x2, y2).
+    
+    Returns:
+    float: The orthogonal distance between the point and the line.
+    """
+    point = np.array(point)
+    line_point1 = np.array(line_point1)
+    line_point2 = np.array(line_point2)
+    
+    line_vec = line_point2 - line_point1
+    point_vec = point - line_point1
+    
+    line_vec_norm = line_vec / np.linalg.norm(line_vec)
+    projection_length = np.dot(point_vec, line_vec_norm)
+    projection_vec = projection_length * line_vec_norm
+    
+    orthogonal_vec = point_vec - projection_vec
+    distance = np.linalg.norm(orthogonal_vec)
+    
+    return distance
 
 def discard_outliers(lines, distances, num_keep=7):
     
@@ -275,12 +328,12 @@ def discard_outliers(lines, distances, num_keep=7):
             last_inlier_idx = inlier_indices[-1]
 
             if first_inlier_idx == 0:
-                bot_dist = 100000000000
+                bot_dist = 1e10
             else:
                 bot_dist = abs(rhos[first_inlier_idx] - rhos[first_inlier_idx - 1])
 
             if last_inlier_idx == len(rhos) - 1:
-                top_dist = 100000000000
+                top_dist = 1e10
             else:
                 top_dist = abs(rhos[last_inlier_idx] - rhos[last_inlier_idx + 1])
 
@@ -462,6 +515,169 @@ def check_if_valid(lines):
 
     return range_diff < 20
 
+def round_to_nearest(x, val1, val2):
+    if abs(x - val1) < abs(x - val2):
+        return val1
+    else:
+        return val2
+
+def find_line_end_pts_horizontal(img_width, img_height, rho, theta, vertical_dilated):
+    horizontal_start_pts = []
+    horizontal_end_pts = []
+
+    scan_right = np.linspace(img_width // 2, img_width-1).astype(int)
+    for x in scan_right:
+        y = int(-np.cos(theta)/np.sin(theta) * x + rho/np.sin(theta))
+        if y >= img_height or y < 0:
+            y = round_to_nearest(y, 0, img_height - 1)
+            horizontal_end_pts.append((x, y))
+            break
+
+        if vertical_dilated[y, x] == 0:
+            horizontal_end_pts.append((x, y))
+            break
+    
+    scan_left = np.linspace(img_width // 2, 0).astype(int)
+    for x in scan_left:
+        y = int(-np.cos(theta)/np.sin(theta) * x + rho/np.sin(theta))
+
+        if y >= img_height or y < 0:
+            y = round_to_nearest(y, 0, img_height - 1)
+            horizontal_end_pts.append((x, y))
+            break
+
+        if vertical_dilated[y, x] == 0:
+            horizontal_start_pts.append((x, y))
+            break
+
+    return horizontal_start_pts, horizontal_end_pts
+
+def find_line_end_pts_vertical(img_width, img_height, rho, theta, horizontal_dilated):
+    vertical_start_pts = []
+    vertical_end_pts = []
+
+    scan_down = np.linspace(img_height // 2, img_height-1).astype(int)
+    for y in scan_down:
+        if theta == 0:
+            x = int(rho)
+        else:
+            x = int((y - rho/np.sin(theta)) * (-np.sin(theta)/np.cos(theta)))
+
+        if x >= img_width or x < 0:
+            x = round_to_nearest(x, 0, img_width - 1)
+            vertical_end_pts.append((img_width - 1, y))
+            break
+
+        if horizontal_dilated[y, x] == 0:
+            vertical_end_pts.append((x, y))
+            break
+    
+    scan_up = np.linspace(img_height // 2, 0).astype(int)
+    for y in scan_up:
+        if theta == 0:
+            x = int(rho)
+        else:
+            x = int((y - rho/np.sin(theta)) * (-np.sin(theta)/np.cos(theta)))
+
+        if x >= img_width or x < 0:
+            x = round_to_nearest(x, 0, img_width - 1)
+            vertical_end_pts.append((img_width - 1, y))
+            break
+
+        if horizontal_dilated[y, x] == 0:
+            vertical_start_pts.append((x, y))
+            break
+
+    return vertical_start_pts, vertical_end_pts
+
+def get_end_points(canny_img, vertical_lines, horizontal_lines):
+    """Search along the lines, starting at the center of the image. To find the end of the line.
+    
+    The lines should be in the center of the dilated lines. Therefore the start and end points 
+    are where the line is no long on a dilated pixel."""
+
+    # find the start and end of the lines/
+    # Define the kernels
+    kernel_vertical = np.ones((15, 3), np.uint8)
+    kernel_horizontal = np.ones((3, 15), np.uint8)
+
+    # Apply morphological operations to find the start and end points of the lines
+    vertical_dilated = cv2.dilate(canny_img, kernel_vertical, iterations=1)
+    horizontal_dilated = cv2.dilate(canny_img, kernel_horizontal, iterations=1)
+
+    # Find the start and end points of the vertical lines
+    horizontal_start_pts = []
+    horizontal_end_pts = []
+    vertical_start_pts = []
+    vertical_end_pts = []
+
+    img_width = canny_img.shape[1]
+    img_height = canny_img.shape[0]
+
+    # Scan left and right for the horizontal lines.
+    for rho, theta in horizontal_lines:
+        horizontal_starts, horizontal_ends = find_line_end_pts_horizontal(img_width, img_height, rho, theta, vertical_dilated)
+        horizontal_start_pts.extend(horizontal_starts)
+        horizontal_end_pts.extend(horizontal_ends)
+    
+    # scan up and down for the vertical lines.
+    for rho, theta in vertical_lines:
+        vertical_starts, vertical_ends = find_line_end_pts_vertical(img_width, img_height, rho, theta, horizontal_dilated)
+        vertical_start_pts.extend(vertical_starts)
+        vertical_end_pts.extend(vertical_ends)
+
+    # find the best fit line for the start and end points
+    horizontal_start_pts = ransac_2d(np.array(horizontal_start_pts), threshold=10)
+    horizontal_end_pts = ransac_2d(np.array(horizontal_end_pts), threshold=10)
+    vertical_start_pts = ransac_2d(np.array(vertical_start_pts), threshold=10)
+    vertical_end_pts = ransac_2d(np.array(vertical_end_pts), threshold=10)
+
+    # # Plot the start and end points on the canny image
+    plt.figure(figsize=(10, 10))
+    plt.imshow(canny_img, cmap='gray')
+    for (x, y) in horizontal_start_pts:
+        plt.plot(x, y, 'go')  # Green dots for start points
+    for (x, y) in horizontal_end_pts:
+        plt.plot(x, y, 'ro')  # Red dots for end points
+    for (x, y) in vertical_start_pts:
+        plt.plot(x, y, 'bo')
+    for (x, y) in vertical_end_pts:
+        plt.plot(x, y, 'yo')
+    plt.title('Start and End Points on Canny Image')
+    plt.show()
+
+    # Get the innermost points
+    min_x_horizontal_end = min([pt[0] for pt in horizontal_end_pts])
+    max_x_horizontal_start = max([pt[0] for pt in horizontal_start_pts])
+    min_y_vertical_end = min([pt[1] for pt in vertical_end_pts])
+    max_y_vertical_start = max([pt[1] for pt in vertical_start_pts])
+
+    board_x_range = (max_x_horizontal_start, min_x_horizontal_end)
+    board_y_range = (max_y_vertical_start, min_y_vertical_end)
+    return board_x_range, board_y_range
+    
+def remove_out_of_lim_lines(lines_hor, lines_vert, board_x_range, board_y_range, buffer=10):
+    mid_x = (board_x_range[0] + board_x_range[1])//2
+    mid_y = (board_y_range[0] + board_y_range[1])//2
+    filtered_lines_hor = []
+    filtered_lines_vert = []
+    for rho, theta in lines_hor:
+        y = int(-np.cos(theta)/np.sin(theta) *mid_x + rho/np.sin(theta))
+
+        if y > board_y_range[0] + buffer and y < board_y_range[1] - buffer:
+            filtered_lines_hor.append((rho, theta))
+    
+    for rho, theta in lines_vert:
+        if theta == 0:
+            x = int(rho)
+        else:
+            x = int((mid_y - rho/np.sin(theta)) * (-np.sin(theta)/np.cos(theta)))
+
+        if x > board_x_range[0] + buffer and x < board_x_range[1] - buffer:
+            filtered_lines_vert.append((rho, theta))
+
+    return filtered_lines_hor, filtered_lines_vert
+
 def find_board_corners(img):
     """
     Pipeline to find a 9x9 chessboard pattern that is roughly aligned vertically with the image. 
@@ -479,30 +695,30 @@ def find_board_corners(img):
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     image_height, image_width  = img.shape
 
-    vertical_lines, horizontal_lines, edges = detect_lines(img)
+    # Apply Canny edge detector
+    canny_img = cv2.Canny(img, 75, 150)
+
+    vertical_lines, horizontal_lines = detect_lines(canny_img)
 
     # Group lines that are within 10 pixels of each other
     grouped_vertical_lines = group_lines(vertical_lines, image_width, image_height)
     grouped_horizontal_lines = group_lines(horizontal_lines, image_width, image_height)
 
+    # Find the chessboard borders by canning along the lines inside.
+    board_x_range, board_y_range = get_end_points(canny_img, grouped_vertical_lines, grouped_horizontal_lines)
+    filtered_horizontal_lines_1, filtered_vertical_lines_1 = remove_out_of_lim_lines(grouped_horizontal_lines, grouped_vertical_lines, board_x_range, board_y_range)
+
     # Find closest distances for vertical and horizontal lines
-    vertical_distances = find_closest_distances(grouped_vertical_lines)
-    horizontal_distances = find_closest_distances(grouped_horizontal_lines)
+    vertical_distances = find_closest_distances(filtered_vertical_lines_1)
+    horizontal_distances = find_closest_distances(filtered_horizontal_lines_1)
 
     # Discard outliers based on the closest distances
-    filtered_vertical_lines = discard_outliers(grouped_vertical_lines, vertical_distances)
-    filtered_horizontal_lines = discard_outliers(grouped_horizontal_lines, horizontal_distances)
+    filtered_vertical_lines_2 = discard_outliers(filtered_vertical_lines_1, vertical_distances)
+    filtered_horizontal_lines_2 = discard_outliers(filtered_horizontal_lines_1, horizontal_distances)
 
-    try:
-        assert len(filtered_vertical_lines) == 7 and len(filtered_horizontal_lines) == 7
-    except AssertionError:
-        print(f"Length of filtered_vertical_lines: {len(filtered_vertical_lines)}")
-        print(f"Length of filtered_horizontal_lines: {len(filtered_horizontal_lines)}")
-        raise
-    
     # sort lines
-    sorted_vertical_lines = sort_lines(filtered_vertical_lines)
-    sorted_horizontal_lines = sort_lines(filtered_horizontal_lines)
+    sorted_vertical_lines = sort_lines(filtered_vertical_lines_2)
+    sorted_horizontal_lines = sort_lines(filtered_horizontal_lines_2)
 
     vert_valid = check_if_valid(sorted_vertical_lines)
     hor_valid = check_if_valid(sorted_horizontal_lines)
@@ -522,15 +738,15 @@ def find_board_corners(img):
     if True:
         draw_pipeline_plots(
             img, vertical_lines, horizontal_lines, grouped_vertical_lines, grouped_horizontal_lines,
-            filtered_vertical_lines, filtered_horizontal_lines, intersection_points, expanded_points, edges,
-            shifted_vertical_lines, shifted_horizontal_lines
+            filtered_vertical_lines_1, filtered_horizontal_lines_1, filtered_vertical_lines_2, filtered_horizontal_lines_2, 
+            intersection_points, expanded_points, canny_img, shifted_vertical_lines, shifted_horizontal_lines
         )
 
     return expanded_points
 
 def draw_pipeline_plots(img, vertical_lines, horizontal_lines, grouped_vertical_lines, grouped_horizontal_lines, 
-                        filtered_vertical_lines, filtered_horizontal_lines, intersection_points, expanded_points, edges,
-                        shifted_vertical_lines, shifted_horizontal_lines):
+                        filtered_vertical_lines_1, filtered_horizontal_lines_1, filtered_vertical_lines_2, filtered_horizontal_lines_2,
+                        intersection_points, expanded_points, edges, shifted_vertical_lines, shifted_horizontal_lines):
     # Create a copy of the original image to draw lines on
     img_with_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
@@ -545,13 +761,19 @@ def draw_pipeline_plots(img, vertical_lines, horizontal_lines, grouped_vertical_
     draw_lines(img_with_grouped_lines, grouped_vertical_lines, (0, 255, 0))  # Green for vertical lines
     draw_lines(img_with_grouped_lines, grouped_horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
 
-
     # Create a copy of the original image to draw filtered lines on
-    img_with_filtered_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    img_with_filtered_lines_1 = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
     # Draw filtered vertical and horizontal lines
-    draw_lines(img_with_filtered_lines, filtered_vertical_lines, (0, 255, 0))  # Green for vertical lines
-    draw_lines(img_with_filtered_lines, filtered_horizontal_lines, (255, 0, 0))  # Blue for horizontal lines
+    draw_lines(img_with_filtered_lines_1, filtered_vertical_lines_2, (0, 255, 0))  # Green for vertical lines
+    draw_lines(img_with_filtered_lines_1, filtered_horizontal_lines_2, (255, 0, 0))  # Blue for horizontal lines
+
+    # Create a copy of the original image to draw filtered lines on
+    img_with_filtered_lines_2 = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+    # Draw filtered vertical and horizontal lines
+    draw_lines(img_with_filtered_lines_2, filtered_vertical_lines_2, (0, 255, 0))  # Green for vertical lines
+    draw_lines(img_with_filtered_lines_2, filtered_horizontal_lines_2, (255, 0, 0))  # Blue for horizontal lines
 
     img_with_shifted_lines = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
@@ -562,38 +784,42 @@ def draw_pipeline_plots(img, vertical_lines, horizontal_lines, grouped_vertical_
     # Display the results
     plt.figure(figsize=(15, 10))
 
-    plt.subplot(2, 4, 1)
+    plt.subplot(2, 5, 1)
     plt.title('Original Image')
     plt.imshow(img, cmap='gray')
 
-    plt.subplot(2, 4, 2)
+    plt.subplot(2, 5, 2)
     plt.title('Canny Edges')
     plt.imshow(edges, cmap='gray')
 
-    plt.subplot(2, 4, 3)
+    plt.subplot(2, 5, 3)
     plt.title('Detected Vert and Hor Lines')
     plt.imshow(cv2.cvtColor(img_with_lines, cv2.COLOR_BGR2RGB))
 
-    plt.subplot(2, 4, 4)
+    plt.subplot(2, 5, 4)
     plt.title('Grouped Lines')
     plt.imshow(cv2.cvtColor(img_with_grouped_lines, cv2.COLOR_BGR2RGB))
 
-    plt.subplot(2, 4, 5)
-    plt.title('Discard Outliers')
-    plt.imshow(cv2.cvtColor(img_with_filtered_lines, cv2.COLOR_BGR2RGB))
+    plt.subplot(2, 5, 5)
+    plt.title('Discard lines that are out of limits')
+    plt.imshow(cv2.cvtColor(img_with_filtered_lines_1, cv2.COLOR_BGR2RGB))
 
-    plt.subplot(2, 4, 6)
+    plt.subplot(2, 5, 6)
+    plt.title('Discard Outliers')
+    plt.imshow(cv2.cvtColor(img_with_filtered_lines_2, cv2.COLOR_BGR2RGB))
+
+    plt.subplot(2, 5, 7)
     plt.title('Shifted Lines')
     plt.imshow(cv2.cvtColor(img_with_shifted_lines, cv2.COLOR_BGR2RGB))
 
-    plt.subplot(2, 4, 7)
+    plt.subplot(2, 5, 8)
     plt.title('Intersection points')
     plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
     # Plot intersection points
     for (x, y) in intersection_points.reshape(-1, 2):
         plt.plot(x, y, 'r.')  # Red dots for intersection points
 
-    plt.subplot(2, 4, 8)
+    plt.subplot(2, 5, 9)
     plt.title('Expanded points')
     plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
     # Plot expanded points
@@ -603,8 +829,8 @@ def draw_pipeline_plots(img, vertical_lines, horizontal_lines, grouped_vertical_
     plt.show()
 
 def main():
-    img_path = Path("C:\\Users\\spies\\OneDrive\\Documents\\scap\\invalid_board", "8.jpg")
-    # img_path = Path("Chessboard_detection", "dataset", "images", "rg_1.jpg")
+    # img_path = Path("C:\\Users\\spies\\OneDrive\\Documents\\scap\\invalid_board", "8.jpg")
+    img_path = Path("Chessboard_detection", "dataset", "images", "rg_6.jpg")
     img_path_str = str(img_path)
     img = cv2.imread(img_path_str)
     
