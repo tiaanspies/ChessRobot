@@ -42,8 +42,11 @@ class SerialServoCtrl:
         - List of corresponding positions to move to
         Output: None, will send serial command to serial dev board to complete the move.
         """
+
+        assert self.voltage_ok(), "Voltage too low to move servos"
+
         # make sure min move time is 200ms
-        move_time = max(200, move_time)
+        move_time = max(self.servo_config["min_move_time_ms"], move_time)
 
         # clamp position values between 0 and 1000
         for id, pos in zip(motor_ids, positions):
@@ -133,30 +136,42 @@ class SerialServoCtrl:
             index += 3
         
         return positions
+
+    def voltage_ok(self):
+        """
+        Input: None
+        Output: Bool, True if voltage is within limits, False otherwise
+        """
+        voltage = self.read_voltage()
+        return voltage > self.servo_config["min_voltage"] 
     
     def read_voltage(self):
         """
-        Input: Array of servo motor positions to read.
-        Output: Dict of servo positions of the servos (integers 0-1000)
+        Input: None
+        Output: Voltage (V) input to the servo master board.
         """
         parameters = []
     
         self.send_command(self.serial_con, COMMAND_READ_VOLTAGE, parameters)
 
         # 5 + x*3 bytes are returned, where x is the number of servos
-        response = self.serial_con.read(5)
+        response = self.serial_con.read(6)
 
-        if len(response) < 5:
+        if len(response) < 6:
             print(f"Invalid response received from servo master: {response}")
-            return None  # Invalid response
+            return 0  # Invalid response
 
         if response[0] != 0x55 or response[1] != 0x55:
             print(f"Invalid header received from servo master: {response[0:2]}")
             return None  # Invalid header
 
-
+        print("Response:", " ".join(f"{byte:02x}" for byte in response))
+        print(len(response))
+        pos_low = response[4]
+        pos_high = response[5]
+        voltage = (pos_high << 8) | pos_low
         
-        return voltage
+        return float(voltage)/1000.0
     
     def interpolate_serial(self, serial_pos, limit_dict):
         """
@@ -264,7 +279,7 @@ class SerialServoCtrl:
 
 if __name__ == "__main__":
     controller = SerialServoCtrl()
-    controller.move_to_multi_angle_pos(2000, {"shoulder": 90, "elbow":0})
+    # controller.move_to_multi_angle_pos(2000, {"shoulder": 90, "elbow":0})
     # controller.move_to_multi_angle_pos(3000, {"base": 180, "shoulder": 30, "elbow":40})
     # time.sleep(3)
     # controller.move_to_multi_angle_pos(2000, {"base": 90, "shoulder": 90, "elbow":90})
@@ -280,4 +295,8 @@ if __name__ == "__main__":
 
     # print(pos)
     # controller.calibrate_home_positions()
+
+    v = controller.read_voltage()
+
+    print("Voltage: ", v)
 
