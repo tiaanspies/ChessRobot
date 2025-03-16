@@ -46,7 +46,7 @@ class GripperMotor:
         kit = ServoKit(channels=16)
 
         # ELec settings
-        self.gripper_servo = kit.servo[0]
+        self.gripper_servo = kit.servo[12]
         self.gripper_servo.set_pulse_width_range(500,2500)
 
         # Config
