@@ -59,6 +59,17 @@ class MotorCommandsSerial:
         else:
             self.motor.move_to_multi_angle_pos(500, pos_dict)
 
+    def in_position(self, position_target):
+        """checks if the robot is in the starting position"""
+        axis_names = ['base', 'shoulder', 'elbow']
+
+        positions_current  = self.motor.read_pos_multi_angle(axis_names)
+
+        for axis in axis_names:
+            if abs(positions_current[axis] - position_target[axis]) > 2:
+                return False
+        return True
+
     def run(self, thetas, angletype='rad'):
         """runs the full set of theta commands"""
         # save data
@@ -75,7 +86,16 @@ class MotorCommandsSerial:
         else:
             raise ValueError("angletype argument must be either 'rad' or 'deg'")
         
-        self.go_to(angles[:,0], 'deg')
+        #if the robot is not in the starting position, move to the starting position
+        pos_dict = {
+            'base': angle[0, 0],
+            'shoulder': angle[1, 0],
+            'elbow': angle[2, 0]
+        }
+        if not self.in_position(pos_dict):
+            self.go_to(angles[:,0], 'deg')
+
+        # loop through the rest of the positions    
         for angle in angles.T:
             pos_dict = {
                 'base': angle[0],

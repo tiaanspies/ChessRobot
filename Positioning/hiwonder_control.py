@@ -205,8 +205,13 @@ class SerialServoCtrl:
         position = self.read_pos_multi_angle_raw([servo_id])
         return position[servo_id]
 
-    def read_pos_multi_angle(self, servo_ids):
+    def read_pos_multi_angle(self, input) -> dict[str, int]:
         """ Read Position of servo motors. Add zero offset and reverse direction if needed."""
+
+        if isinstance(input[0], str):
+            servo_ids = [self.servo_config[axis]["servo_id"] for axis in input]
+        elif isinstance(input[0], int):
+            servo_ids = input
 
         positions = self.read_pos_multi_angle_raw(servo_ids)
         angle_positions = {}
