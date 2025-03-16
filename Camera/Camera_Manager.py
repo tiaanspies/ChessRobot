@@ -123,7 +123,7 @@ class RPiCamera:
             if absPath is None:
                 raise ValueError("absPath must be given if loadSavedFirst is true. "\
                                   "Set loadSavedFirst to false to not load stored image first")
-            self.stateNum = -1
+            self.stateNum = 0
         else:
             self.stateNum = 1
 
@@ -148,8 +148,16 @@ class RPiCamera:
     
     def read(self):
         
-        if self.stateNum <= 0:
+        if self.stateNum == -1:
             self.frame = cv.imread(os.path.join(self.path_full, "empty.jpg"))
+
+            if self.frame is None:
+                print("Cannot read stored initialization file")
+                exit()
+
+            self.frame = cv.resize(self.frame, self.cameraRes)
+        elif self.stateNum == 0:
+            self.frame = cv.imread(os.path.join(self.path_full, "init.jpg"))
 
             if self.frame is None:
                 print("Cannot read stored initialization file")
@@ -178,6 +186,7 @@ class RPiCamera:
 
     def isOpened(self):
         ret, _ = self.read()
+        self.stateNum -= 1
 
         return ret
 
