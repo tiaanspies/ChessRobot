@@ -4,6 +4,7 @@ from pathlib import Path
 from matplotlib import pyplot as plt
 from sklearn.linear_model import RANSACRegressor
 from mpl_toolkits.mplot3d import Axes3D
+from itertools import combinations
 
 def detect_lines(canny_img, threshold_angle=15):
     """
@@ -296,70 +297,44 @@ def orthogonal_distance_2d(point, line_point1, line_point2):
     
     return distance
 
-def discard_outliers(lines, distances, num_keep=7):
+def discard_outliers(lines, num_keep=7):
     
-    # Combine lines and distances into a list of tuples
-    lines_with_distances = list(zip(lines, distances))
+    # Find all combinations of 7 lines from the lines array
+    all_combinations = list(combinations(lines, 7))
 
-    # Sort the lines by their corresponding distances
-    sorted_lines_with_distances = sorted(lines_with_distances, key=lambda x: x[0][0])
-    # Extract rho, theta, and distance values
-    rhos = np.array([line[0][0] for line in sorted_lines_with_distances])
-    thetas =  np.array([line[0][1] for line in sorted_lines_with_distances])
-    distances =  np.array([line[1] for line in sorted_lines_with_distances])
+    # Initialize the best combination and the minimum distance
+    best_combination = None
+    best_std_dev = float('inf')
 
-    # Apply RANSAC to find inliers and outliers
-    inlier_mask = ransac_3d(rhos, thetas, distances)
 
-    # Check if the number of inliers is less than 7
-    if np.sum(inlier_mask) < 7:
-        inlier_indices = np.where(inlier_mask == 1)[0]
+    # Loop through all combinations
+    for combination in all_combinations:
+        # Plot diffs on a scatter plot and fit a best fit line
+        
+        diffs = np.array([combination[i + 1][0] - combination[i][0] for i in range(6)])
+        x = np.arange(len(diffs))
+        # Fit a linear regression to diffs
+        slope, intercept = np.polyfit(x, diffs, 1)
+        line_fit = slope * x + intercept
 
-        first_inlier_idx = inlier_indices[0]
-        last_inlier_idx = inlier_indices[-1]
-        inlier_mask[first_inlier_idx:last_inlier_idx + 1] = 1
+        # Calculate the correlation coefficient
 
-        # Check again if the number of inliers is 7
-        # add the closest ones to the end pts
-        while np.sum(inlier_mask) < 7 and len(lines) >= 7:
-            inlier_indices = np.where(inlier_mask == 1)[0]
+        std_dev = np.std(diffs - line_fit)
 
-            first_inlier_idx = inlier_indices[0]
-            last_inlier_idx = inlier_indices[-1]
+        # plt.scatter(x, diffs, label='Diffs')
+        # plt.plot(x, line_fit, color='red', label='Best Fit Line')
+        # plt.xlabel('Index')
+        # plt.ylabel('Difference')
+        # plt.title('Differences and Best Fit Line')
+        # plt.legend()
+        # plt.show()
 
-            if first_inlier_idx == 0:
-                bot_dist = 1e10
-            else:
-                bot_dist = abs(rhos[first_inlier_idx] - rhos[first_inlier_idx - 1])
+        # If the correlation is high, update the best combination
+        if std_dev < best_std_dev:
+            best_std_dev = std_dev
+            best_combination = combination
 
-            if last_inlier_idx == len(rhos) - 1:
-                top_dist = 1e10
-            else:
-                top_dist = abs(rhos[last_inlier_idx] - rhos[last_inlier_idx + 1])
-
-            if bot_dist < top_dist:
-                inlier_mask[first_inlier_idx - 1] = 1
-            else:
-                inlier_mask[last_inlier_idx + 1] = 1
-
-    while np.sum(inlier_mask) > 7:
-        inlier_indices = np.where(inlier_mask == 1)[0]
-
-        first_inlier_idx = inlier_indices[0]
-        last_inlier_idx = inlier_indices[-1]
-
-        bot_dist = abs(rhos[first_inlier_idx] - rhos[first_inlier_idx + 1])
-        top_dist = abs(rhos[last_inlier_idx] - rhos[last_inlier_idx - 1])
-
-        if bot_dist > top_dist:
-            inlier_mask[first_inlier_idx] = 0
-        else:
-            inlier_mask[last_inlier_idx] = 0
-
-    # Filter lines based on inliers
-    filtered_lines = [sorted_lines_with_distances[i][0] for i in range(len(lines)) if inlier_mask[i] == 1]
-
-    return filtered_lines
+    return list(best_combination)
 
 def find_all_intersections(lines_vertical, lines_horizontal):
     """
@@ -704,21 +679,17 @@ def find_board_corners(img):
     grouped_vertical_lines = group_lines(vertical_lines, image_width, image_height)
     grouped_horizontal_lines = group_lines(horizontal_lines, image_width, image_height)
 
-    # Find the chessboard borders by canning along the lines inside.
+    # Find the chessboard borders by scanning along the lines inside.
     board_x_range, board_y_range = get_end_points(canny_img, grouped_vertical_lines, grouped_horizontal_lines)
     filtered_horizontal_lines_1, filtered_vertical_lines_1 = remove_out_of_lim_lines(grouped_horizontal_lines, grouped_vertical_lines, board_x_range, board_y_range)
 
-    # Find closest distances for vertical and horizontal lines
-    vertical_distances = find_closest_distances(filtered_vertical_lines_1)
-    horizontal_distances = find_closest_distances(filtered_horizontal_lines_1)
+    # sort lines
+    sorted_vertical_lines = sort_lines(filtered_vertical_lines_1)
+    sorted_horizontal_lines = sort_lines(filtered_horizontal_lines_1)
 
     # Discard outliers based on the closest distances
-    filtered_vertical_lines_2 = discard_outliers(filtered_vertical_lines_1, vertical_distances)
-    filtered_horizontal_lines_2 = discard_outliers(filtered_horizontal_lines_1, horizontal_distances)
-
-    # sort lines
-    sorted_vertical_lines = sort_lines(filtered_vertical_lines_2)
-    sorted_horizontal_lines = sort_lines(filtered_horizontal_lines_2)
+    filtered_vertical_lines_2 = discard_outliers(sorted_vertical_lines, sorted_vertical_lines)
+    filtered_horizontal_lines_2 = discard_outliers(sorted_horizontal_lines, sorted_horizontal_lines)
 
     vert_valid = check_if_valid(sorted_vertical_lines)
     hor_valid = check_if_valid(sorted_horizontal_lines)
@@ -727,7 +698,7 @@ def find_board_corners(img):
         print("Lines are not valid!!!")
 
     # shift the lines by 2 pixels
-    shifted_vertical_lines = shift_lines(sorted_vertical_lines, 1)
+    shifted_vertical_lines = shift_lines(filtered_vertical_lines_2, 1)
     shifted_horizontal_lines = shift_lines(sorted_horizontal_lines, 1)
 
     intersection_points = find_all_intersections(shifted_vertical_lines, shifted_horizontal_lines).reshape(7, 7, 2)
@@ -765,8 +736,8 @@ def draw_pipeline_plots(img, vertical_lines, horizontal_lines, grouped_vertical_
     img_with_filtered_lines_1 = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
     # Draw filtered vertical and horizontal lines
-    draw_lines(img_with_filtered_lines_1, filtered_vertical_lines_2, (0, 255, 0))  # Green for vertical lines
-    draw_lines(img_with_filtered_lines_1, filtered_horizontal_lines_2, (255, 0, 0))  # Blue for horizontal lines
+    draw_lines(img_with_filtered_lines_1, filtered_vertical_lines_1, (0, 255, 0))  # Green for vertical lines
+    draw_lines(img_with_filtered_lines_1, filtered_horizontal_lines_1, (255, 0, 0))  # Blue for horizontal lines
 
     # Create a copy of the original image to draw filtered lines on
     img_with_filtered_lines_2 = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
