@@ -115,6 +115,6 @@ def process_image_multiple_squares(img):
     squares = split_image_into_squares(cropped_image)
 
     # shrink the squares to remove the border
-    squares = crop_squared_by_border_width(squares, border_width=2)
+    squares = crop_squared_by_border_width(squares, border_width=5)
 
     return squares

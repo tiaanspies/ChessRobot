@@ -72,28 +72,17 @@ def play_again():
 
 class ChessManager:
     def __init__(self):
-        self.stockfish = Stockfish(r"/home/tpie/ChessRobot/Stockfish/Stockfish-sf_15/src/stockfish", depth=15, parameters={"UCI_Elo":500})
+        self.stockfish = Stockfish(
+            r"/home/tpie/ChessRobot/Stockfish/Stockfish-sf_15/src/stockfish", 
+            parameters={"UCI_Elo":500, "UCI_LimitStrength":True},
+            depth=10
+        )
         self.pyboard = chess.Board()
         self.human_color = None
         self.robot_color = None
         self.current_visboard = np.vstack((np.ones((2,8), dtype=np.int64), np.zeros((4,8), dtype=np.int64), np.ones((2,8), dtype=np.int64)*-1))
         self.prev_visboard = self.current_visboard.copy()
-        self.board_vision = ChessVisionHough("GMM")
-
-    def setup_board_vision_empty(self, cam):
-
-        # Initialize ChessBoard object and select optimal thresh
-        # Board must be empty when this is called
-        while True:
-            ans = input("Is the empty board setup in view? (y/n): ").strip().lower()
-            if ans == 'y':
-                _, img = cam.read()
-
-                self.board_vision.setup_empty_board(img)
-
-                return
-            else:
-                print("Please put the empty board is in view.")
+        self.board_vision = ChessVisionHough("black_white")
 
     def setup_board_vision_starting_position(self, cam):
 
@@ -307,12 +296,10 @@ def main():
     robot = Robot()
     chess_manager = ChessManager()
     
-
     # move robot to starting position
     robot.move_home()
 
     # create an instance of the cam and board classes for converting input from the camera
-    chess_manager.setup_board_vision_empty(robot.cam)
     chess_manager.setup_board_vision_starting_position(robot.cam)
     
     #determine which color the Robot and human are playing.

@@ -22,21 +22,13 @@ class ChessVisionHough:
         # Process image into individual squares snippets (Array of 64 squares each 2D numpy array with 3 BGR channels)
         self.piece_detection_algo = piece_detection_algo
 
-        
-
         self.square_background_means = None
         self.model_piece_vs_empty = None
         self.model_piece_color = None
+        self.piece_threshold = None
 
         # in order to setup the class the following functions must be run
-        # 1. setup_empty_board
         # 2. setup_starting_position_board
-    
-    def setup_empty_board(self, img):
-        """
-        Setup the empty board by getting the background means of the empty squares.
-        """
-        self.square_background_means = self.get_background_means(img)
 
     def setup_starting_position_board(self, img):
         """
@@ -50,7 +42,6 @@ class ChessVisionHough:
 
         # get the linear regression model to determine if a square has a piece or not.
         self.model_piece_vs_empty = self.get_piece_vs_empty_model(blurred_hsv_squares)
-        self.model_piece_color = self.get_piece_color_model(squares)
 
 
     def get_piece_vs_empty_model(self, squares):
@@ -64,83 +55,6 @@ class ChessVisionHough:
         # plot_decision_boundary(model, features, labels)
 
         return model
-    
-    def get_background_means(self, img):
-        """
-        Inputs an image of the empty chessboard and returns the means of the V channel for each empty square.
-        """
-        empty_sqaures = proj.process_image_multiple_squares(img)
-
-        gmm_empty_means = []
-
-        for i, empty_square in enumerate(empty_sqaures):
-            empty_square_hsv = cv2.cvtColor(empty_square, cv2.COLOR_BGR2HSV)
-            value_channel = empty_square_hsv[:, :, 2].flatten()
-
-            gmm = GaussianMixture(n_components=1)
-            gmm.fit(value_channel.reshape(-1, 1))
-            gmm_empty_means.append(gmm.means_.flatten()[0])
-
-        return gmm_empty_means
-
-    def predict_piece_color(self, square):
-        """
-        Predicts the color of the piece on the square.
-        """
-
-        init_square_hsv = cv2.cvtColor(square, cv2.COLOR_BGR2HSV)
-
-        value_channel = init_square_hsv[:, :, 2].flatten()
-
-        gmm_piece = GaussianMixture(n_components=2)
-        gmm_piece.fit(value_channel.reshape(-1, 1))
-
-        means_piece = gmm_piece.means_.flatten()
-        mean_empty = self.square_background_means[i]
-
-        piece_mean = max(means_piece, key=lambda x: abs(x - mean_empty))
-
-        prediction = self.model_piece_color.predict([piece_mean])
-        
-        if prediction == 0:
-            prediction = -1
-        return prediction
-
-
-    def get_piece_color_model(self, init_squares):
-        """
-        Inputs a list of 64 squares and returns a logistic regression model that determins if a square has a white or black piece."""
-        piece_means = []
-
-        for i, init_square in enumerate(init_squares):
-            if i // 8 in [2, 3, 4, 5]:
-                continue
-            init_square_hsv = cv2.cvtColor(init_square, cv2.COLOR_BGR2HSV)
-
-            value_channel = init_square_hsv[:, :, 2].flatten()
-
-            gmm_piece = GaussianMixture(n_components=2)
-            gmm_piece.fit(value_channel.reshape(-1, 1))
-
-            means_piece = gmm_piece.means_.flatten()
-            mean_empty = self.square_background_means[i]
-
-            piece_mean = max(means_piece, key=lambda x: abs(x - mean_empty))
-            piece_means.append(piece_mean)
-
-        labels = get_init_piece_labels()
-        model = get_logistic_regression_model(piece_means, labels)
-
-        return model
-    
-    def fit_gmm(self, v_channel):
-        """
-        Fits a Gaussian Mixture Model to the V channel
-        """
-        gmm = GaussianMixture(n_components=2, covariance_type='full', random_state=0)
-        gmm.fit(v_channel.reshape(-1, 1))
-
-        return gmm
 
     def indentify_piece_ids(self, img):
         """
@@ -150,18 +64,17 @@ class ChessVisionHough:
 
         # preprocess the squares (apply Gaussian blur and convert to HSV)
         blurred_hsv_squares = [preprocess_square(square) for square in squares]
-
+        
+        # find which squares are empty
         piece_v_empty = self.model_piece_vs_empty.predict(extract_features(blurred_hsv_squares))
+        piece_squares = [square for i, square in enumerate(blurred_hsv_squares) if piece_v_empty[i] != 0]
 
         if self.piece_detection_algo == "standard":
-            piece_squares = [square for i, square in enumerate(blurred_hsv_squares) if piece_v_empty[i] != 0]
             piece_label_ids = self.predict_piece_standard(piece_squares)
         elif self.piece_detection_algo == "red_green":
-            piece_squares = [square for i, square in enumerate(blurred_hsv_squares) if piece_v_empty[i] != 0]
             piece_label_ids = self.predict_piece_red_green(piece_squares)
-        elif self.piece_detection_algo == "GMM":
-            piece_squares = [square for i, square in enumerate(squares) if piece_v_empty[i] != 0]
-            piece_label_ids = self.predict_piece_GMM(piece_squares)
+        elif self.piece_detection_algo == "black_white":
+            piece_label_ids = self.predict_piece_white_black(piece_squares)
 
         board_ids = []
         for i in range(64):
@@ -170,6 +83,8 @@ class ChessVisionHough:
             else:
                 board_ids.append(piece_label_ids.pop(0))
 
+        print("Board IDS: ")
+        print(board_ids)
         return board_ids   
 
     def predict_piece_standard(self, piece_squares):
@@ -228,17 +143,36 @@ class ChessVisionHough:
             else:
                 piece_label_ids.append(1)   # Green piece (white ID)
 
-        return piece_label_ids
+        return piece_label_ids     
     
-    def predict_piece_GMM(self, squares):
+    def predict_piece_white_black(self, squares):
+        # Define HSV ranges for red and green colors
+        lower_white = np.array([70, 14, 184])
+        upper_white = np.array([180, 255, 255])
+        lower_black = np.array([0, 0, 0])
+        upper_black = np.array([180, 255, 20])
 
         piece_label_ids = []
-        for square in squares:
-            color = self.predict_piece_color()
-            piece_label_ids.append(color)
 
-        return piece_label_ids
-        
+        for i, square in enumerate(squares):
+            # Count red and green pixels
+            square_bgr = cv2.cvtColor(square, cv2.COLOR_HSV2BGR)
+            debug.saveTempImg(square_bgr, f"square_{i}.jpg")
+            white_mask = cv2.inRange(square, lower_white, upper_white)
+            black_mask = cv2.inRange(square, lower_black, upper_black)
+
+            white_count = np.sum(white_mask)
+            black_count = np.sum(black_mask)
+
+            # Determine piece color based on the count
+            if white_count > black_count:
+                piece_label_ids.append(1)  
+            elif black_count > white_count:
+                piece_label_ids.append(-1) 
+            else:
+                raise "Could not spot piece color for number {}".format(i)
+
+        return piece_label_ids     
     
     def label_chessboard(self, img):
         """
@@ -346,7 +280,7 @@ def get_init_piece_labels():
     """
     Return an array [32] where 1 is a white piece, -1 is a black piece and 0 is empty.
     """
-    labels = [1]*16+[0]*16
+    labels = [1]*16+[-1]*16
 
     return labels
 
