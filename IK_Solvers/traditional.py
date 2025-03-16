@@ -89,10 +89,17 @@ class MotionPlanner():
         self.board_coords[:2,:,:] = np.array(np.meshgrid(self.file_coords,self.rank_coords))
     
         # define array for coords of captured pieces
+        x_row_1 = np.ones(10)*(-self.BOARD_WIDTH/2) - 35
+        x_row_2 = np.ones(8)*(-self.BOARD_WIDTH/2) - 65
+        y_row_1 = np.linspace(self.BASE_DIST,self.BASE_DIST + self.BOARD_WIDTH, 10,endpoint=True)
+        y_row_2 = np.linspace(self.BASE_DIST+60,self.BASE_DIST + self.BOARD_WIDTH, 8,endpoint=True)
+        x_coords_storage = np.hstack((x_row_1, x_row_2))
+        y_coords_storage = np.hstack((y_row_1, y_row_2))
+
         self.storage_coords = list(np.vstack((
-            np.ones(15)*(-self.BOARD_WIDTH/2 - 45),
-            np.linspace(self.BASE_DIST,self.BOARD_WIDTH,15,endpoint=True),
-            np.ones(15)*self.GRIP_HEIGHT)
+            x_coords_storage,
+            y_coords_storage,
+            np.ones(18)*self.GRIP_HEIGHT)
         ).T)
         
         #each coordinate has to be 3,1
