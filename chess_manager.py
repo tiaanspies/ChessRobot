@@ -177,17 +177,11 @@ class ChessManager:
         
         # get image
         _, img = cam.read()
-        debug.saveTempImg(img, "chessboard.jpg")
         
         positions = self.board_vision.indentify_piece_ids(img) # turn it into -1, 0, 1 representation
         # self.current_visboard = np.fliplr(np.array(positions).reshape(8,8))
         self.current_visboard = np.array(positions).reshape(8,8)
         human_move = self.compare_visboards() # Compare boards to figure out what piece moved
-        
-        # if move was not successfully detected, start over
-        if human_move is None:
-            print("Let's try that again")
-            return self.perceive_human_move(cam)
         
         # if move was a promotion, find out which piece they chose
         if chess.Move.from_uci(human_move + "q") in self.pyboard.legal_moves:
@@ -298,6 +292,7 @@ def main():
     
     # move robot to starting position
     robot.move_home()
+    robot.motor_commands.gripper.open_gripper()
 
     # create an instance of the cam and board classes for converting input from the camera
     chess_manager.setup_board_vision_starting_position(robot.cam)
@@ -317,7 +312,13 @@ def main():
         
         ### HUMAN'S TURN ###
         # figure out what their move was
-        human_move = chess_manager.perceive_human_move(robot.cam)
+        try:
+            human_move = chess_manager.perceive_human_move(robot.cam)
+        except Exception as e:
+            print(e)
+            print("Failed to perceive move. Trying again.")
+            robot.move_home()
+            human_move = chess_manager.perceive_human_move(robot.cam)
         
         # if not a legal move, have them try again
         if not chess_manager.is_legal_move(human_move):
