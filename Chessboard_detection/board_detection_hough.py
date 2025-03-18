@@ -22,7 +22,7 @@ def detect_lines(canny_img, threshold_angle=15):
 
 
     # Use Hough Line Transform to detect lines
-    lines = cv2.HoughLines(canny_img, 2, np.pi / 180, 200)
+    lines = cv2.HoughLines(canny_img, 2, np.pi / 180, 180)
 
     vertical_lines = []
     horizontal_lines = []
@@ -241,7 +241,36 @@ def ransac_3d(x_pts, y_pts, z_pts, threshold_x=10, threshold_y=0.005, threshold_
 
     return inlier_mask
 
-def ransac_2d(pts, threshold=10):
+def is_vertical(theta, threshold_angle):
+    """
+    Check if a line is vertical based on the angle.
+    Parameters:
+    theta (float): The angle of the line in degrees.
+    threshold_angle (float, optional): The angle threshold to classify a line as vertical. Defaults to 15.
+    Returns:
+    bool: True if the line is vertical, False otherwise.
+    """
+    theta_deg = theta % 360
+    check_1 = abs(theta_deg) < threshold_angle
+    check_2 = abs(theta_deg - 180) < threshold_angle
+    check_3 = abs(theta_deg - 360) < threshold_angle
+    result = check_1 or check_2 or check_3
+    return result
+
+def is_horizontal(theta, threshold_angle=10):
+    """
+    Check if a line is horizontal based on the angle.
+    Parameters:
+    theta (float): The angle of the line in degrees.
+    threshold_angle (float, optional): The angle threshold to classify a line as horizontal. Defaults to 15.
+    Returns:
+    bool: True if the line is horizontal, False otherwise.
+    """
+    theta_deg = theta % 360
+    result = abs(theta_deg - 90) < threshold_angle or abs(theta_deg - 270) < threshold_angle
+    return result
+
+def ransac_2d(pts, threshold=10, threshold_angle=10, vert_only=False, horizontal_only=False):
 
     inlier_best = 0
     inlier_mask = np.zeros(pts.shape[0])
@@ -253,6 +282,15 @@ def ransac_2d(pts, threshold=10):
             pt_1 = pts[pt_1_idx]
             pt_2 = pts[pt_2_idx]
 
+            _, theta = calculate_rho_theta(pt_1, pt_2)
+            angle = np.degrees(theta)
+
+            if vert_only and not is_vertical(angle, threshold_angle):
+                continue
+            
+            if horizontal_only and not is_horizontal(angle, threshold_angle):
+                continue          
+            
             current_inliers = 0
             current_inlier_mask = np.zeros(pts.shape[0])
             for j in range(pts.shape[0]):
@@ -589,24 +627,24 @@ def get_end_points(canny_img, vertical_lines, horizontal_lines):
     img_width = canny_img.shape[1]
     img_height = canny_img.shape[0]
 
-    # Visualize the dilated images with lines drawn over them
-    plt.figure(figsize=(15, 10))
+    # # Visualize the dilated images with lines drawn over them
+    # plt.figure(figsize=(15, 10))
 
-    # Vertical dilated image with vertical lines
-    plt.subplot(1, 2, 1)
-    plt.title('Vertical Dilated with Vertical Lines')
-    vertical_dilated_with_lines = cv2.cvtColor(vertical_dilated, cv2.COLOR_GRAY2BGR)
-    draw_lines(vertical_dilated_with_lines, horizontal_lines, (0, 255, 0))  # Green for vertical lines
-    plt.imshow(cv2.cvtColor(vertical_dilated_with_lines, cv2.COLOR_BGR2RGB))
+    # # Vertical dilated image with vertical lines
+    # plt.subplot(1, 2, 1)
+    # plt.title('Vertical Dilated with Vertical Lines')
+    # vertical_dilated_with_lines = cv2.cvtColor(vertical_dilated, cv2.COLOR_GRAY2BGR)
+    # draw_lines(vertical_dilated_with_lines, horizontal_lines, (0, 255, 0))  # Green for vertical lines
+    # plt.imshow(cv2.cvtColor(vertical_dilated_with_lines, cv2.COLOR_BGR2RGB))
 
-    # Horizontal dilated image with horizontal lines
-    plt.subplot(1, 2, 2)
-    plt.title('Horizontal Dilated with Horizontal Lines')
-    horizontal_dilated_with_lines = cv2.cvtColor(horizontal_dilated, cv2.COLOR_GRAY2BGR)
-    draw_lines(horizontal_dilated_with_lines, vertical_lines, (255, 0, 0))  # Blue for horizontal lines
-    plt.imshow(cv2.cvtColor(horizontal_dilated_with_lines, cv2.COLOR_BGR2RGB))
+    # # Horizontal dilated image with horizontal lines
+    # plt.subplot(1, 2, 2)
+    # plt.title('Horizontal Dilated with Horizontal Lines')
+    # horizontal_dilated_with_lines = cv2.cvtColor(horizontal_dilated, cv2.COLOR_GRAY2BGR)
+    # draw_lines(horizontal_dilated_with_lines, vertical_lines, (255, 0, 0))  # Blue for horizontal lines
+    # plt.imshow(cv2.cvtColor(horizontal_dilated_with_lines, cv2.COLOR_BGR2RGB))
 
-    plt.show()
+    # plt.show()
 
     # Scan left and right for the horizontal lines.
     for rho, theta in horizontal_lines:
@@ -619,14 +657,28 @@ def get_end_points(canny_img, vertical_lines, horizontal_lines):
         vertical_starts, vertical_ends = find_line_end_pts_vertical(img_width, img_height, rho, theta, horizontal_dilated)
         vertical_start_pts.extend(vertical_starts)
         vertical_end_pts.extend(vertical_ends)
+    
+    # # Plot the start and end points on the canny image
+    # plt.figure(figsize=(10, 10))
+    # plt.imshow(canny_img, cmap='gray')
+    # for (x, y) in horizontal_start_pts:
+    #     plt.plot(x, y, 'go')  # Green dots for start points
+    # for (x, y) in horizontal_end_pts:
+    #     plt.plot(x, y, 'ro')  # Red dots for end points
+    # for (x, y) in vertical_start_pts:
+    #     plt.plot(x, y, 'bo')
+    # for (x, y) in vertical_end_pts:
+    #     plt.plot(x, y, 'yo')
+    # plt.title('Start and End Points on Canny Image')
+    # plt.show()
 
     # find the best fit line for the start and end points
-    horizontal_start_pts = ransac_2d(np.array(horizontal_start_pts), threshold=5)
-    horizontal_end_pts = ransac_2d(np.array(horizontal_end_pts), threshold=5)
-    vertical_start_pts = ransac_2d(np.array(vertical_start_pts), threshold=5)
-    vertical_end_pts = ransac_2d(np.array(vertical_end_pts), threshold=5)
+    horizontal_start_pts = ransac_2d(np.array(horizontal_start_pts), threshold=3, vert_only=True)
+    horizontal_end_pts = ransac_2d(np.array(horizontal_end_pts), threshold=3, vert_only=True)
+    vertical_start_pts = ransac_2d(np.array(vertical_start_pts), threshold=3, horizontal_only=True)
+    vertical_end_pts = ransac_2d(np.array(vertical_end_pts), threshold=3, horizontal_only=True)
 
-    # Plot the start and end points on the canny image
+    # # Plot the start and end points on the canny image
     # plt.figure(figsize=(10, 10))
     # plt.imshow(canny_img, cmap='gray')
     # for (x, y) in horizontal_start_pts:
