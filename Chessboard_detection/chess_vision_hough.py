@@ -146,7 +146,10 @@ class ChessVisionHough:
         return piece_label_ids     
     
     def predict_piece_white_black(self, squares):
-        # Define HSV ranges for red and green colors
+        """
+        Predicts whether a square contains a white or black piece, giving more weight to pixels in the center of the square.
+        """
+        # Define HSV ranges for white and black colors
         lower_white = np.array([70, 14, 184])
         upper_white = np.array([180, 255, 255])
         lower_black = np.array([0, 0, 0])
@@ -155,24 +158,37 @@ class ChessVisionHough:
         piece_label_ids = []
 
         for i, square in enumerate(squares):
-            # Count red and green pixels
-            square_bgr = cv2.cvtColor(square, cv2.COLOR_HSV2BGR)
-            debug.saveTempImg(square_bgr, f"square_{i}.jpg")
+            # Create a weighting mask with higher weights at the center
+            h, w, _ = square.shape
+            y, x = np.meshgrid(np.linspace(-0.4, 0.4, w), np.linspace(-0.4, 0.4, h))
+            distance_from_center = np.sqrt(x**2 + y**2)
+            weight_mask = 1 - distance_from_center  # Higher weights at the center
+            weight_mask = np.clip(weight_mask, 0, 1)  # Ensure weights are between 0 and 1
+
+            # Convert the square to HSV
+            # square_hsv = cv2.cvtColor(square, cv2.COLOR_BGR2HSV)
+
+            # Create masks for white and black pixels
             white_mask = cv2.inRange(square, lower_white, upper_white)
             black_mask = cv2.inRange(square, lower_black, upper_black)
 
-            white_count = np.sum(white_mask)
-            black_count = np.sum(black_mask)
+            white_score_mat = white_mask * weight_mask
+            black_score_mat = black_mask * weight_mask
+            # Apply the weighting mask to the pixel counts
+            white_count_weighted = np.sum(white_score_mat)
+            black_count_weighted = np.sum(black_score_mat)
 
-            # Determine piece color based on the count
-            if white_count > black_count:
-                piece_label_ids.append(1)  
-            elif black_count > white_count:
-                piece_label_ids.append(-1) 
+            white_count = np.sum(white_mask)/255
+            black_count = np.sum(black_mask)/255
+            # Determine piece color based on the weighted counts
+            if white_count_weighted > black_count_weighted:
+                piece_label_ids.append(1)  # White piece
+            elif black_count_weighted > white_count_weighted:
+                piece_label_ids.append(-1)  # Black piece
             else:
-                raise "Could not spot piece color for number {}".format(i)
+                raise ValueError(f"Could not determine piece color for square {i}")
 
-        return piece_label_ids     
+        return piece_label_ids    
     
     def label_chessboard(self, img):
         """
