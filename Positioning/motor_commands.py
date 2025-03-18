@@ -64,10 +64,13 @@ class MotorCommandsSerial:
         axis_names = ['base', 'shoulder', 'elbow']
 
         positions_current  = self.motor.read_pos_multi_angle(axis_names)
-
-        for axis in axis_names:
-            if abs(positions_current[axis] - position_target[axis]) > 2:
-                return False
+        try:
+            for axis in axis_names:
+                if abs(positions_current[axis] - position_target[axis]) > 2:
+                    return False
+        except KeyError:
+            print("KeyError in in_position")
+            return False
         return True
 
     def run(self, thetas, angletype='rad'):
@@ -88,9 +91,9 @@ class MotorCommandsSerial:
         
         #if the robot is not in the starting position, move to the starting position
         pos_dict = {
-            'base': angle[0, 0],
-            'shoulder': angle[1, 0],
-            'elbow': angle[2, 0]
+            'base': angles[0, 0],
+            'shoulder': angles[1, 0],
+            'elbow': angles[2, 0]
         }
         if not self.in_position(pos_dict):
             self.go_to(angles[:,0], 'deg')

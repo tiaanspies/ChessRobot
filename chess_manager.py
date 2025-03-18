@@ -47,13 +47,13 @@ def humansTurnFinished():
     """Simple yes/no question to determine if human is done with their turn. This will eventually be the function that flags when the clock is pressed"""
     
     ans = input("Are you finished? (y/n): ").strip().lower()
-    if ans not in ['y', 'n']:
+    if ans not in ['y', 'n', '']:
         print(f'"{ans}" is invalid, please try again...')
         return humansTurnFinished()
     elif ans == 'n':
         print('Take your time, human')
         return humansTurnFinished()
-    elif ans == 'y':
+    elif ans == 'y' or ans == '':
         return True
     return False
 
@@ -74,7 +74,7 @@ class ChessManager:
     def __init__(self):
         self.stockfish = Stockfish(
             r"/home/tpie/ChessRobot/Stockfish/Stockfish-sf_15/src/stockfish", 
-            parameters={"UCI_Elo":500, "UCI_LimitStrength":True},
+            parameters={"UCI_Elo":400, "UCI_LimitStrength":True},
             depth=10
         )
         self.pyboard = chess.Board()

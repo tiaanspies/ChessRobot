@@ -222,7 +222,7 @@ class SerialServoCtrl:
             if servo_config["reverse"]:
                 angle_positions[axis] = servo_config["zero_offset"] - positions[servo_id]
             else:
-                angle_positions[axis] = servo_config["zero_offset"] + positions[servo_id]
+                angle_positions[axis] = positions[servo_id] - servo_config["zero_offset"]
 
         return angle_positions
     
