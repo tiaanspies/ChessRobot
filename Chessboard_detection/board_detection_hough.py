@@ -500,7 +500,7 @@ def find_line_end_pts_horizontal(img_width, img_height, rho, theta, vertical_dil
     horizontal_start_pts = []
     horizontal_end_pts = []
 
-    scan_right = np.linspace(img_width // 2, img_width-1).astype(int)
+    scan_right = np.arange(img_width // 2, img_width-1)
     for x in scan_right:
         y = int(-np.cos(theta)/np.sin(theta) * x + rho/np.sin(theta))
         if y >= img_height or y < 0:
@@ -512,7 +512,7 @@ def find_line_end_pts_horizontal(img_width, img_height, rho, theta, vertical_dil
             horizontal_end_pts.append((x, y))
             break
     
-    scan_left = np.linspace(img_width // 2, 0).astype(int)
+    scan_left = np.arange(img_width // 2, 0, -1)
     for x in scan_left:
         y = int(-np.cos(theta)/np.sin(theta) * x + rho/np.sin(theta))
 
@@ -531,7 +531,7 @@ def find_line_end_pts_vertical(img_width, img_height, rho, theta, horizontal_dil
     vertical_start_pts = []
     vertical_end_pts = []
 
-    scan_down = np.linspace(img_height // 2, img_height-1).astype(int)
+    scan_down = np.arange(img_height // 2, img_height-1)
     for y in scan_down:
         if theta == 0:
             x = int(rho)
@@ -547,7 +547,7 @@ def find_line_end_pts_vertical(img_width, img_height, rho, theta, horizontal_dil
             vertical_end_pts.append((x, y))
             break
     
-    scan_up = np.linspace(img_height // 2, 0).astype(int)
+    scan_up = np.arange(img_height // 2, 0, -1)
     for y in scan_up:
         if theta == 0:
             x = int(rho)
@@ -589,6 +589,25 @@ def get_end_points(canny_img, vertical_lines, horizontal_lines):
     img_width = canny_img.shape[1]
     img_height = canny_img.shape[0]
 
+    # Visualize the dilated images with lines drawn over them
+    plt.figure(figsize=(15, 10))
+
+    # Vertical dilated image with vertical lines
+    plt.subplot(1, 2, 1)
+    plt.title('Vertical Dilated with Vertical Lines')
+    vertical_dilated_with_lines = cv2.cvtColor(vertical_dilated, cv2.COLOR_GRAY2BGR)
+    draw_lines(vertical_dilated_with_lines, horizontal_lines, (0, 255, 0))  # Green for vertical lines
+    plt.imshow(cv2.cvtColor(vertical_dilated_with_lines, cv2.COLOR_BGR2RGB))
+
+    # Horizontal dilated image with horizontal lines
+    plt.subplot(1, 2, 2)
+    plt.title('Horizontal Dilated with Horizontal Lines')
+    horizontal_dilated_with_lines = cv2.cvtColor(horizontal_dilated, cv2.COLOR_GRAY2BGR)
+    draw_lines(horizontal_dilated_with_lines, vertical_lines, (255, 0, 0))  # Blue for horizontal lines
+    plt.imshow(cv2.cvtColor(horizontal_dilated_with_lines, cv2.COLOR_BGR2RGB))
+
+    plt.show()
+
     # Scan left and right for the horizontal lines.
     for rho, theta in horizontal_lines:
         horizontal_starts, horizontal_ends = find_line_end_pts_horizontal(img_width, img_height, rho, theta, vertical_dilated)
@@ -602,12 +621,12 @@ def get_end_points(canny_img, vertical_lines, horizontal_lines):
         vertical_end_pts.extend(vertical_ends)
 
     # find the best fit line for the start and end points
-    horizontal_start_pts = ransac_2d(np.array(horizontal_start_pts), threshold=10)
-    horizontal_end_pts = ransac_2d(np.array(horizontal_end_pts), threshold=10)
-    vertical_start_pts = ransac_2d(np.array(vertical_start_pts), threshold=10)
-    vertical_end_pts = ransac_2d(np.array(vertical_end_pts), threshold=10)
+    horizontal_start_pts = ransac_2d(np.array(horizontal_start_pts), threshold=5)
+    horizontal_end_pts = ransac_2d(np.array(horizontal_end_pts), threshold=5)
+    vertical_start_pts = ransac_2d(np.array(vertical_start_pts), threshold=5)
+    vertical_end_pts = ransac_2d(np.array(vertical_end_pts), threshold=5)
 
-    # # Plot the start and end points on the canny image
+    # Plot the start and end points on the canny image
     # plt.figure(figsize=(10, 10))
     # plt.imshow(canny_img, cmap='gray')
     # for (x, y) in horizontal_start_pts:
@@ -679,27 +698,32 @@ def find_board_corners(img):
     grouped_vertical_lines = group_lines(vertical_lines, image_width, image_height)
     grouped_horizontal_lines = group_lines(horizontal_lines, image_width, image_height)
 
-    # Find the chessboard borders by scanning along the lines inside.
-    board_x_range, board_y_range = get_end_points(canny_img, grouped_vertical_lines, grouped_horizontal_lines)
-    filtered_horizontal_lines_1, filtered_vertical_lines_1 = remove_out_of_lim_lines(grouped_horizontal_lines, grouped_vertical_lines, board_x_range, board_y_range)
-
     # sort lines
-    sorted_vertical_lines = sort_lines(filtered_vertical_lines_1)
-    sorted_horizontal_lines = sort_lines(filtered_horizontal_lines_1)
+    sorted_vertical_lines = sort_lines(grouped_vertical_lines)
+    sorted_horizontal_lines = sort_lines(grouped_horizontal_lines)
+
+    # Find the chessboard borders by scanning along the lines inside.
+    board_x_range, board_y_range = get_end_points(canny_img, sorted_vertical_lines, sorted_horizontal_lines)
+    filtered_horizontal_lines_1, filtered_vertical_lines_1 = remove_out_of_lim_lines(
+                                                                sorted_horizontal_lines, 
+                                                                sorted_vertical_lines, 
+                                                                board_x_range, 
+                                                                board_y_range
+                                                            )
 
     # Discard outliers based on the closest distances
-    filtered_vertical_lines_2 = discard_outliers(sorted_vertical_lines, sorted_vertical_lines)
-    filtered_horizontal_lines_2 = discard_outliers(sorted_horizontal_lines, sorted_horizontal_lines)
+    filtered_vertical_lines_2 = discard_outliers(filtered_vertical_lines_1)
+    filtered_horizontal_lines_2 = discard_outliers(filtered_horizontal_lines_1)
 
-    vert_valid = check_if_valid(sorted_vertical_lines)
-    hor_valid = check_if_valid(sorted_horizontal_lines)
+    vert_valid = check_if_valid(filtered_vertical_lines_2)
+    hor_valid = check_if_valid(filtered_horizontal_lines_2)
 
     if not vert_valid or not hor_valid:
         print("Lines are not valid!!!")
 
     # shift the lines by 2 pixels
     shifted_vertical_lines = shift_lines(filtered_vertical_lines_2, 1)
-    shifted_horizontal_lines = shift_lines(sorted_horizontal_lines, 1)
+    shifted_horizontal_lines = shift_lines(filtered_horizontal_lines_2, 1)
 
     intersection_points = find_all_intersections(shifted_vertical_lines, shifted_horizontal_lines).reshape(7, 7, 2)
 
