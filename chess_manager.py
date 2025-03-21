@@ -109,11 +109,17 @@ class ChessManager:
 
     def compute_robot_move(self, human_move=None):
         """takes in the game in it's current state and returns it having made one best move or None if robot won"""
-        
+        # Move Cases
+        # 1. Direct capture
+        # 2. En passant
+        # 3. Promotion
+        # 4. Castling
+        # 5. Regular move
         best_move = self.stockfish.get_best_move()
 
         # handle captures
         capture = self.stockfish.will_move_be_a_capture(best_move)
+  
         if capture is self.stockfish.Capture.DIRECT_CAPTURE:
             capture_square = best_move[2:]
         elif capture is self.stockfish.Capture.EN_PASSANT:
@@ -346,6 +352,7 @@ def main():
 # TODO: handle castling for robot
 # TODO: make waypoints that are more smooth and won't result in a jerky motion straight up, stop, over, stop, down. - started this with quintecs
 # TODO: build in a check that the physical move worked according to the camera
+# TODO: Add a way to reset the board if the human makes a mistake
 
 if __name__ == "__main__":
     while GAME_COUNTER == 0 or play_again():
