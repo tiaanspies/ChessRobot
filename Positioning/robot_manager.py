@@ -134,7 +134,7 @@ class Robot:
 
         self.motor_commands.filter_go_to(angles, self.motor_commands.GRIPPER_OPEN)
 
-    def execute_chess_move(self, robot_move, capture_square):
+    def execute_chess_move(self, robot_move, capture_square, rook_move):
         """creates and executes the robot's physical move"""
         start = self.motion_planner.get_coords(robot_move[:2])
         goal = self.motion_planner.get_coords(robot_move[2:])
@@ -142,7 +142,14 @@ class Robot:
         if capture_square is not None:
             capture_square = self.motion_planner.get_coords(capture_square)
 
+        if rook_move is not None:
+            rook_start = self.motion_planner.get_coords(rook_move[:2])
+            rook_goal = self.motion_planner.get_coords(rook_move[2:])
+        else:
+            rook_start = None
+            rook_goal = None
+
         print(f"Start: {start}, Goal: {goal}, Capture: {capture_square}")
-        path, gripper_commands = self.motion_planner.generate_quintic_path(start, goal, capture_square) # generate waypoints
+        path, gripper_commands = self.motion_planner.generate_quintic_path(start, goal, capture_square, rook_start, rook_goal) # generate waypoints
         
         self.move_to_path(path, gripper_commands, True) # move the robot
