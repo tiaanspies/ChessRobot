@@ -145,7 +145,7 @@ class MotionPlanner():
 
         return np.hstack((first_moves, second_moves))
 
-    def generate_quintic_path(self, start, goal, cap_sq=None, rook_start=None, rook_goal=None, step=20):
+    def generate_quintic_path(self, start, goal, cap_sq=None, rook_start=None, rook_goal=None, step=40):
         """creates a 3xN array of waypoints to and from home, handling captures and lifting over pieces"""
 
         lift_vector = np.array([[0],[0],[self.LIFT]])
@@ -156,8 +156,9 @@ class MotionPlanner():
             move1 = self.quintic_line(self.HOME, cap_sq+lift_vector, step) # Move above the piece to be captured
             # Gripper medium open
             move2 = self.quintic_line(cap_sq+lift_vector, cap_sq, step/2) # Move down to piece
+            move2 = np.hstack((move2, np.tile(move2[:, -1].reshape(3, 1), 2))) # repeat the move to wait before closing gripper
             # Close Gripper
-            move3 = self.quintic_line(cap_sq, cap_sq + lift_vector, step/2) # Lift piece
+            move3 = self.quintic_line(cap_sq, cap_sq + lift_vector, step) # Lift piece
             move4 = self.quintic_line(cap_sq + lift_vector, storage + lift_vector_storage, step) # Move to storage
             move5 = self.quintic_line(storage + lift_vector_storage, storage, step) # Place piece in storage
             #Open Gripper
@@ -165,6 +166,7 @@ class MotionPlanner():
             move7 = self.quintic_line(storage + lift_vector_storage, start + lift_vector, step) # Move to capturing piece start
             # Gripper medium open
             move8 = self.quintic_line(start + lift_vector, start, step/2) # Move down to capturing piece
+            move8 = np.hstack((move8, np.tile(move8[:, -1].reshape(3, 1), 2)))
 
             first_moves = np.hstack((move1, move2, move3, move4, move5, move6, move7, move8))
 
@@ -186,7 +188,8 @@ class MotionPlanner():
         else: # No capture
             move1 = self.quintic_line(self.HOME, start+lift_vector, step) # Move above the piece being moved
             #gripper medium open
-            move2 = self.quintic_line(start+lift_vector, start, step) # Move down to piece
+            move2 = self.quintic_line(start+lift_vector, start, step/2) # Move down to piece
+            move2 = np.hstack((move2, np.tile(move2[:, -1].reshape(3, 1), 2))) # repeate the move to wait before closing gripper
 
             first_moves = np.hstack((move1, move2))
 
@@ -195,13 +198,13 @@ class MotionPlanner():
             gripper_commands_move1 = np.zeros((1, np.size(move1, 1) + np.size(move2, 1)))
             gripper_commands_move1[0, gripper_medium] = 2
         
-        if rook_start is None:
+        if rook_start is None: #normal move
             #Close Gripper
-            move1 = self.quintic_line(start, start+lift_vector, step/2) # Lift piece
+            move1 = self.quintic_line(start, start+lift_vector, step) # Lift piece
             move2 = self.quintic_line(start+lift_vector, goal+lift_vector, step) # Move to goal
             move3 = self.quintic_line(goal+lift_vector, goal, step/2) # Place piece
             #Open Gripper
-            move4 = self.quintic_line(goal, goal+lift_vector, step/2) # Lift gripper
+            move4 = self.quintic_line(goal, goal+lift_vector, step) # Lift gripper
             move5 = self.quintic_line(goal+lift_vector, self.HOME, step) # Move to home
             second_moves = np.hstack((move1, move2, move3, move4, move5))
 
@@ -214,22 +217,23 @@ class MotionPlanner():
             gripper_commands_move2[0, gripper_open] = 3
         else: # normal move and castle
             #Close Gripper
-            move1 = self.quintic_line(start, start+lift_vector, step/2) # Lift piece
+            move1 = self.quintic_line(start, start+lift_vector, step) # Lift piece
             move2 = self.quintic_line(start+lift_vector, goal+lift_vector, step) # Move to goal
             move3 = self.quintic_line(goal+lift_vector, goal, step/2) # Place piece
             #Open Gripper
-            move4 = self.quintic_line(goal, goal+lift_vector, step/2) # Lift gripper
+            move4 = self.quintic_line(goal, goal+lift_vector, step) # Lift gripper
             move5 = self.quintic_line(goal+lift_vector, rook_start+lift_vector, step) # Move to rook start
             # gripper medium open
             move6 = self.quintic_line(rook_start+lift_vector, rook_start, step/2) # Move down to rook start
             #Close Gripper
-            move7 = self.quintic_line(rook_start, rook_start+lift_vector, step/2) # Lift rook
+            move7 = self.quintic_line(rook_start, rook_start+lift_vector, step) # Lift rook
             move8 = self.quintic_line(rook_start+lift_vector, rook_goal+lift_vector, step) # Move rook to goal
-            move9 = self.quintic_line(rook_goal+lift_vector, rook_goal, step/2)
+            move9 = self.quintic_line(rook_goal+lift_vector, rook_goal, step/2) # place at goal
             #Open Gripper
-            move10 = self.quintic_line(rook_goal, rook_goal+lift_vector, step/2) # Lift gripper
+            move10 = self.quintic_line(rook_goal, rook_goal+lift_vector, step) # Lift gripper
             move11 = self.quintic_line(rook_goal+lift_vector, self.HOME, step)
-            second_moves = np.hstack((move1, move2, move3, move4, move5))
+            second_moves = np.hstack((move1, move2, move3, move4, move5, move6, 
+                                      move7, move8, move9, move10, move11))
 
             gripper_close1 = 0
             gripper_open1 = np.size(move1, 1) + np.size(move2, 1) + np.size(move3, 1)
@@ -325,8 +329,8 @@ class MotionPlanner():
         for waypoint_idx in range(1, num_waypoints):
             waypoint = np.hstack((path[:,waypoint_idx]))
             theta_path[:,waypoint_idx] = self.chess_arm.inverse_kinematics_grad_descent(waypoint)
-            if waypoint_idx % 10 == 0:
-                print(f"Waypoint {waypoint_idx}/{num_waypoints} complete.")
+            # if waypoint_idx % 10 == 0:
+                # print(f"Calculating robot path: {waypoint_idx}/{num_waypoints} complete.")
         return theta_path
 
     def forward_kinematics(self, thetas):
@@ -398,6 +402,7 @@ class MotionPlanner():
         for step in range(n_steps):
             path[:,step] = [xqnt.calc_point(step), yqnt.calc_point(step), zqnt.calc_point(step)]
         
+        path[:, -1] = goal.flatten()
         return path
     
     @staticmethod

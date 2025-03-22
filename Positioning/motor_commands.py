@@ -59,18 +59,27 @@ class MotorCommandsSerial:
         else:
             self.motor.move_to_multi_angle_pos(500, pos_dict)
 
-    def in_position(self, position_target):
+    def in_position(self, position_target, threshold_degrees=4):
         """checks if the robot is in the starting position"""
         axis_names = ['base', 'shoulder', 'elbow']
 
         positions_current  = self.motor.read_pos_multi_angle(axis_names)
         try:
             for axis in axis_names:
-                if abs(positions_current[axis] - position_target[axis]) > 2:
+                if abs(positions_current[axis] - position_target[axis]) > threshold_degrees:
                     return False
         except KeyError:
-            print("KeyError in in_position")
-            return False
+            print("KeyError in in_position. Trying again.")
+            positions_current  = self.motor.read_pos_multi_angle(axis_names)
+
+            try:
+                for axis in axis_names:
+                    if abs(positions_current[axis] - position_target[axis]) > threshold_degrees:
+                        return False
+                
+            except KeyError:
+                print("2nd Read also failed. Returning False.")
+                return False
         return True
 
     def run(self, thetas, angletype='rad'):
@@ -95,7 +104,7 @@ class MotorCommandsSerial:
             'shoulder': angles[1, 0],
             'elbow': angles[2, 0]
         }
-        if not self.in_position(pos_dict):
+        if not self.in_position(pos_dict, threshold_degrees=4):
             self.go_to(angles[:,0], 'deg')
 
         # loop through the rest of the positions    
@@ -115,7 +124,7 @@ class MotorCommandsSerial:
             elif gripper_command == 3:
                 self.gripper.open_gripper()
 
-            self.motor.move_to_multi_angle_pos(200, pos_dict)
+            self.motor.move_to_multi_angle_pos(400, pos_dict)
 
     def load_path(self, thetas, plan_points = None, angletype='rad'):
         """

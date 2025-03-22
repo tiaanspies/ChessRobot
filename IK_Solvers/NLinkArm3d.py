@@ -116,7 +116,7 @@ class NLinkArm:
             return np.linalg.norm(ref_ee_pose - np.array(ee_pos))
 
         initial_guess = self.get_joint_angles()
-        result = minimize(objective, initial_guess, method='BFGS', options={'gtol': 0.1})
+        result = minimize(objective, initial_guess, method='BFGS', options={'gtol': 0.2})
         self.set_joint_angles(result.x)
         
         if plot:

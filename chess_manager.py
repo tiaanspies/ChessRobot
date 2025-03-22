@@ -33,8 +33,7 @@ import chess
 # from Chessboard_detection import Chess_Vision_kmeans
 from Chessboard_detection.chess_vision_hough import ChessVisionHough
 from Positioning.robot_manager import Robot
-import logging
-import Chessboard_detection.pi_debugging as debug
+from time import sleep
 ### INITIALIZE ###
 
 # define global variables for tracking the running score
@@ -46,7 +45,7 @@ GAME_COUNTER = 0
 def humansTurnFinished():
     """Simple yes/no question to determine if human is done with their turn. This will eventually be the function that flags when the clock is pressed"""
     
-    ans = input("Are you finished? (y/n): ").strip().lower()
+    ans = input("Your turn. Are you finished? (y/n): ").strip().lower()
     if ans not in ['y', 'n', '']:
         print(f'"{ans}" is invalid, please try again...')
         return humansTurnFinished()
@@ -74,7 +73,7 @@ class ChessManager:
     def __init__(self):
         self.stockfish = Stockfish(
             r"/home/tpie/ChessRobot/Stockfish/Stockfish-sf_15/src/stockfish", 
-            parameters={"UCI_Elo":400, "UCI_LimitStrength":True},
+            parameters={"UCI_Elo":400, "UCI_LimitStrength":'true'},
             depth=10
         )
         self.pyboard = chess.Board()
@@ -112,8 +111,6 @@ class ChessManager:
         
         best_move = self.stockfish.get_best_move()
 
-        print(f"Robot's move: {best_move}")
-
         return best_move
     
     def compute_human_move(self, human_move):
@@ -121,7 +118,7 @@ class ChessManager:
         self.pyboard.push_uci(human_move)
         self.stockfish.make_moves_from_current_position([human_move])
     
-    def update_visboard(self, move, capture=None):
+    def update_visboard(self):
         """Updates the -1, 0, 1 representation of the board"""
         piece_map = self.pyboard.piece_map()
         board_new = np.zeros((8,8), dtype=np.int64)
@@ -148,6 +145,10 @@ class ChessManager:
         self.current_visboard = np.array(positions).reshape(8,8)
         human_move = self.compare_visboards() # Compare boards to figure out what piece moved
         
+        if human_move is None:
+            self.current_visboard = self.prev_visboard.copy()
+            return None
+        
         # if move was a promotion, find out which piece they chose
         if chess.Move.from_uci(human_move + "q") in self.pyboard.legal_moves:
             human_move += input("Which piece did you promote the pawn to? [q,r,b,n]: ")
@@ -157,18 +158,6 @@ class ChessManager:
     def compare_visboards(self):
         """compares the CV output with most recent board and outputs the move that was made or None if it can't tell"""
         
-        # debugging
-        '''
-        print("current:")
-        print(current)
-        print("previous:")
-        print(previous)
-        print("compared:")
-        print(current!=previous)
-        print("Human:")
-        print(current==HUMAN)
-        '''
-
         # deal with castling
         if np.sum(self.current_visboard!=self.prev_visboard) >= 4:
             if self.human_color == chess.WHITE:
@@ -177,7 +166,7 @@ class ChessManager:
                 elif self.pyboard.has_queenside_castling_rights(chess.WHITE) and (np.sum(self.current_visboard.ravel()[2:5] != self.prev_visboard.ravel()[2:5]) == 3):
                     human_move = "e1c1"
                 else:
-                    ans = input("Detected 4+ changed pieces, but no one castled. Have you reset the turn and played again? ")
+                    print("Detected 4+ changed pieces, but no one castled. Please reset and play again.")
                     return None
             else: # Robot is white
                 if self.pyboard.has_kingside_castling_rights(chess.BLACK) and (np.sum(self.current_visboard.ravel()[60:63] != self.prev_visboard.ravel()[60:63]) == 3):
@@ -185,7 +174,7 @@ class ChessManager:
                 elif self.pyboard.has_queenside_castling_rights(chess.BLACK) and (np.sum(self.current_visboard.ravel()[58:61] != self.prev_visboard.ravel()[58:61]) == 3):
                     human_move = "e8c8"
                 else:
-                    ans = input("Detected 4+ changed pieces, but no one castled. Have you reset the turn and played again? ")
+                    print("Detected 4+ changed pieces, but no one castled. Please reset and play again.")
                     return None
         
         # deal with any other type of move
@@ -195,11 +184,9 @@ class ChessManager:
             
             if start_square.size == 0:
                 print("failed to locate which piece was moved")
-                ans = input("Have you reset the turn and played again? ")
                 return None
             elif end_square.size == 0:
                 print("failed to locate where the piece was played")
-                ans = input("Have you reset the turn and played again? ")
                 return None
             
             start_name = chess.square_name(start_square[0])
@@ -214,12 +201,9 @@ class ChessManager:
         """checks if the move is legal"""
         # if move is illegal make human try again
         if chess.Move.from_uci(move) not in self.pyboard.legal_moves:
-            print("Not a valid move. Try again, human")
+            print("Not a valid move. I will be undoing that, human")
             if self.pyboard.is_into_check(chess.Move.from_uci(move)):
                 print("PS, you might want to avoid check this time")
-            
-            # TODO: replace the below with starting human's timer again
-            ans = input("Have you reset the turn and played again? ")
             
             return False
         return True
@@ -268,6 +252,11 @@ class ChessManager:
             end_file = robot_move[2]
             capture_square = end_file + start_rank
 
+        elif robot_move[-1].lower() in ['q','r','b','n']: # promotion
+            promotion_request = robot_move[-1].lower()
+            if self.pyboard.is_capture(uci_move):
+                capture_square = robot_move[2:4]
+
         elif self.pyboard.is_capture(uci_move): # direct capture
             capture_square = robot_move[2:]
 
@@ -279,17 +268,15 @@ class ChessManager:
             elif end_file == 'c':
                 rook_move = 'a' + rank + 'd' + rank
 
-        elif robot_move[-1].lower() in ['q','r','b','n']: # promotion
-            promotion_request = robot_move[-1].lower()    
         else: # regular move
             pass
 
         # make that move and update the board representations
         self.stockfish.make_moves_from_current_position([robot_move])
         self.pyboard.push_uci(robot_move)
-        self.update_visboard(robot_move, capture=capture_square)
+        self.update_visboard()
 
-        return robot_move, capture_square, rook_move, promotion_request
+        return capture_square, rook_move, promotion_request
         
 
 def main():
@@ -320,19 +307,28 @@ def main():
         
         ### HUMAN'S TURN ###
         # figure out what their move was
-        try:
-            human_move = chess_manager.perceive_human_move(robot.cam)
-        except Exception as e:
-            print(e)
-            print("Failed to perceive move. Trying again.")
-            robot.move_home()
-            human_move = chess_manager.perceive_human_move(robot.cam)
-        
-        # if not a legal move, have them try again
-        if not chess_manager.is_legal_move(human_move):
-            continue
+        move_success = False
 
-        chess_manager.compute_human_move(human_move)
+        while not move_success:
+            print("===========================================")
+            human_move = chess_manager.perceive_human_move(robot.cam)
+
+            if human_move is None:
+                humansTurnFinished()
+                continue
+
+            # if not a legal move, have them try again
+            if not chess_manager.is_legal_move(human_move):
+                move_reversed = human_move[2:4] + human_move[0:2]
+                robot.execute_chess_move(move_reversed, None, None)
+                print("That is not a legal move. Please try again.")
+                chess_manager.update_visboard()
+                sleep(1)
+                humansTurnFinished()
+                continue # undo move
+            
+            move_success = True
+            chess_manager.compute_human_move(human_move)
         
         # end the game if the human won   
         if chess_manager.is_game_over():
@@ -343,21 +339,18 @@ def main():
         robot_move = chess_manager.compute_robot_move()
         
         # make the move physically
-        robot_move, capture_square, rook_move, promotion_request = chess_manager.complete_robot_move(robot_move)
+        capture_square, rook_move, promotion_request = chess_manager.complete_robot_move(robot_move)
         robot.execute_chess_move(robot_move, capture_square, rook_move)
 
         if promotion_request is not None:
             promote_dict = {'q': 'queen', 'r': 'rook', 'b': 'bishop', 'n': 'knight'}
             print(f"Please promote the pawn to a {promote_dict[promotion_request]}")
+            input("Press enter when ready")
 
         # end the game if the robot won
         if chess_manager.is_game_over():
             break
 
-# TODO: make a better display of who won. The chess object output doesn't make sense - think I fixed this, will need to test
-# TODO: handle promotions - done for human, not for robot
-# TODO: handle castling for robot
-# TODO: make waypoints that are more smooth and won't result in a jerky motion straight up, stop, over, stop, down. - started this with quintecs
 # TODO: build in a check that the physical move worked according to the camera
 # TODO: Add a way to reset the board if the human makes a mistake
 

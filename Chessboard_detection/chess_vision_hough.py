@@ -83,8 +83,6 @@ class ChessVisionHough:
             else:
                 board_ids.append(piece_label_ids.pop(0))
 
-        print("Board IDS: ")
-        print(board_ids)
         return board_ids   
 
     def predict_piece_standard(self, piece_squares):

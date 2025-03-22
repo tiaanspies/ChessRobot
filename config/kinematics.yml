@@ -7,7 +7,7 @@ IK_CONFIG:
     y: 2
     z: 57
   chess_square_width: 40
-  grip_height: 120
+  grip_height: 115
   home_pos_backward:
     x: 0
     y: 200

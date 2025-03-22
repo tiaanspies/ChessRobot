@@ -149,7 +149,6 @@ class Robot:
             rook_start = None
             rook_goal = None
 
-        print(f"Start: {start}, Goal: {goal}, Capture: {capture_square}")
         path, gripper_commands = self.motion_planner.generate_quintic_path(start, goal, capture_square, rook_start, rook_goal) # generate waypoints
         
         self.move_to_path(path, gripper_commands, True) # move the robot

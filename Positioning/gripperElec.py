@@ -134,9 +134,6 @@ class GripperMotor:
             time.sleep(self.gripper_config["force_time_step"])
             current_angle = self.gripperEncoder.readAngle()
             current_force = self.gripper_servo.angle - current_angle
-
-            print(f"Force: {current_force:.2f}, Angle: {current_angle:.2f}, Motor angle: {self.gripper_servo.angle:.2f}")
-
 def main():
     gripper = GripperMotor()
     gripper.open_gripper()
