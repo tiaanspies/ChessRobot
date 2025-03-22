@@ -62,7 +62,6 @@ class MotionPlanner():
             if h_list_paths is not None:
                 for path in h_list_paths:
                     full_path = Path(H_MATRIX_PATH, path)
-                    print(f"Loading position compensation matrix from {full_path}")
                     self.h_list.append(np.loadtxt(full_path, delimiter=','))
 
         except FileNotFoundError:

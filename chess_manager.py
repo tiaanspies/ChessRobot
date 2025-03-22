@@ -60,7 +60,6 @@ def play_again():
     """decide whether to play again"""
     ans = input("Play again? (y/n): ").strip().lower()
     if ans == 'y':
-        global GAME_COUNTER
         GAME_COUNTER += 1
         return True
     elif ans == 'n':
@@ -278,6 +277,21 @@ class ChessManager:
 
         return capture_square, rook_move, promotion_request
         
+def perceive_w_retries(chess_manager: ChessManager, robot: Robot):
+    try:
+        human_move = chess_manager.perceive_human_move(robot.cam)
+    except:
+        print("Whoops, I couldn't see the board. Trying again...")
+        robot.move_home_backward()
+        sleep(0.5)
+        try:
+            human_move = chess_manager.perceive_human_move(robot.cam)
+        except:
+            print("I still can't see. Tell Tiaan to improve his algorithm.")
+            print("But just so we can keep playing. What move did you make? e.g.'b2b4'")
+            human_move = input()
+
+    return human_move
 
 def main():
     #define managers
@@ -311,7 +325,7 @@ def main():
 
         while not move_success:
             print("===========================================")
-            human_move = chess_manager.perceive_human_move(robot.cam)
+            human_move = perceive_w_retries(chess_manager, robot)
 
             if human_move is None:
                 humansTurnFinished()
@@ -356,4 +370,5 @@ def main():
 
 if __name__ == "__main__":
     while GAME_COUNTER == 0 or play_again():
+        GAME_COUNTER += 1
         main()

@@ -40,7 +40,6 @@ class MotorCommandsSerial:
 
     def go_to(self, theta, angletype='rad'):
         """moves directly to provided theta configuration"""
-        print(theta)
         if angletype == 'rad':
             angle = np.rad2deg(theta)
         elif angletype == 'deg':

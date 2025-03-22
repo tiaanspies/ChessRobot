@@ -112,13 +112,6 @@ class RPiCamera:
 
         # Change statenum to -1 to use saved picture as first picture.
         # Change statenum to 1 to used camera for all pictures
-        print(
-            f"Creating camera object.\n"\
-            f"\t loadSavedFirst: {loadSavedFirst}\n"\
-            f"\t storeImgHist: {storeImgHist}\n"\
-            f"\t camera.rotation: {self.camera.rotation}"
-        )
-
         if loadSavedFirst:
             if absPath is None:
                 raise ValueError("absPath must be given if loadSavedFirst is true. "\
@@ -127,7 +120,7 @@ class RPiCamera:
         else:
             self.stateNum = 1
 
-        sleep(2)
+        sleep(0.5)
 
     def __del__(self):
         self.camera.close()
