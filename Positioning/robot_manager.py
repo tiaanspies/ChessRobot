@@ -25,8 +25,9 @@ class Robot:
 
     def init_camera(self):
         # create camera object
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        abs_path = dir_path + "/Chessboard_detection/TestImages/Temp"
+        # dir_path = os.path.dirname(os.path.realpath(__file__))
+        dir_path = ""
+        abs_path = dir_path + "Chessboard_detection/TestImages/Temp"
         self.cam = Camera_Manager.RPiCamera(abs_path,loadSavedFirst=False, storeImgHist=True)
 
         if not self.cam.isOpened():
