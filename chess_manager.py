@@ -107,35 +107,14 @@ class ChessManager:
         self.human_color = chess.WHITE
         self.robot_color = chess.BLACK
 
-    def compute_robot_move(self, human_move=None):
+    def compute_robot_move(self):
         """takes in the game in it's current state and returns it having made one best move or None if robot won"""
-        # Move Cases
-        # 1. Direct capture
-        # 2. En passant
-        # 3. Promotion
-        # 4. Castling
-        # 5. Regular move
+        
         best_move = self.stockfish.get_best_move()
-
-        # handle captures
-        capture = self.stockfish.will_move_be_a_capture(best_move)
-  
-        if capture is self.stockfish.Capture.DIRECT_CAPTURE:
-            capture_square = best_move[2:]
-        elif capture is self.stockfish.Capture.EN_PASSANT:
-            capture_square = human_move[2:]
-            #TODO: Figure out what this human move is used for
-        elif capture is self.stockfish.Capture.NO_CAPTURE:
-            capture_square = None
-
-        # make that move and update the board representations
-        self.stockfish.make_moves_from_current_position([best_move])
-        self.update_visboard(best_move, capture=capture_square)
-        self.pyboard.push_uci(best_move)
 
         print(f"Robot's move: {best_move}")
 
-        return best_move, capture_square
+        return best_move
     
     def compute_human_move(self, human_move):
         # update board representations
@@ -144,35 +123,15 @@ class ChessManager:
     
     def update_visboard(self, move, capture=None):
         """Updates the -1, 0, 1 representation of the board"""
-        board_new = self.current_visboard.copy()
+        piece_map = self.pyboard.piece_map()
+        board_new = np.zeros((8,8), dtype=np.int64)
 
-        player = board_new.ravel()[chess.parse_square(move[:2])]
-        # deal with castling
-        if move == "e1g1":
-            board_new.ravel()[4:8] = 0
-            board_new.ravel()[5:7] = player
-        elif move == "e8g8":
-            board_new.ravel()[60:] = 0
-            board_new.ravel()[61:63] = player       
-        elif move == "e1c1":
-            board_new.ravel()[0:5] = 0
-            board_new.ravel()[2:4] = player
-        elif move == "e8c8":
-            board_new.ravel()[56:61] = 0
-            board_new.ravel()[58:60] = player
-
-        # deal with other moves
-        else:
-            start_square = chess.parse_square(move[:2])
-            end_square = chess.parse_square(move[2:])
-
-            # adding this here handles en passants
-            if capture:
-                capture_square = chess.parse_square(capture)
-                board_new.ravel()[capture_square] = 0
-            
-            board_new.ravel()[start_square] = 0
-            board_new.ravel()[end_square] = player
+        for square, piece in piece_map.items():
+            row, col = divmod(square, 8)
+            if piece.color == chess.WHITE:
+                board_new[row, col] = 1
+            else:
+                board_new[row, col] = -1
             
         self.current_visboard = board_new
 
@@ -289,6 +248,49 @@ class ChessManager:
             return True
 
         return False
+    
+    def complete_robot_move(self, robot_move):
+        # Move Cases
+        # 1. Direct capture (no en passant)
+        # 2. En passant 
+        # 3. Promotion
+        # 4. Castling
+        # 5. Regular move
+
+        promotion_request = None
+        rook_move = None
+        capture_square = None
+
+        uci_move = chess.Move.from_uci(robot_move)
+        # determine the type of capture
+        if self.pyboard.is_en_passant(uci_move): # en passant
+            start_rank = robot_move[1]
+            end_file = robot_move[2]
+            capture_square = end_file + start_rank
+
+        elif self.pyboard.is_capture(uci_move): # direct capture
+            capture_square = robot_move[2:]
+
+        elif self.pyboard.is_castling(uci_move): # castling
+            rank = robot_move[1]
+            end_file = robot_move[2]
+            if end_file == 'g':
+                rook_move = 'h' + rank + 'f' + rank
+            elif end_file == 'c':
+                rook_move = 'a' + rank + 'd' + rank
+
+        elif robot_move[-1].lower() in ['q','r','b','n']: # promotion
+            promotion_request = robot_move[-1].lower()    
+        else: # regular move
+            pass
+
+        # make that move and update the board representations
+        self.stockfish.make_moves_from_current_position([robot_move])
+        self.pyboard.push_uci(robot_move)
+        self.update_visboard(robot_move, capture=capture_square)
+
+        return robot_move, capture_square, rook_move, promotion_request
+        
 
 def main():
     #define managers
@@ -338,10 +340,15 @@ def main():
         
         ### ROBOT'S TURN ###
         # make the move virtually
-        robot_move, capture_square = chess_manager.compute_robot_move(human_move)
+        robot_move = chess_manager.compute_robot_move()
         
         # make the move physically
-        robot.execute_chess_move(robot_move, capture_square)
+        robot_move, capture_square, rook_move, promotion_request = chess_manager.complete_robot_move(robot_move)
+        robot.execute_chess_move(robot_move, capture_square, rook_move)
+
+        if promotion_request is not None:
+            promote_dict = {'q': 'queen', 'r': 'rook', 'b': 'bishop', 'n': 'knight'}
+            print(f"Please promote the pawn to a {promote_dict[promotion_request]}")
 
         # end the game if the robot won
         if chess_manager.is_game_over():

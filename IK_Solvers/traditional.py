@@ -145,25 +145,26 @@ class MotionPlanner():
 
         return np.hstack((first_moves, second_moves))
 
-    def generate_quintic_path(self, start, goal, cap_sq=None, step=20):
+    def generate_quintic_path(self, start, goal, cap_sq=None, rook_start=None, rook_goal=None, step=20):
         """creates a 3xN array of waypoints to and from home, handling captures and lifting over pieces"""
 
         lift_vector = np.array([[0],[0],[self.LIFT]])
         lift_vector_storage = np.array([[0], [0], [self.LIFT + self.BOARD_HEIGHT]])
+
         if cap_sq is not None:
             storage = np.array(self.storage_coords.pop(0))
-            move1 = self.quintic_line(self.HOME, cap_sq+lift_vector, step)
+            move1 = self.quintic_line(self.HOME, cap_sq+lift_vector, step) # Move above the piece to be captured
             # Gripper medium open
-            move2 = self.quintic_line(cap_sq+lift_vector, cap_sq, step/2)
+            move2 = self.quintic_line(cap_sq+lift_vector, cap_sq, step/2) # Move down to piece
             # Close Gripper
-            move3 = self.quintic_line(cap_sq, cap_sq + lift_vector, step/2)
-            move4 = self.quintic_line(cap_sq + lift_vector, storage + lift_vector_storage, step)
-            move5 = self.quintic_line(storage + lift_vector_storage, storage, step)
+            move3 = self.quintic_line(cap_sq, cap_sq + lift_vector, step/2) # Lift piece
+            move4 = self.quintic_line(cap_sq + lift_vector, storage + lift_vector_storage, step) # Move to storage
+            move5 = self.quintic_line(storage + lift_vector_storage, storage, step) # Place piece in storage
             #Open Gripper
-            move6 = self.quintic_line(storage, storage + lift_vector_storage, step)
-            move7 = self.quintic_line(storage + lift_vector_storage, start + lift_vector, step)
+            move6 = self.quintic_line(storage, storage + lift_vector_storage, step) # Lift gripper
+            move7 = self.quintic_line(storage + lift_vector_storage, start + lift_vector, step) # Move to capturing piece start
             # Gripper medium open
-            move8 = self.quintic_line(start + lift_vector, start, step/2)
+            move8 = self.quintic_line(start + lift_vector, start, step/2) # Move down to capturing piece
 
             first_moves = np.hstack((move1, move2, move3, move4, move5, move6, move7, move8))
 
@@ -182,10 +183,10 @@ class MotionPlanner():
             gripper_commands_move1[0, gripper_open] = 3 # open gripper
             gripper_commands_move1[0, gripper_medium2] = 2 # medium open
 
-        else:
-            move1 = self.quintic_line(self.HOME, start+lift_vector, step)
+        else: # No capture
+            move1 = self.quintic_line(self.HOME, start+lift_vector, step) # Move above the piece being moved
             #gripper medium open
-            move2 = self.quintic_line(start+lift_vector, start, step)
+            move2 = self.quintic_line(start+lift_vector, start, step) # Move down to piece
 
             first_moves = np.hstack((move1, move2))
 
@@ -194,23 +195,56 @@ class MotionPlanner():
             gripper_commands_move1 = np.zeros((1, np.size(move1, 1) + np.size(move2, 1)))
             gripper_commands_move1[0, gripper_medium] = 2
         
-        #Close Gripper
-        move1 = self.quintic_line(start, start+lift_vector, step/2)
-        move2 = self.quintic_line(start+lift_vector, goal+lift_vector, step)
-        move3 = self.quintic_line(goal+lift_vector, goal, step/2)
-        #Open Gripper
-        move4 = self.quintic_line(goal, goal+lift_vector, step/2)
-        move5 = self.quintic_line(goal+lift_vector, self.HOME, step)
-        second_moves = np.hstack((move1, move2, move3, move4, move5))
+        if rook_start is None:
+            #Close Gripper
+            move1 = self.quintic_line(start, start+lift_vector, step/2) # Lift piece
+            move2 = self.quintic_line(start+lift_vector, goal+lift_vector, step) # Move to goal
+            move3 = self.quintic_line(goal+lift_vector, goal, step/2) # Place piece
+            #Open Gripper
+            move4 = self.quintic_line(goal, goal+lift_vector, step/2) # Lift gripper
+            move5 = self.quintic_line(goal+lift_vector, self.HOME, step) # Move to home
+            second_moves = np.hstack((move1, move2, move3, move4, move5))
 
-        gripper_close = 0
-        gripper_open = np.size(move1, 1) + np.size(move2, 1) + np.size(move3, 1)
-        total_moves = gripper_open + np.size(move4, 1) + np.size(move5, 1)
+            gripper_close = 0
+            gripper_open = np.size(move1, 1) + np.size(move2, 1) + np.size(move3, 1)
+            total_moves = gripper_open + np.size(move4, 1)  + np.size(move5, 1)
 
-        gripper_commands_move2 = np.zeros((1, total_moves))
-        gripper_commands_move2[0, gripper_close] = 1
-        gripper_commands_move2[0, gripper_open] = 3
+            gripper_commands_move2 = np.zeros((1, total_moves))
+            gripper_commands_move2[0, gripper_close] = 1
+            gripper_commands_move2[0, gripper_open] = 3
+        else: # normal move and castle
+            #Close Gripper
+            move1 = self.quintic_line(start, start+lift_vector, step/2) # Lift piece
+            move2 = self.quintic_line(start+lift_vector, goal+lift_vector, step) # Move to goal
+            move3 = self.quintic_line(goal+lift_vector, goal, step/2) # Place piece
+            #Open Gripper
+            move4 = self.quintic_line(goal, goal+lift_vector, step/2) # Lift gripper
+            move5 = self.quintic_line(goal+lift_vector, rook_start+lift_vector, step) # Move to rook start
+            # gripper medium open
+            move6 = self.quintic_line(rook_start+lift_vector, rook_start, step/2) # Move down to rook start
+            #Close Gripper
+            move7 = self.quintic_line(rook_start, rook_start+lift_vector, step/2) # Lift rook
+            move8 = self.quintic_line(rook_start+lift_vector, rook_goal+lift_vector, step) # Move rook to goal
+            move9 = self.quintic_line(rook_goal+lift_vector, rook_goal, step/2)
+            #Open Gripper
+            move10 = self.quintic_line(rook_goal, rook_goal+lift_vector, step/2) # Lift gripper
+            move11 = self.quintic_line(rook_goal+lift_vector, self.HOME, step)
+            second_moves = np.hstack((move1, move2, move3, move4, move5))
 
+            gripper_close1 = 0
+            gripper_open1 = np.size(move1, 1) + np.size(move2, 1) + np.size(move3, 1)
+            gripper_medium1 = gripper_open1 + np.size(move4, 1) + np.size(move5, 1)
+            gripper_close2 = gripper_medium1  + np.size(move6, 1)
+            gripper_open2 = gripper_close2 + np.size(move7, 1) + np.size(move8, 1) + np.size(move9, 1)
+            total_moves = gripper_open2 + np.size(move10, 1) + np.size(move11, 1)
+
+            gripper_commands_move2 = np.zeros((1, total_moves))
+            gripper_commands_move2[0, gripper_close1] = 1 # close gripper
+            gripper_commands_move2[0, gripper_open1] = 3 # open gripper
+            gripper_commands_move2[0, gripper_medium1] = 2 # medium open
+            gripper_commands_move2[0, gripper_close2] = 1 # close gripper
+            gripper_commands_move2[0, gripper_open2] = 3 # open gripper
+            
         gripper_commands = np.hstack((gripper_commands_move1, gripper_commands_move2))
 
         return np.hstack((first_moves, second_moves)), gripper_commands
